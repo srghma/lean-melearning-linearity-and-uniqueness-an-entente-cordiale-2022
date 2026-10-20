@@ -1,5 +1,8 @@
 module
-public import Mathlib
+public import Mathlib.Algebra.Ring.Defs
+public import Mathlib.Tactic.DeriveFintype
+public import Mathlib.Data.Fintype.Basic
+public import Mathlib.Order.Basic
 
 /-!
 # The none-one-tons semiring `{0, 1, ω}` (Section 4.1)

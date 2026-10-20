@@ -1,5 +1,7 @@
 module
-public import Mathlib
+public import Mathlib.Data.Fin.Tuple.Basic
+public import Mathlib.Data.Fintype.Defs
+public import Mathlib.Algebra.Ring.Defs
 
 /-!
 # The Linear-Cartesian-Unique (LCU) calculus: syntax
@@ -233,17 +235,17 @@ lemma Ren.up_comp {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) :
   funext i; cases i using Fin.cases <;> rfl
 
 lemma rename_id {n : ℕ} (t : Term n) : rename id t = t := by
-  induction t <;> simp_all [rename, Ren.up_id]
+  induction t <;> simp only [rename, Ren.up_id, id_eq, *]
 
 lemma rename_rename {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) (t : Term n) :
     rename ρ' (rename ρ t) = rename (ρ' ∘ ρ) t := by
-  induction t generalizing m k <;> simp_all [rename, Ren.up_comp]
+  induction t generalizing m k <;> simp only [rename, Ren.up_comp, Function.comp_apply, *]
 
 lemma Subst.up_var {n : ℕ} : Subst.up (var : Fin n → Term n) = var := by
   funext i; cases i using Fin.cases <;> rfl
 
 lemma subst_var {n : ℕ} (t : Term n) : subst var t = t := by
-  induction t <;> simp_all [subst, Subst.up_var]
+  induction t <;> simp only [subst, Subst.up_var, *]
 
 lemma Subst.up_ren {n m : ℕ} (ρ : Fin n → Fin m) :
     Subst.up (var ∘ ρ) = var ∘ Ren.up ρ := by
@@ -251,7 +253,7 @@ lemma Subst.up_ren {n m : ℕ} (ρ : Fin n → Fin m) :
 
 lemma subst_ren {n m : ℕ} (ρ : Fin n → Fin m) (t : Term n) :
     subst (var ∘ ρ) t = rename ρ t := by
-  induction t generalizing m <;> simp_all [subst, rename, Subst.up_ren]
+  induction t generalizing m <;> simp only [subst, rename, Subst.up_ren, Function.comp_apply, *]
 
 lemma Subst.up_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Fin m → Term k) :
     Subst.up (σ ∘ ρ) = Subst.up σ ∘ Ren.up ρ := by
@@ -259,7 +261,7 @@ lemma Subst.up_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Fin m → Term 
 
 lemma subst_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Fin m → Term k) (t : Term n) :
     subst σ (rename ρ t) = subst (σ ∘ ρ) t := by
-  induction t generalizing m k <;> simp_all [subst, rename, Subst.up_rename]
+  induction t generalizing m k <;> simp only [subst, rename, Subst.up_rename, Function.comp_apply, *]
 
 lemma Subst.up_rename' {n m k : ℕ} (σ : Fin n → Term m) (ρ : Fin m → Fin k) :
     Subst.up (rename ρ ∘ σ) = rename (Ren.up ρ) ∘ Subst.up σ := by
@@ -269,7 +271,7 @@ lemma Subst.up_rename' {n m k : ℕ} (σ : Fin n → Term m) (ρ : Fin m → Fin
 
 lemma rename_subst {n m k : ℕ} (σ : Fin n → Term m) (ρ : Fin m → Fin k) (t : Term n) :
     rename ρ (subst σ t) = subst (rename ρ ∘ σ) t := by
-  induction t generalizing m k <;> simp_all [subst, rename, Subst.up_rename']
+  induction t generalizing m k <;> simp only [subst, rename, Subst.up_rename', Function.comp_apply, *]
 
 lemma Subst.up_comp {n m k : ℕ} (σ : Fin n → Term m) (τ : Fin m → Term k) :
     Subst.up (subst τ ∘ σ) = subst (Subst.up τ) ∘ Subst.up σ := by
@@ -280,7 +282,7 @@ lemma Subst.up_comp {n m k : ℕ} (σ : Fin n → Term m) (τ : Fin m → Term k
 
 lemma subst_subst {n m k : ℕ} (σ : Fin n → Term m) (τ : Fin m → Term k) (t : Term n) :
     subst τ (subst σ t) = subst (subst τ ∘ σ) t := by
-  induction t generalizing m k <;> simp_all [subst, Subst.up_comp]
+  induction t generalizing m k <;> simp only [subst, Subst.up_comp, Function.comp_apply, *]
 
 /-- Substituting into a weakened term has no effect. -/
 @[simp] lemma subst1_rename_succ {n : ℕ} (s t : Term n) :
