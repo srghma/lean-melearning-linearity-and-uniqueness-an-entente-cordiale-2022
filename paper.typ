@@ -30,9 +30,14 @@
 #let comprel = $bowtie$
 #let circ = $compose$
 #let le = $<=$
-#let squig = $arrow.zigzag$
-#let bang = $!$
-#let star = $*$
+#let squig = $arrow.squiggly$
+#let bangcol = rgb("1d4ed8")
+#let starcol = rgb("b91c1c")
+#let ucol(x) = text(fill: starcol)[#x]
+#let lcol(x) = text(fill: bangcol)[#x]
+#let bang = lcol($!$)
+#let star = ucol($*$)
+#let mapsto = $scripts(|->)$
 #let dom = math.op("dom")
 #let arrRefs = math.op("arrRefs")
 #let copyop = math.op("copy")
@@ -277,7 +282,7 @@ Given a linear basis, we formalise the idea that we can map from unique to non-u
 
 $
   t &::= x | lambda x. t | t_1 space t_2 | (t_1, t_2) | "let" (x, y) = t_1 "in" t_2 | "unit" | "let unit" = t_1 "in" t_2 \
-    &quad | !t | "let!" x = t_1 "in" t_2 | &t | "copy" t_1 "as" x "in" t_2 | *t quad (upright("terms"))
+    &quad | lcol(!t) | "let!" x = t_1 "in" t_2 | \& t | "copy" t_1 "as" x "in" t_2 | ucol(*t) quad (upright("terms"))
 $
 
 The meaning is explained in the next section with reference to typing.
@@ -287,9 +292,9 @@ The meaning is explained in the next section with reference to typing.
 
 Typing judgments are of the form $Gamma tack t : A$, with types $A$ defined:
 $
-  A, B ::= A lolli B | A tensor B | unitT | !A | *A quad (upright("types"))
+  A, B ::= A lolli B | A tensor B | unitT | lcol(!A) | ucol(*A) quad (upright("types"))
 $
-Thus our type syntax comprises linear function types $A lolli B$, linear multiplicative products $A tensor B$, a linear multiplicative unit $unitT$, the non-linearity modality $!A$ and the uniqueness modality $*A$.
+Thus our type syntax comprises linear function types $A lolli B$, linear multiplicative products $A tensor B$, a linear multiplicative unit $unitT$, the non-linearity modality #lcol[$!A$] and the uniqueness modality #ucol[$*A$].
 
 Typing contexts are defined as follows:
 $
@@ -332,8 +337,8 @@ The non-linear modality $!$ has the following introduction and elimination rules
   #grid(
     columns: (1fr, 1.6fr, 1.1fr),
     align: center,
-    prooftree(rule(name: [$!$I], [$[Gamma] tack t : A$], [$[Gamma] tack !t : !A$])),
-    prooftree(rule(name: [$!$E], [$Gamma_1 tack t_1 : !A$], [$Gamma_2, x : [A] tack t_2 : B$], [$Gamma_1 + Gamma_2 tack "let!" x = t_1 "in" t_2 : B$])),
+    prooftree(rule(name: [$!$I], [$[Gamma] tack t : A$], [$[Gamma] tack lcol(!t : !A)$])),
+    prooftree(rule(name: [$!$E], [$Gamma_1 tack t_1 : lcol(!A)$], [$Gamma_2, x : [A] tack t_2 : B$], [$Gamma_1 + Gamma_2 tack "let!" x = t_1 "in" t_2 : B$])),
     prooftree(rule(name: [der], [$Gamma, x : A tack t : B$], [$Gamma, x : [A] tack t : B$]))
   )
 ]
@@ -346,15 +351,15 @@ So far everything is standard from other linear type systems. We now move to our
   #grid(
     columns: (1.1fr, 1.9fr),
     align: center,
-    prooftree(rule(name: [borrow], [$Gamma tack t : *A$], [$Gamma tack &t : !A$])),
-    prooftree(rule(name: [copy], [$Gamma_1 tack t_1 : !A$], [$Gamma_2, x : *A tack t_2 : !B$], [$Gamma_1 + Gamma_2 tack "copy" t_1 "as" x "in" t_2 : !B$]))
+    prooftree(rule(name: [borrow], [$Gamma tack t : ucol(*A)$], [$Gamma tack \& t : lcol(!A)$])),
+    prooftree(rule(name: [copy], [$Gamma_1 tack t_1 : lcol(!A)$], [$Gamma_2, x : ucol(*A) tack t_2 : lcol(!B)$], [$Gamma_1 + Gamma_2 tack "copy" t_1 "as" x "in" t_2 : lcol(!B)$]))
   )
 ]
 
 The borrow rule maps a unique value to a non-linear value, allowing a uniqueness guarantee to be forgotten. In terms of the operational semantics (see Section 3.4), this causes evaluation of $t$ before the borrow. Next, the copy rule says that a non-linear value of type $A$ can be copied to produce a unique $A$ which is used by $t_2$; the input is required to be non-linear so that we cannot circumvent a linearity restriction by copying a linear value, and the output is required to be non-unique so that we cannot leverage the copy to smuggle out a value which pretends to be truly unique. These rules in turn are accompanied by the ‘necessitation’ rule that says values can be assumed unique as long as they have no dependencies:
 
 #align(center)[
-  #prooftree(rule(name: [nec], [$emptyset tack t : A$], [$[Gamma] tack *t : *A$]))
+  #prooftree(rule(name: [nec], [$emptyset tack t : A$], [$[Gamma] tack ucol(*t : *A)$]))
 ]
 
 The borrow and copy rules in this logic suggest a monad-like relationship between the $!$ and $*$ modalities, with the borrow rule representing the ‘return’ of the monad and the copy rule likewise acting as the ‘bind’. The $*$ modality is not in itself a monad (or indeed, a comonad like $!$); rather, it acts as a functor over which the $!$ modality becomes a _relative monad_ @ref3. A relative monad comprises a functor $J$ and an object mapping $T$, along with an operation $eta : J X -> T X$ and a mapping from $J X -> T Y$ arrows to $T X -> T Y$ with axioms analogous to the monad axioms. Thus, here $J$ is the uniqueness modality $*$ and $T$ the non-linearity modality $!$. If one imagines the dual version of this logic where the basis is unique, the hypothetical linearity modality would act as a functor making the non-uniqueness modality into a relative comonad @ref1 @ref37 in much the same way.
@@ -390,15 +395,15 @@ The borrow and copy rules in this logic suggest a monad-like relationship betwee
         columns: (1fr, 1.2fr, 1.7fr),
         align: center + horizon,
         prooftree(rule(name: [der], [$Gamma, x : A tack t : B$], [$Gamma, x : [A] tack t : B$])),
-        prooftree(rule(name: [$!$I], [$[Gamma] tack t : A$], [$[Gamma] tack !t : !A$])),
-        prooftree(rule(name: [$!$E], [$Gamma_1 tack t_1 : !A$], [$Gamma_2, x : [A] tack t_2 : B$], [$Gamma_1 + Gamma_2 tack "let!" x = t_1 "in" t_2 : B$]))
+        prooftree(rule(name: [$!$I], [$[Gamma] tack t : A$], [$[Gamma] tack lcol(!t : !A)$])),
+        prooftree(rule(name: [$!$E], [$Gamma_1 tack t_1 : lcol(!A)$], [$Gamma_2, x : [A] tack t_2 : B$], [$Gamma_1 + Gamma_2 tack "let!" x = t_1 "in" t_2 : B$]))
       ),
       grid(
         columns: (1fr, 1.6fr, 1fr),
         align: center + horizon,
-        prooftree(rule(name: [borrow], [$Gamma tack t : *A$], [$Gamma tack &t : !A$])),
-        prooftree(rule(name: [copy], [$Gamma_1 tack t_1 : !A$], [$Gamma_2, x : *A tack t_2 : !B$], [$Gamma_1 + Gamma_2 tack "copy" t_1 "as" x "in" t_2 : !B$])),
-        prooftree(rule(name: [nec], [$emptyset tack t : A$], [$[Gamma] tack *t : *A$]))
+        prooftree(rule(name: [borrow], [$Gamma tack t : ucol(*A)$], [$Gamma tack \& t : lcol(!A)$])),
+        prooftree(rule(name: [copy], [$Gamma_1 tack t_1 : lcol(!A)$], [$Gamma_2, x : ucol(*A) tack t_2 : lcol(!B)$], [$Gamma_1 + Gamma_2 tack "copy" t_1 "as" x "in" t_2 : lcol(!B)$])),
+        prooftree(rule(name: [nec], [$emptyset tack t : A$], [$[Gamma] tack ucol(*t : *A)$]))
       )
     )
   ),
@@ -411,13 +416,13 @@ The borrow and copy rules in this logic suggest a monad-like relationship betwee
 
 One way of understanding the meaning of the LCU calculus is to see its equational theory (which we later prove sound against its operational model). The calculus has the standard $beta eta$-equalities for the multiplicative linear $lambda$-calculus fragment, which includes the following $beta eta$ rules for $!$:
 $
-  "let!" x = !t "in" t' &equiv [t / x]t' &quad &(beta!) \
-  "let!" x = t "in" !x &equiv t &quad &(eta!)
+  "let!" x = lcol(!t) "in" t\' &equiv [t \/ x]t\' &quad &(beta!) \
+  "let!" x = t "in" lcol(!x) &equiv t &quad &(eta!)
 $
 along with the following equalities on the uniqueness fragment:
 $
-  "copy" t "as" x "in" &x &equiv t &quad &("unitR") \
-  "copy" &v "as" x "in" t' &equiv [v / x]t' &quad &("unitL") \
+  "copy" t "as" x "in" \& x &equiv t &quad &("unitR") \
+  "copy" \& v "as" x "in" t\' &equiv [v \/ x]t\' &quad &("unitL") \
   "copy" t_1 "as" x "in" ("copy" t_2 "as" y "in" t_3) &equiv "copy" ("copy" t_1 "as" x "in" t_2) "as" y "in" t_3 &quad &("assoc")
 $
 The first axiom states that copying a non-linear $t$ into a unique value $x$ and immediately borrowing it to be non-linear is equivalent to just $t$. The second axiom states that borrowing a unique value $v$ and copying it to a unique $x$ in the scope of $t'$ is the same as just substituting in that $v$ for $x$. The last axiom gives associativity of copying under the side condition that $x$ is free in $t_3$. These equations are exactly the relative monad axioms @ref3, though we specialise (unitL) slightly by restricting to values to account for the reduction semantics.
@@ -462,9 +467,9 @@ We extend the syntax of terms with a value form $a$ representing runtime array r
 
 Heaps are defined as follows akin to a context but containing two kinds of ‘allocations’ for variables $x$ and for array references $a$:
 $
-  H ::= emptyset | H, x |->_r (Gamma tack t : A) | H, a |->_r "arr" quad (upright("heaps"))
+  H ::= emptyset | H, x mapsto_r (Gamma tack t : A) | H, a mapsto_r "arr" quad (upright("heaps"))
 $
-In the case of extending the heap with a variable allocation for $x$, the heap records that $x$ can be used according to $r$ and that it maps to a term $t$, along with its typing which is only present to aid the metatheory. For brevity, we sometimes write $x |->_r t$ instead of $x |->_r (Gamma tack t : A)$ when the typing is not important. In the case of an array reference $a$, the heap records the number of references currently held to it, where $r$ is again used (representing either one reference $1$ or many $omega$), and describes the heap-only array representation term `arr` pointed to by that reference (whose syntax we introduce later along with the relevant rules).
+In the case of extending the heap with a variable allocation for $x$, the heap records that $x$ can be used according to $r$ and that it maps to a term $t$, along with its typing which is only present to aid the metatheory. For brevity, we sometimes write $x mapsto_r t$ instead of $x mapsto_r (Gamma tack t : A)$ when the typing is not important. In the case of an array reference $a$, the heap records the number of references currently held to it, where $r$ is again used (representing either one reference $1$ or many $omega$), and describes the heap-only array representation term `arr` pointed to by that reference (whose syntax we introduce later along with the relevant rules).
 
 Multiple reductions are composed from zero or more single-step reductions, with judgments of the form $H tack t arrow.double H' tack t' | Gamma | Delta$ given by two rules capturing empty reduction sequences and extending a sequence at its head:
 
@@ -489,8 +494,8 @@ In the case of ext the binding contexts are disjoint (since we treat binders as 
 $
   Delta_1 + emptyset = Delta_1 \
   Delta_1 + (Delta_2, x : r) = cases(
-    (Delta_1 + Delta_2), x : r & quad x in.not dom(Delta_1),
-    (Delta_1' + Delta_2), x : omega & quad Delta_1 = Delta_1', x : r'
+    (Delta_1 + Delta_2)"," x : r &quad x in.not dom(Delta_1),
+    (Delta_1' + Delta_2)"," x : omega &quad Delta_1 = Delta_1'"," x : r'
   )
 $
 i.e., if a variable $x$ appears in both usage contexts then in the resulting context $x : omega$ since for the purposes of our counting we are interested in counting $0$ uses (via absence in $Delta$) or $1$ use or many uses ($omega$).
@@ -501,8 +506,8 @@ i.e., if a variable $x$ appears in both usage contexts then in the resulting con
   #grid(
     columns: (1fr, 1.2fr),
     align: center,
-    prooftree(rule(name: [$upright("var")_1$], $H, x |->_1 t tack x squig H tack t | emptyset | x : 1$)),
-    prooftree(rule(name: [$upright("var")_omega$], $H, x |->_omega t tack x squig H, x |->_omega t tack t | emptyset | x : 1$))
+    prooftree(rule(name: [$upright("var")_1$], $H, x mapsto_1 t tack x squig H tack t | emptyset | x : 1$)),
+    prooftree(rule(name: [$upright("var")_omega$], $H, x mapsto_omega t tack x squig H, x mapsto_omega t tack t | emptyset | x : 1$))
   )
 ]
 
@@ -514,7 +519,7 @@ $beta$-reduction is then given as follows:
   #prooftree(rule(
     name: [$beta$],
     [$Gamma tack t' : A$],
-    [$H tack (lambda x. t) space t' squig H, x |->_1 (Gamma tack t' : A) tack t | x : A | emptyset$]
+    [$H tack (lambda x. t) space t' squig H, x mapsto_1 (Gamma tack t' : A) tack t | x : A | emptyset$]
   ))
 ]
 
@@ -536,7 +541,7 @@ We elide the rules for products and unit which follow much the same scheme; one 
   #prooftree(rule(
     name: [$!beta$],
     [$[Gamma] tack t_1 : A$],
-    [$H tack "let!" x = !t_1 "in" t_2 squig H, x |->_omega ([Gamma] tack t_1 : A) tack t_2 | x : [A] | emptyset$]
+    [$H tack "let!" x = !t_1 "in" t_2 squig H, x mapsto_omega ([Gamma] tack t_1 : A) tack t_2 | x : [A] | emptyset$]
   ))
 ]
 
@@ -549,19 +554,19 @@ The more interesting rules are for the uniqueness aspects of the language. Borro
     prooftree(rule(
       name: [$\&$],
       [$H tack t squig H' tack t' | Gamma | Delta$],
-      [$H tack &t squig H' tack &t' | Gamma | Delta$]
+      [$H tack \& t squig H' tack \& t\' | Gamma | Delta$]
     )),
     prooftree(rule(
       name: [$\&beta$],
       [$dom(H) equiv arrRefs(v)$],
-      [$H, H' tack &(*v) squig ([H]_omega), H' tack !v | emptyset | emptyset$]
+      [$H, H' tack \& ucol(*v) squig [H]_omega, H' tack lcol(!v) | emptyset | emptyset$]
     ))
   )
 ]
 
 The action is in the right-hand rule here, where the incoming heap is split into two parts, where $H$ is such that it provides the allocations for all array references in $v$ (enforced by the premise here). The unique value $*v$ is wrapped to be non-linear in the result $!v$ and thus all of its array references are now marked as ‘many’ via $[H]_omega$ which replaces all reference counts with $omega$, e.g.:
 $
-  H', a |->_1 "arr" tack &(*a) squig H', a |->_omega "arr" tack !a | emptyset | emptyset
+  H', a mapsto_1 "arr" tack \& ucol(*a) squig H', a mapsto_omega "arr" tack lcol(!a) | emptyset | emptyset
 $
 Thus, borrowing enacts the idea that a reference is no longer unique and may be used many times (and hence now is a non-linear value). Copying then has three reductions; a congruence (elided), a reduction which forces evaluation under the non-linear modality, and a $beta$-reduction to enact copying to a unique value:
 
@@ -571,14 +576,14 @@ Thus, borrowing enacts the idea that a reference is no longer unique and may be 
     prooftree(rule(
       name: [$"copy"_!$],
       [$H tack t squig H' tack t' | Gamma | Delta$],
-      [$H tack "copy" !t "as" x "in" t_2 squig H' tack "copy" !t' "as" x "in" t_2 | Gamma | Delta$]
+      [$H tack "copy" lcol(!t) "as" x "in" t_2 squig H' tack "copy" lcol(!t\') "as" x "in" t_2 | Gamma | Delta$]
     )),
     prooftree(rule(
       name: [$"copy"_beta$],
       [$Gamma tack v : A$],
       [$dom(H') equiv arrRefs(v)$],
       [$(H'', theta) equiv copyop(H')$],
-      [$H, H' tack "copy" !v "as" x "in" t squig H, H', H'', x |->_1 (Gamma tack *theta(v) : *A) tack t | x : *A | emptyset$]
+      [$H, H' tack "copy" !v "as" x "in" t squig H, H', H'', x mapsto_1 (Gamma tack *theta(v) : *A) tack t | x : *A | emptyset$]
     ))
   )
 ]
@@ -589,20 +594,14 @@ Lastly, the semantics of the array primitives uses an array representation on th
 
 #align(center)[
   #stack(
-    spacing: 1em,
+    spacing: 0.8em,
     prooftree(rule(
       [$a \# H$],
-      [$H tack "newArray" space n squig H, a |->_1 "arr" tack *a | emptyset | emptyset$]
+      [$H tack "newArray" space n squig H, a mapsto_1 "arr" tack ucol(*a) | emptyset | emptyset$]
     )),
-    prooftree(rule(
-      $H, a |->_r ("arr"[i] = v) tack "readArray" space (*a) space i squig H, a |->_r ("arr"[i] = v) tack (v, *a) | emptyset | emptyset$
-    )),
-    prooftree(rule(
-      $H, a |->_r "arr" tack "writeArray" space (*a) space i space v squig H, a |->_r ("arr"[i] = v) tack *a | emptyset | emptyset$
-    )),
-    prooftree(rule(
-      $H, a |->_r "arr" tack "deleteArray" space (*a) squig H tack "unit" | emptyset | emptyset$
-    ))
+    $H, a mapsto_r ("arr"[i] = v) tack "readArray" space ucol((*a)) space i squig H, a mapsto_r ("arr"[i] = v) tack (v, ucol(*a)) | emptyset | emptyset$,
+    $H, a mapsto_r "arr" tack "writeArray" space ucol((*a)) space i space v squig H, a mapsto_r ("arr"[i] = v) tack ucol(*a) | emptyset | emptyset$,
+    $H, a mapsto_r "arr" tack "deleteArray" space ucol((*a)) squig H tack "unit" | emptyset | emptyset$
   )
 ]
 
@@ -614,11 +613,11 @@ Thus `newArray` creates a fresh array reference $a$ and allocates a new array on
 Proofs of all the statements that follow are provided in the appendix @ref28. We first establish some key results showing the admissibility of substitution and weakening, which are leveraged in later proofs:
 
 #block(stroke: (left: 2pt + rgb("94a3b8")), inset: (left: 0.8em))[
-  *Lemma 1 (Linear substitution).* _If $Gamma' tack t' : A$ and $Gamma, x : A tack t : B$ then $Gamma' + Gamma tack [t' / x]t : B$._
+  *Lemma 1 (Linear substitution).* _If $Gamma' tack t' : A$ and $Gamma, x : A tack t : B$ then $Gamma' + Gamma tack [t\' \/ x]t : B$._
 ]
 
 #block(stroke: (left: 2pt + rgb("94a3b8")), inset: (left: 0.8em))[
-  *Lemma 2 (Non-linear substitution).* _If $[Gamma'] tack t' : A$ and $Gamma, x : [A] tack t : B$ then $[Gamma'] + Gamma tack [t' / x]t : B$._
+  *Lemma 2 (Non-linear substitution).* _If $[Gamma'] tack t' : A$ and $Gamma, x : [A] tack t : B$ then $[Gamma'] + Gamma tack [t\' \/ x]t : B$._
 ]
 
 #block(stroke: (left: 2pt + rgb("94a3b8")), inset: (left: 0.8em))[
@@ -637,14 +636,14 @@ Next, the heap model allows us to establish the key properties of well-typed pro
       prooftree(rule(
         name: [Ref],
         [$H comprel Gamma$],
-        [$H, a |->_r "arr" comprel Gamma, a : "Array" A$]
+        [$H, a mapsto_r "arr" comprel Gamma, a : "Array" A$]
       )),
       prooftree(rule(
         name: [Lin],
         [$H comprel (Gamma_1 + Gamma_2)$],
         [$Gamma_2 tack t : A$],
         [$x in.not dom(H)$],
-        [$(H, x |->_r (Gamma_2 tack t : A)) comprel (Gamma_1, x : A)$]
+        [$(H, x mapsto_r (Gamma_2 tack t : A)) comprel (Gamma_1, x : A)$]
       ))
     )
   ]
@@ -658,7 +657,7 @@ Next, the heap model allows us to establish the key properties of well-typed pro
         [$H comprel (Gamma_1 + [Gamma_2])$],
         [$[Gamma_2] tack t : A$],
         [$x in.not dom(H)$],
-        [$(H, x |->_omega ([Gamma_2] tack t : A)) comprel (Gamma_1, x : [A])$]
+        [$(H, x mapsto_omega ([Gamma_2] tack t : A)) comprel (Gamma_1, x : [A])$]
       ))
     )
   ]
@@ -672,7 +671,7 @@ From a heap (and likewise from a typing context) we can also extract usage infor
   *Definition 4 (Usage context extraction).* _For a context $Gamma$ or heap $H$ we can extract usage information denoted $over(Gamma)$ or $over(H)$ defined as:_
   $
     over(emptyset) &= emptyset &quad over((Gamma, x : [A])) &= over(Gamma), x : omega &quad over((Gamma, a : A)) &= over(Gamma) &quad over((Gamma, x : A)) &= over(Gamma), x : 1 \
-    over(emptyset) &= emptyset &quad over((H, x |->_r (Gamma tack t : A))) &= over(H), x : r &quad over((H, a |->_r t)) &= over(H)
+    over(emptyset) &= emptyset &quad over((H, x mapsto_r (Gamma tack t : A))) &= over(H), x : r &quad over((H, a mapsto_r t)) &= over(H)
   $
 ]
 
@@ -690,9 +689,9 @@ The first conjunct is regular type preservation, linked with heap compatibility 
 We then establish that all heap references have only one reference to them at the end of execution.
 
 #block(stroke: (left: 2pt + rgb("94a3b8")), inset: (left: 0.8em))[
-  *Theorem 5 (Uniqueness).* _For a well-typed term $Gamma tack t : *A$ and all $Gamma_0$ and $H$ such that $H comprel (Gamma_0 + Gamma)$ and given a multi-reduction to a value $H tack t arrow.double H' tack *v | Gamma' | Delta$, for all $a in arrRefs(v)$ (array references in $v$) we have:_
+  *Theorem 5 (Uniqueness).* _For a well-typed term $Gamma tack t : ucol(*A)$ and all $Gamma_0$ and $H$ such that $H comprel (Gamma_0 + Gamma)$ and given a multi-reduction to a value $H tack t arrow.double H' tack *v | Gamma' | Delta$, for all $a in arrRefs(v)$ (array references in $v$) we have:_
   $
-    a |->_1 t' in H ==> exists t''. a |->_1 t'' in H' quad and quad a in.not dom(H) ==> exists t''. a |->_1 t'' in H'
+    a mapsto_1 t' in H ==> exists t''. a mapsto_1 t'' in H' quad and quad a in.not dom(H) ==> exists t''. a mapsto_1 t'' in H'
   $
   _i.e., any array references contributing to the final term that are unique in the incoming heap stay unique in the resulting term, and any new array references contributing to the final term are also unique._
 ]
@@ -757,62 +756,64 @@ Here, borrowing (`&`) converts the unique `Coffee` value into an unrestricted on
 Figure 2 illustrates the relationship between uniqueness, linearity and other common forms of substructural typing in the resulting system.
 
 #figure(
-  block(
-    width: 100%,
-    stroke: rgb("94a3b8"),
-    inset: 1.2em,
-    radius: 4pt,
-    fill: rgb("fafafa"),
-    align(center)[
-      #grid(
-        columns: (1.2fr, 2.2fr, 1.8fr, 1.8fr, 1fr),
-        align: center + horizon,
-        gutter: 0.5em,
-        [
-          #block(stroke: 0.5pt, inset: 6pt, radius: 2pt, fill: white)[
-            *Unique*\
-            #text(size: 8pt)[$*a$]
-          ]
-        ],
-        [
-          $limits(-->)^("forget guarantee")_("of no contraction")$
-        ],
-        [
-          #block(stroke: 0.5pt, inset: 6pt, radius: 2pt, fill: white)[
-            *Unrestricted*\
-            #text(size: 8pt)[(non-linear)\ (non-unique)\ $a [0..infinity]$\ $a ["Many"]$\ $!a$]
-          ]
-        ],
-        [
-          #stack(
-            spacing: 1.2em,
-            [
-              $limits(arrow.tr)^("restrict")_("contraction")$
-              #block(stroke: 0.5pt, inset: 4pt, radius: 2pt, fill: white)[
-                *Affine*\
-                #text(size: 8pt)[$a [0..1]$]
-              ]
-              $limits(arrow.br)^("restrict")_("weakening")$
-            ],
-            [
-              $limits(arrow.br)^("restrict")_("weakening")$
-              #block(stroke: 0.5pt, inset: 4pt, radius: 2pt, fill: white)[
-                *Relevant*\
-                #text(size: 8pt)[$a [1..infinity]$]
-              ]
-              $limits(arrow.tr)^("restrict")_("contraction")$
-            ]
-          )
-        ],
-        [
-          #block(stroke: 0.5pt, inset: 6pt, radius: 2pt, fill: white)[
-            *Linear*\
-            #text(size: 8pt)[$a [1]$\ $a$]
-          ]
-        ]
-      )
-    ]
-  ),
+  align(center)[
+    #let fbox(body) = rect(
+      stroke: 0.6pt + luma(80),
+      inset: (x: 8pt, y: 6pt),
+      radius: 0pt,
+      fill: white,
+      align(center, body)
+    )
+    #grid(
+      columns: (auto, auto, auto, auto, auto, auto, auto),
+      rows: (auto, auto, auto),
+      align: (center + horizon),
+      gutter: 0.5em,
+
+      // Row 1 (top): Affine branch
+      [], [], [],
+      align(bottom)[#text(size: 7pt)[restrict contraction] #v(-2pt) $arrow.tr$],
+      fbox[
+        *Affine*\
+        #text(size: 8pt)[$a [0..1]$]
+      ],
+      align(bottom)[#text(size: 7pt)[restrict weakening] #v(-2pt) $arrow.br$],
+      [],
+
+      // Row 2 (middle): Unique -> Unrestricted ... Linear
+      fbox[
+        *Unique*\
+        #text(size: 8.5pt)[#ucol($*a$)]
+      ],
+      [
+        #text(size: 7pt)[forget guarantee] #v(-2pt)
+        $limits(-->)^( )$ #v(-2pt)
+        #text(size: 7pt)[of no contraction]
+      ],
+      fbox[
+        *Unrestricted*\
+        #text(size: 7.5pt)[(non-linear) (non-unique)]\
+        #text(size: 8pt)[$a [0..infinity]$]\
+        #text(size: 8pt)[$a ["Many"] quad #lcol($!a$)$]
+      ],
+      [], [], [],
+      fbox[
+        *Linear*\
+        #text(size: 8pt)[$a [1]$]\
+        #text(size: 8pt)[$a$]
+      ],
+
+      // Row 3 (bottom): Relevant branch
+      [], [], [],
+      align(top)[$arrow.br$ #v(-2pt) #text(size: 7pt)[restrict weakening]],
+      fbox[
+        *Relevant*\
+        #text(size: 8pt)[$a [1..infinity]$]
+      ],
+      align(top)[$arrow.tr$ #v(-2pt) #text(size: 7pt)[restrict contraction]],
+      []
+    )
+  ],
   caption: [Relationship between various flavours of substructural types demonstrating how they can all be represented using Granule’s expressive modalities.],
 )
 <fig:substructural-relationships>
@@ -870,11 +871,11 @@ As mentioned in Section 1, one motivation for using uniqueness types is to do th
             align: (left, right, right),
             stroke: 0.5pt + rgb("cbd5e1"),
             [Iterations], [Unique (ms)], [Non-unique (ms)],
-            [100], [~20], [~120],
-            [200], [~40], [~250],
-            [300], [~60], [~390],
-            [400], [~80], [~530],
-            [500], [~105], [~680]
+            [100], [20], [120],
+            [200], [40], [250],
+            [300], [60], [390],
+            [400], [80], [530],
+            [500], [105], [680]
           )
         ],
         [
@@ -886,11 +887,11 @@ As mentioned in Section 1, one motivation for using uniqueness types is to do th
             align: (left, right, right),
             stroke: 0.5pt + rgb("cbd5e1"),
             [Iterations], [Unique (ms)], [Non-unique (ms)],
-            [100], [< 5], [~30],
-            [200], [< 8], [~70],
-            [300], [< 12], [~115],
-            [400], [< 18], [~155],
-            [500], [< 24], [~200]
+            [100], [< 5], [30],
+            [200], [< 8], [70],
+            [300], [< 12], [115],
+            [400], [< 18], [155],
+            [500], [< 24], [200]
           )
         ]
       ),
