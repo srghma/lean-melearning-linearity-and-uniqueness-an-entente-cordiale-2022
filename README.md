@@ -30,6 +30,11 @@ Context addition (Definition 2) and `[Γ]` (Definition 1) are defined pointwise.
 | `Counter*.lean` | formal disproofs of these four statements (see below) |
 | `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
 | `CbnExamples.lean` | the progress and conservation counterexamples reduce to values under `CbnStep` |
+| `CbnNormalization.lean` | termination of `CbnStep` evaluation on well-typed closed terms (logical relation) |
+| `KeyIdeas.lean` | the examples of Section 2 (impossible/possible cake and coffee programs, `sip`, dereliction, borrowing, `uniqueReturn`/`uniqueBind`) |
+| `RefShift.lean` | renaming of array references (for `copy_β`) and weakening into larger non-linear contexts |
+| `ArraySemantics.lean` | a store-based semantics with mutable arrays, `AStep`, with subject reduction, progress and type safety |
+| `ArrayExamples.lean` | an example run: `readArray (writeArray (newArray 3) 0 x) 0` evaluates to `(x, *a)` |
 | `Granule.lean` | the `{0, 1, ω}` semiring of §4.1: a commutative semiring and partial order with monotone `+` and `*` |
 
 ## Reconstruction choices
@@ -79,3 +84,56 @@ array references are non-linear (for example closed terms in the empty context),
 
 The restriction to terms with no free variables is needed. `not_cbnStep_preserves_open`
 shows that with `x : [1]`, the term `copy !x as y in &y : !1` steps to the untypable `&(*x)`.
+
+## Termination of call-by-name evaluation
+
+`CbnNormalization.lean` proves that `CbnStep` evaluation terminates. It uses a unary
+logical relation `Reducible A t`, and the fundamental lemma `HasTypeD.reducible`.
+
+* `cbn_normalization`: every well-typed closed term without array primitives reduces
+  to a value;
+* `cbn_eval`: the value has the same type (in a context whose array references are
+  non-linear);
+* `cbn_value_unique`: the value is unique.
+
+## The examples of Section 2
+
+`KeyIdeas.lean` checks the typing claims of the paper's Key Ideas section in LCU. The
+types `Cake`, `Happy`, `Coffee` and `Awake` are arbitrary. The functions `eat`, `have`,
+`drink` and `keep` are free non-linear variables.
+
+* `not_hasType_lam_pair_dup`: `λx. (t₁, t₂)` is ill-typed whenever `x` occurs in both
+  `t₁` and `t₂`. As instances, `impossible_cake` (`λc. (eat c, have c)`) and
+  `impossible_coffee` (`λc. (drink c, keep c)`) are ill-typed at every type.
+* `possible_cake`: `λlots. let! cake = lots in (eat cake, have cake) : !Cake ⊸ Happy ⊗ Cake`.
+* `sip_hasType`: `λfresh. let! coffee = &fresh in (keep coffee, drink coffee) : *Coffee ⊸ Coffee ⊗ Awake`.
+* `derelict_hasType` (`!A ⊸ A`), `uniqueReturn_hasType` (`*A ⊸ !A`),
+  `unique_to_linear_hasType` (`*A ⊸ A`), `bang_contract_hasType` (`!A ⊸ !A ⊗ !A`),
+  `bang_weaken_hasType` (`!A ⊸ 1`) and `uniqueBind_hasType` (`(*A ⊸ !B) ⊸ !A ⊸ !B`).
+
+## Mutable arrays: a store-based semantics with type safety
+
+`ArraySemantics.lean` extends the call-by-name semantics with a store of mutable float
+arrays. The reduction `σ ⊢ t ⟶ σ' ⊢ t'` (`AStep`) uses these rules:
+
+* `newArray k` allocates a fresh array;
+* `readArray (*a) k` reads from the store;
+* `writeArray (*a) k x` updates the store destructively;
+* `copy !u as x in t ⟶ [*θ(u)/x]t` copies every array referenced by `u` to a fresh
+  reference (`θ(a) = N + a`), as in the paper's `copy_β`;
+* arguments of primitives are evaluated, including under `*`.
+
+Configurations are typed by a context `Γ` compatible with the store (`ConfOK`): no
+variable assumptions, non-linear array references, and every typed reference allocated.
+The results are:
+
+* `AStep.preserves`: subject reduction. The context may grow, for example by fresh
+  arrays.
+* `astep_progress`: progress for all terms, including array primitives.
+* `array_type_safety`: a well-typed closed program, run from the empty store, never
+  gets stuck.
+* `writeReadProg_hasType` and `writeReadProg_eval`: an example program is well-typed,
+  and its read sees the preceding destructive write.
+
+**Caveat.** In this semantics `deleteArray` does not free memory. Safe deallocation
+needs the uniqueness guarantee (Theorem 5), and this semantics does not prove it.

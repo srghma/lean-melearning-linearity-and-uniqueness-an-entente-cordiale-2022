@@ -1,21 +1,33 @@
-# Summary of changes for run 268ad72a-0149-4d34-82a5-d4f99ce1077f
-I continued the formalisation with a positive type-safety result for LCU. In the earlier run, Theorems 4–7 turned out to be false for the heap model as written in the text. This run adds a repaired operational semantics and proves syntactic type safety for it. The whole project builds with no `sorry`, and the only axioms used are `propext`, `Classical.choice` and `Quot.sound`. Terms still use de Bruijn indices, with `Term 0` for closed terms.
+# Summary of changes for run c97d04f3-a3b0-4e76-a25f-be874e7a9d1a
+I added four results to the formalisation, in five new files under `RequestProject/LCU/`. The whole project builds with no `sorry`, and the only axioms used are `propext`, `Classical.choice` and `Quot.sound`. Terms still use de Bruijn indices, with `Term 0` for closed terms.
 
-**New file `RequestProject/LCU/CbnSemantics.lean`.** `CbnStep` is a call-by-name reduction (the same strategy as the paper's heap model) for the fragment without arrays. It follows the heap rules but substitutes instead of allocating heap bindings:
-- \((\lambda x.t)\,u \to [u/x]t\) and the β-rules for \(\otimes\), \(1\) and \(!\);
-- `&(*t) ⟶ !t` for any `t`, not only values. This fixes the progress counterexample;
-- `copy !u as x in t ⟶ [*u/x]t`;
-- congruence rules in the position each elimination form evaluates.
+**1. Evaluation terminates (`CbnNormalization.lean`).** This applies to the call-by-name semantics from the previous run, for terms without array primitives. The paper doesn't state this result.
+- `cbn_normalization`: every closed term that has a type reduces to a value.
+- `cbn_eval`: that value has the same type, given non-linear array references in the context.
+- `cbn_value_unique`: the value is unique.
 
-The theorems below hold for terms with no free variables whose runtime array references are non-linear (for example closed terms in the empty context):
-- **Subject reduction:** `CbnStep.preserves` and `CbnSteps.preserves`.
-- **Progress** for terms with no array primitives: `cbn_progress`. A well-typed term is either a value in the paper's sense or can take a step. Array primitives are excluded because they need a heap to reduce.
-- **Type safety for closed terms:** `cbn_type_safety`. Every reduct keeps its type and is either a value or can step again.
-- **Values don't step, and reduction is deterministic:** `IsValue.not_cbnStep` and `CbnStep.deterministic`.
-- **The no-free-variables restriction is needed:** `not_cbnStep_preserves_open`. With `x : [1]`, the term `copy !x as y in &y : !1` steps to `&(*x)`, which has no type because `nec` forbids variable assumptions.
+**2. The examples from Section 2 (`KeyIdeas.lean`).** `Cake`, `Coffee` and the other types are arbitrary, and `eat`, `have`, `drink` and `keep` are free non-linear variables.
+- `not_hasType_lam_pair_dup`: `λx. (t₁, t₂)` has no type if `x` occurs in both parts. So `λc. (eat c, have c)` (`impossible_cake`) and `λc. (drink c, keep c)` (`impossible_coffee`) are ill-typed at every type.
+- These have the expected types:
+  - `possible_cake`: `λlots. let! cake = lots in (eat cake, have cake) : !Cake ⊸ Happy ⊗ Cake`;
+  - `sip_hasType`: `λfresh. let! coffee = &fresh in (keep coffee, drink coffee) : *Coffee ⊸ Coffee ⊗ Awake`;
+  - dereliction `!A ⊸ A`, `*A ⊸ A`, and contraction and weakening for `!`;
+  - Granule's `uniqueReturn : *A ⊸ !A` and `uniqueBind : (*A ⊸ !B) ⊸ !A ⊸ !B`.
 
-**New file `RequestProject/LCU/CbnExamples.lean`.** The two earlier counterexample terms behave well under the new semantics. `&(*((λz.z) unit))` takes a step, and `copy !((λz.z) unit) as x in &x` reduces to the value `!((λz.z) unit)` of type `!1`.
+**3. Type safety with mutable arrays (`ArraySemantics.lean`, `RefShift.lean`).** I added a semantics `AStep` with a store of float arrays, following the paper's array rules:
+- `newArray` allocates a fresh array, `readArray` reads it, and `writeArray` updates it in place;
+- `copy` copies every array the copied value refers to, giving the copies fresh references;
+- primitive arguments are evaluated, including under `*`.
 
-**Caveat:** this is a repaired semantics that I designed, not the paper's heap model. It does not track usage or uniqueness, so it does not rescue Theorems 4–7 themselves.
+Results:
+- `AStep.preserves`: each step keeps the type (the typing context may gain fresh arrays).
+- `astep_progress`: a term with a type is a value or can step. This now includes the array primitives.
+- `array_type_safety`: a closed program that has a type, run from the empty store, never gets stuck.
 
-`README.md` now describes the new files, and the new definition and theorems are in the Properties table, all marked proved. `ARISTOTLE_SUMMARY.md` was left unchanged.
+**4. An example run (`ArrayExamples.lean`).** For any float `x`, `readArray (writeArray (newArray 3) 0 x) 0` has a type and evaluates to `(x, *a)`, so the read sees the write.
+
+**Limitations.**
+- In the array semantics, `deleteArray` does not free memory. Freeing safely needs the uniqueness guarantee (Theorem 5), which I did not prove. Array references are treated as non-linear throughout.
+- These are repaired semantics I designed, not the paper's heap model. The literal Theorems 4–7 remain disproved, as in the previous run.
+
+`README.md` describes the new files. The new definition and theorems are in the Properties table, and the theorems are marked proved. `ARISTOTLE_SUMMARY.md` is unchanged.
