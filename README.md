@@ -28,6 +28,8 @@ Context addition (Definition 2) and `[Γ]` (Definition 1) are defined pointwise.
 | `Heap.lean` | the heap model (§3.4): heaps, single-step reduction `Step`, multi-step `Steps`, full β-reduction, compatibility `Compat` (**Definition 3**) |
 | `Metatheory.lean` | **Theorems 4–7** stated literally as propositions `Conservation`, `Uniqueness`, `Progress`, `EqSoundness` |
 | `Counter*.lean` | formal disproofs of these four statements (see below) |
+| `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
+| `CbnExamples.lean` | the progress and conservation counterexamples reduce to values under `CbnStep` |
 | `Granule.lean` | the `{0, 1, ω}` semiring of §4.1: a commutative semiring and partial order with monotone `+` and `*` |
 
 ## Reconstruction choices
@@ -58,3 +60,22 @@ each negation in Lean:
 
 These counterexamples point to gaps or imprecision in the rules as written in the
 provided text. They do not necessarily apply to the full rule set in the paper's appendix.
+
+## A repaired call-by-name semantics with type safety
+
+`CbnSemantics.lean` gives a substitution-based call-by-name reduction `CbnStep`. It
+follows the heap rules, but substitutes instead of allocating heap bindings:
+`(λx.t) u ⟶ [u/x]t`, `let (x,y) = (t₁,t₂) in t ⟶ [t₁/x,t₂/y]t`, `let unit = unit in t ⟶ t`,
+`let! x = !u in t ⟶ [u/x]t`, `&(*t) ⟶ !t` (for any `t`, not only values) and
+`copy !u as x in t ⟶ [*u/x]t`, plus congruence rules for the eliminated position of
+each elimination form. For terms with no free variables, in contexts whose runtime
+array references are non-linear (for example closed terms in the empty context), we prove:
+
+* subject reduction: `CbnStep.preserves` and `CbnSteps.preserves`;
+* progress for terms with no array primitives: `cbn_progress`;
+* syntactic type safety for closed terms: `cbn_type_safety`;
+* values are normal forms (`IsValue.not_cbnStep`), and the reduction is deterministic
+  (`CbnStep.deterministic`).
+
+The restriction to terms with no free variables is needed. `not_cbnStep_preserves_open`
+shows that with `x : [1]`, the term `copy !x as y in &y : !1` steps to the untypable `&(*x)`.

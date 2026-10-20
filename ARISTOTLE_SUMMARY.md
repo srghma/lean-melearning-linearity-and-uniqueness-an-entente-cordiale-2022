@@ -1,22 +1,21 @@
-# Summary of changes for run 519ff1b3-d28a-43a2-846f-cf92c732c074
-I formalised the LCU calculus from `paper.typ` in Lean 4 with Mathlib. Read literally against the rules in the provided text, all four of the paper's main metatheorems (Theorems 4–7) are false, and I proved each negation in Lean. The project builds with no `sorry`; the only axioms used are `propext`, `Classical.choice` and `Quot.sound`. Everything is in `RequestProject/LCU/` (namespace `LCU`), and `README.md` gives an overview.
+# Summary of changes for run 268ad72a-0149-4d34-82a5-d4f99ce1077f
+I continued the formalisation with a positive type-safety result for LCU. In the earlier run, Theorems 4–7 turned out to be false for the heap model as written in the text. This run adds a repaired operational semantics and proves syntactic type safety for it. The whole project builds with no `sorry`, and the only axioms used are `propext`, `Classical.choice` and `Quot.sound`. Terms still use de Bruijn indices, with `Term 0` for closed terms.
 
-**Representation (as you asked):** terms use de Bruijn indices with no named variables. `Term n` has `Term.var : Fin n → Term n`, so `Term 0` is the type of closed terms. Contexts give each variable a linear \(x : A\), non-linear \(x : [A]\), or no hypothesis, and context addition is defined pointwise.
+**New file `RequestProject/LCU/CbnSemantics.lean`.** `CbnStep` is a call-by-name reduction (the same strategy as the paper's heap model) for the fragment without arrays. It follows the heap rules but substitutes instead of allocating heap bindings:
+- \((\lambda x.t)\,u \to [u/x]t\) and the β-rules for \(\otimes\), \(1\) and \(!\);
+- `&(*t) ⟶ !t` for any `t`, not only values. This fixes the progress counterexample;
+- `copy !u as x in t ⟶ [*u/x]t`;
+- congruence rules in the position each elimination form evaluates.
 
-**Proved:**
-- **Syntax and typing:** renaming and substitution (`Syntax.lean`), and the typing rules of Figure 1 plus the array primitives (`Typing.lean`). `TypingD.lean` gives an equivalent system without a separate dereliction rule.
-- **Lemma 1** (linear substitution) and **Lemma 2** (non-linear substitution) in `Substitution.lean`; **Lemma 3** (weakening) in `Weakening.lean`.
-- **Equational theory** (`Equational.lean`): every axiom preserves typing left to right, and the axioms that don't involve substitution also preserve it right to left.
-- **Section 4's \(\{0,1,\omega\}\) semiring** (`Granule.lean`): it is a commutative semiring, the order \(0 \sqsubseteq \omega\), \(1 \sqsubseteq \omega\) is a partial order, and \(+\) and \(\times\) are monotone.
+The theorems below hold for terms with no free variables whose runtime array references are non-linear (for example closed terms in the empty context):
+- **Subject reduction:** `CbnStep.preserves` and `CbnSteps.preserves`.
+- **Progress** for terms with no array primitives: `cbn_progress`. A well-typed term is either a value in the paper's sense or can take a step. Array primitives are excluded because they need a heap to reduce.
+- **Type safety for closed terms:** `cbn_type_safety`. Every reduct keeps its type and is either a value or can step again.
+- **Values don't step, and reduction is deterministic:** `IsValue.not_cbnStep` and `CbnStep.deterministic`.
+- **The no-free-variables restriction is needed:** `not_cbnStep_preserves_open`. With `x : [1]`, the term `copy !x as y in &y : !1` steps to `&(*x)`, which has no type because `nec` forbids variable assumptions.
 
-**Heap model** (`Heap.lean`): heaps, single-step and multi-step reduction, full β-reduction, and heap–context compatibility (Definition 3). `Metatheory.lean` states Theorems 4–7 exactly as written in the paper.
+**New file `RequestProject/LCU/CbnExamples.lean`.** The two earlier counterexample terms behave well under the new semantics. `&(*((λz.z) unit))` takes a step, and `copy !((λz.z) unit) as x in &x` reduces to the value `!((λz.z) unit)` of type `!1`.
 
-**Theorems 4–7 are false as written:**
-- **Theorem 4 (Conservation)**, `not_conservation`: `copy !((λz.z) unit) as x in &x : !1` steps to a term that has no valid typing.
-- **Theorem 5 (Uniqueness)**, `not_uniqueness`: `let! z = (copy !(newArray 1) as x in &x) in z` ends with a fresh array that is not uniquely owned.
-- **Theorem 6 (Progress)**, `not_progress`: `&(*((λz.z) unit))` is well-typed, not a value, and stuck.
-- **Theorem 7 (Equational soundness)**, `not_eqSoundness`: the two sides of the η! instance `let! x = !unit in !x ≡ !unit` can never reach the same final heap.
+**Caveat:** this is a repaired semantics that I designed, not the paper's heap model. It does not track usage or uniqueness, so it does not rescue Theorems 4–7 themselves.
 
-**Caveat:** the provided text leaves out some rules, including the runtime typing rule for array references (which is in the paper's appendix) and some heap-model rules. I reconstructed these; the choices are documented in `Typing.lean`, `Heap.lean` and the README. So the counterexamples refute the theorems for the rules as given in the text plus these reconstructions, not necessarily for the full rule set in the appendix. The progress counterexample in particular relies on the text having no rule that reduces under `*`.
-
-The Properties table lists all of these results with their final status.
+`README.md` now describes the new files, and the new definition and theorems are in the Properties table, all marked proved. `ARISTOTLE_SUMMARY.md` was left unchanged.
