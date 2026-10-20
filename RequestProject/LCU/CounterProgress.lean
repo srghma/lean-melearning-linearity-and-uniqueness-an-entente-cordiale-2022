@@ -35,15 +35,14 @@ lemma prog_typed : HasType Ctx.empty prog (.bang .unit) := by
   exact .app (.abs (HasTypeD.var_zero_single (.lin .unit))) (.unitI Ctx.AllNonLin.empty)
     (Ctx.Add.empty_left _)
 
-lemma prog_not_value : ¬ IsValue prog := by
-  intro h; cases h
+lemma prog_not_value : ¬ IsValue prog := not_isValue_borrow _
 
 lemma prog_stuck {m : ℕ} (H : Heap 0) (H' : Heap m) (t' : Term m) (Γ : BCtx m) (Δ : UCtx m) :
     ¬ Step H prog H' t' Γ Δ := by
   intro h
   cases h with
   | borrow h => cases h
-  | betaBorrow hv _ => cases hv
+  | betaBorrow hv _ => exact not_isValue_app_lam _ _ hv
 
 end ProgressCounterexample
 

@@ -45,8 +45,20 @@ inductive Usage where
   | omega
   deriving DecidableEq, Repr
 
-/-- The preorder `1 ≤ ω`. -/
-instance : LE Usage := ⟨fun r s => r = .one ∨ s = .omega⟩
+/-- The order `1 ≤ ω` (a partial order: `1 ≤ 1`, `1 ≤ ω`, `ω ≤ ω`, but not `ω ≤ 1`). -/
+instance : PartialOrder Usage where
+  le r s := r = .one ∨ s = .omega
+  le_refl r := by cases r <;> simp
+  le_trans r s t := by cases r <;> cases s <;> cases t <;> simp
+  le_antisymm r s := by cases r <;> cases s <;> simp
+
+instance : DecidableRel (α := Usage) (· ≤ ·) := fun r s =>
+  inferInstanceAs (Decidable (r = .one ∨ s = .omega))
+
+@[simp] lemma Usage.one_le (r : Usage) : Usage.one ≤ r := Or.inl rfl
+@[simp] lemma Usage.le_omega (r : Usage) : r ≤ Usage.omega := Or.inr rfl
+@[simp] lemma Usage.not_omega_le_one : ¬ Usage.omega ≤ Usage.one := by
+  rintro (h | h) <;> cases h
 
 /-- Usage contexts `Δ ::= ∅ | Δ, x : r` over `m` variables (`none` = absent). -/
 abbrev UCtx (m : ℕ) : Type := Fin m → Option Usage
@@ -101,15 +113,22 @@ def Ctx.liftTo {n : ℕ} (m : ℕ) (Γ : Ctx n) : Ctx m :=
 
 /-! ## Heaps -/
 
-/-- A variable allocation `x ↦_r (Γ ⊢ t : A)`. -/
+/-- A variable allocation `x ↦_r (Γ ⊢ t : A)`.  The typing judgment is part of the
+entry and is required to hold: a heap can only record *derivable* judgments `Γ ⊢ t : A`. -/
 structure VarEntry (n : ℕ) where
+  /-- the usage / reference counter `r` -/
   r : Usage
+  /-- the context `Γ` of the recorded judgment -/
   ctx : Ctx n
+  /-- the bound term `t` -/
   term : Term n
+  /-- the type `A` of the recorded judgment -/
   ty : Ty
+  /-- the recorded judgment `Γ ⊢ t : A` holds -/
+  typed : HasType ctx term ty
 
-/-- Array objects `arr`, with `arr[i] = v`. -/
-abbrev ArrObj : Type := ℕ → Option Float
+/-- Array objects `arr`: finite arrays of floats, with `arr[i] = v` for `i < arr.length`. -/
+abbrev ArrObj : Type := List Float
 
 /-- An array allocation `a ↦_r arr`. -/
 structure ArrEntry where
@@ -118,36 +137,58 @@ structure ArrEntry where
 
 /-- Heaps `H ::= ∅ | H, x ↦_r (Γ ⊢ t : A) | H, a ↦_r arr`. -/
 structure Heap (n : ℕ) where
+  /-- the variable allocations -/
   vars : Fin n → Option (VarEntry n)
+  /-- the array allocations -/
   arrs : ℕ → Option ArrEntry
+  /-- heaps are finite: only finitely many array references are allocated -/
+  arrs_finite : ∃ N, ∀ a, N ≤ a → arrs a = none
 
 namespace Heap
 
 variable {n m : ℕ}
 
 /-- The empty heap. -/
-def empty : Heap n := ⟨fun _ => none, fun _ => none⟩
+def empty : Heap n := ⟨fun _ => none, fun _ => none, ⟨0, fun _ _ => rfl⟩⟩
 
 /-- Update the binding of a variable. -/
 def setVar (H : Heap n) (x : Fin n) (e : Option (VarEntry n)) : Heap n :=
-  ⟨Function.update H.vars x e, H.arrs⟩
+  ⟨Function.update H.vars x e, H.arrs, H.arrs_finite⟩
 
 /-- Update the allocation of an array reference. -/
 def setArr (H : Heap n) (a : ℕ) (e : Option ArrEntry) : Heap n :=
-  ⟨H.vars, Function.update H.arrs a e⟩
+  ⟨H.vars, Function.update H.arrs a e, by
+    obtain ⟨N, hN⟩ := H.arrs_finite
+    refine ⟨max N (a + 1), fun b hb => ?_⟩
+    rw [Function.update_of_ne (by omega)]
+    exact hN b (by omega)⟩
 
 /-- Usage extraction `H̄` (Definition 4). -/
 def usage (H : Heap n) : UCtx n := fun x => (H.vars x).map VarEntry.r
 
 end Heap
 
+/-- Embedding a context into a larger scope is a renaming of contexts. -/
+lemma Ctx.renCtx_liftTo {n m : ℕ} (h : n ≤ m) (Γ : Ctx n) :
+    Ctx.RenCtx (Fin.castLE h) Γ (Γ.liftTo m) where
+  inj := Fin.castLE_injective h
+  map i := by simp [Ctx.liftTo, i.isLt]
+  off j hj := by
+    simp only [Ctx.liftTo, Sum.elim_inl]
+    split_ifs with hjn
+    · exact absurd (Fin.ext rfl) (hj ⟨j, hjn⟩)
+    · trivial
+  refs _ := rfl
+
 /-- Embedding a variable allocation into a larger scope. -/
 def VarEntry.lift {n m : ℕ} (h : n ≤ m) (e : VarEntry n) : VarEntry m :=
-  ⟨e.r, e.ctx.liftTo m, e.term.rename (Fin.castLE h), e.ty⟩
+  ⟨e.r, e.ctx.liftTo m, e.term.rename (Fin.castLE h), e.ty,
+    e.typed.rename (Ctx.renCtx_liftTo h e.ctx)⟩
 
 /-- Embedding a heap into a larger scope. -/
 def Heap.lift {n m : ℕ} (h : n ≤ m) (H : Heap n) : Heap m :=
-  ⟨fun j => if hj : (j : ℕ) < n then (H.vars ⟨j, hj⟩).map (VarEntry.lift h) else none, H.arrs⟩
+  ⟨fun j => if hj : (j : ℕ) < n then (H.vars ⟨j, hj⟩).map (VarEntry.lift h) else none, H.arrs,
+    H.arrs_finite⟩
 
 /-- Extending a heap with a binding for a fresh variable (index `n`). -/
 def Heap.push {n : ℕ} (H : Heap n) (e : VarEntry n) : Heap (n + 1) :=
@@ -205,7 +246,9 @@ open Classical in
 /-- `[H]_ω` restricted to the arrays referenced by `v`: all their reference counts
 become `ω`. -/
 noncomputable def Heap.markOmega {n : ℕ} (H : Heap n) (v : Term n) : Heap n :=
-  ⟨H.vars, fun a => if RefIn a v then (H.arrs a).map (fun e => ⟨.omega, e.arr⟩) else H.arrs a⟩
+  ⟨H.vars, fun a => if RefIn a v then (H.arrs a).map (fun e => ⟨.omega, e.arr⟩) else H.arrs a, by
+    obtain ⟨N, hN⟩ := H.arrs_finite
+    exact ⟨N, fun a ha => by dsimp only; split_ifs <;> simp [hN a ha]⟩⟩
 
 /-- `(H'', θ) ≡ copy(H|arrRefs(v))`: `H₂` extends `H` with fresh copies `θ a` (with
 reference count `1`) of the arrays `a` referenced by `v`. -/
@@ -217,16 +260,7 @@ structure CopyHeap {n : ℕ} (H : Heap n) (v : Term n) (θ : ℕ → ℕ) (H₂ 
   rest : ∀ b, (∀ a, RefIn a v → θ a ≠ b) → H₂.arrs b = H.arrs b
 
 /-- Initial contents of `newArray k`. -/
-def newArr (k : ℕ) : ArrObj := fun i => if i < k then some 0 else none
-
-/-- Partially applied primitives expecting further arguments (whose arguments are
-evaluated before the primitive fires). -/
-inductive IsPrimFun : {n : ℕ} → Term n → Prop where
-  | prim {n : ℕ} (p : Prim) : IsPrimFun (Term.prim p : Term n)
-  | readArray₁ {n : ℕ} {v : Term n} : IsValue v → IsPrimFun (app (prim .readArray) v)
-  | writeArray₁ {n : ℕ} {v : Term n} : IsValue v → IsPrimFun (app (prim .writeArray) v)
-  | writeArray₂ {n : ℕ} {v₁ v₂ : Term n} :
-      IsValue v₁ → IsValue v₂ → IsPrimFun (app (app (prim .writeArray) v₁) v₂)
+def newArr (k : ℕ) : ArrObj := List.replicate k 0
 
 /-! ## Single-step reduction -/
 
@@ -241,9 +275,9 @@ inductive Step : {n m : ℕ} → Heap n → Term n → Heap m → Term m → BCt
       H.vars x = some e → e.r = .omega →
       Step H (var x) H e.term BCtx.empty (UCtx.single x .one)
   /-- `β`: `H ⊢ (λx. t) t' ⇝ H, x ↦₁ (Γ ⊢ t' : A) ⊢ t | x : A | ∅` given `Γ ⊢ t' : A` -/
-  | beta {n : ℕ} {H : Heap n} {t : Term (n + 1)} {t' : Term n} {Γ : Ctx n} {A : Ty} :
-      HasType Γ t' A →
-      Step H (app (lam t) t') (H.push ⟨.one, Γ, t', A⟩) (t.rename Ren.toLast)
+  | beta {n : ℕ} {H : Heap n} {t : Term (n + 1)} {t' : Term n} {Γ : Ctx n} {A : Ty}
+      (ht : HasType Γ t' A) :
+      Step H (app (lam t) t') (H.push ⟨.one, Γ, t', A, ht⟩) (t.rename Ren.toLast)
         (BCtx.single (Fin.last n) (.lin A)) UCtx.empty
   /-- `app`: reduction on the left of an application -/
   | app {n m : ℕ} {H : Heap n} {H' : Heap m} {t₁ t₂ : Term n} {t₁' : Term m} {Γ : BCtx m}
@@ -260,9 +294,9 @@ inductive Step : {n m : ℕ} → Heap n → Term n → Heap m → Term m → BCt
       Step H (letPair t₁ t₂) H' (letPair t₁' (t₂.rename (Ren.up (Ren.up (Fin.castLE h))))) Γ Δ
   /-- `⊗β`: `H ⊢ let (x, y) = (t₁, t₂) in t ⇝ H, x ↦₁ t₁, y ↦₁ t₂ ⊢ t | x : A, y : B | ∅` -/
   | betaPair {n : ℕ} {H : Heap n} {t₁ t₂ : Term n} {t : Term (n + 2)} {Γ₁ Γ₂ : Ctx n}
-      {A B : Ty} : HasType Γ₁ t₁ A → HasType Γ₂ t₂ B →
+      {A B : Ty} (h₁ : HasType Γ₁ t₁ A) (h₂ : HasType Γ₂ t₂ B) :
       Step H (letPair (pair t₁ t₂) t)
-        ((H.push ⟨.one, Γ₁, t₁, A⟩).push (VarEntry.lift (Nat.le_succ n) ⟨.one, Γ₂, t₂, B⟩))
+        ((H.push ⟨.one, Γ₁, t₁, A, h₁⟩).push (VarEntry.lift (Nat.le_succ n) ⟨.one, Γ₂, t₂, B, h₂⟩))
         (t.rename Ren.toLast₂)
         (optUnion (BCtx.single (Fin.last n).castSucc (.lin A)) (BCtx.single (Fin.last (n + 1)) (.lin B)))
         UCtx.empty
@@ -280,8 +314,8 @@ inductive Step : {n m : ℕ} → Heap n → Term n → Heap m → Term m → BCt
       Step H (letBang t₁ t₂) H' (letBang t₁' (t₂.rename (Ren.up (Fin.castLE h)))) Γ Δ
   /-- `!β`: `H ⊢ let! x = !t₁ in t₂ ⇝ H, x ↦_ω ([Γ] ⊢ t₁ : A) ⊢ t₂ | x : [A] | ∅` -/
   | betaBang {n : ℕ} {H : Heap n} {t₁ : Term n} {t₂ : Term (n + 1)} {Γ : Ctx n} {A : Ty} :
-      Γ.AllNonLin → HasType Γ t₁ A →
-      Step H (letBang (bang t₁) t₂) (H.push ⟨.omega, Γ, t₁, A⟩) (t₂.rename Ren.toLast)
+      Γ.AllNonLin → (ht : HasType Γ t₁ A) →
+      Step H (letBang (bang t₁) t₂) (H.push ⟨.omega, Γ, t₁, A, ht⟩) (t₂.rename Ren.toLast)
         (BCtx.single (Fin.last n) (.nonlin A)) UCtx.empty
   /-- `&`: congruence for borrowing -/
   | borrow {n m : ℕ} {H : Heap n} {H' : Heap m} {t : Term n} {t' : Term m} {Γ : BCtx m}
@@ -302,11 +336,14 @@ inductive Step : {n m : ℕ} → Heap n → Term n → Heap m → Term m → BCt
       Step H t H' t' Γ Δ →
       Step H (copy (bang t) t₂) H' (copy (bang t') (t₂.rename (Ren.up (Fin.castLE h)))) Γ Δ
   /-- `copy_β`: `H, H' ⊢ copy !v as x in t ⇝ H, H', H'', x ↦₁ (Γ ⊢ *θ(v) : *A) ⊢ t | x : *A | ∅`
-  given `Γ ⊢ v : A`, `dom(H') ≡ arrRefs(v)` and `(H'', θ) ≡ copy(H')` -/
+  given `dom(H') ≡ arrRefs(v)` and `(H'', θ) ≡ copy(H')`.  Since heap entries record
+  derivable judgments only, the rule requires the recorded judgment `Γ ⊢ *θ(v) : *A`
+  (whose context `Γ` refers to the fresh copies `θ a`) to hold. -/
   | betaCopy {n : ℕ} {H H₂ : Heap n} {v : Term n} {t : Term (n + 1)} {Γ : Ctx n} {A : Ty}
       {θ : ℕ → ℕ} :
-      IsValue v → HasType Γ v A → (∀ a, RefIn a v → H.arrs a ≠ none) → CopyHeap H v θ H₂ →
-      Step H (copy (bang v) t) (H₂.push ⟨.one, Γ, star (renameRefs θ v), .star A⟩)
+      IsValue v → (hc : HasType Γ (star (renameRefs θ v)) (.star A)) →
+      (∀ a, RefIn a v → H.arrs a ≠ none) → CopyHeap H v θ H₂ →
+      Step H (copy (bang v) t) (H₂.push ⟨.one, Γ, star (renameRefs θ v), .star A, hc⟩)
         (t.rename Ren.toLast) (BCtx.single (Fin.last n) (.lin (.star A))) UCtx.empty
   /-- `newArray`: `H ⊢ newArray k ⇝ H, a ↦₁ arr ⊢ *a | ∅ | ∅` for `a # H` -/
   | newArray {n : ℕ} {H : Heap n} {a k : ℕ} :
@@ -315,14 +352,14 @@ inductive Step : {n m : ℕ} → Heap n → Term n → Heap m → Term m → BCt
         BCtx.empty UCtx.empty
   /-- `readArray`: `H, a ↦_r (arr[i] = v) ⊢ readArray (*a) i ⇝ … ⊢ (v, *a) | ∅ | ∅` -/
   | readArray {n : ℕ} {H : Heap n} {a i : ℕ} {e : ArrEntry} {x : Float} :
-      H.arrs a = some e → e.arr i = some x →
+      H.arrs a = some e → e.arr[i]? = some x →
       Step H (app (app (prim .readArray) (star (ref a))) (nat i)) H (pair (float x) (star (ref a)))
         BCtx.empty UCtx.empty
   /-- `writeArray`: `H, a ↦_r arr ⊢ writeArray (*a) i v ⇝ H, a ↦_r (arr[i] = v) ⊢ *a | ∅ | ∅` -/
   | writeArray {n : ℕ} {H : Heap n} {a i : ℕ} {e : ArrEntry} {x : Float} :
       H.arrs a = some e →
       Step H (app (app (app (prim .writeArray) (star (ref a))) (nat i)) (float x))
-        (H.setArr a (some ⟨e.r, Function.update e.arr i (some x)⟩)) (star (ref a))
+        (H.setArr a (some ⟨e.r, e.arr.set i x⟩)) (star (ref a))
         BCtx.empty UCtx.empty
   /-- `deleteArray`: `H, a ↦_r arr ⊢ deleteArray (*a) ⇝ H ⊢ unit | ∅ | ∅` -/
   | deleteArray {n : ℕ} {H : Heap n} {a : ℕ} {e : ArrEntry} :
@@ -406,14 +443,14 @@ inductive Compat : {n : ℕ} → Heap n → Ctx n → Prop where
   | ref {n : ℕ} {H : Heap n} {Γ : Ctx n} {a : ℕ} {e : ArrEntry} {A : Ty} :
       Compat H Γ → H.arrs a = none →
       Compat (H.setArr a (some e)) (Γ.set (.inr a) (some (.lin A)))
-  /-- `H ⋈ Γ₁ + Γ₂`, `Γ₂ ⊢ t : A`, `x ∉ dom(H)` give `H, x ↦_r (Γ₂ ⊢ t : A) ⋈ Γ₁, x : A` -/
-  | lin {n : ℕ} {H : Heap n} {Γ₁ Γ₂ Γ₁₂ : Ctx n} {x : Fin n} {r : Usage} {t : Term n} {A : Ty} :
-      Compat H Γ₁₂ → Γ₁.Add Γ₂ Γ₁₂ → HasType Γ₂ t A → H.vars x = none →
-      Compat (H.setVar x (some ⟨r, Γ₂, t, A⟩)) (Γ₁.set (.inl x) (some (.lin A)))
-  /-- `H ⋈ Γ₁ + [Γ₂]`, `[Γ₂] ⊢ t : A`, `x ∉ dom(H)` give
-  `H, x ↦_ω ([Γ₂] ⊢ t : A) ⋈ Γ₁, x : [A]` -/
-  | omega {n : ℕ} {H : Heap n} {Γ₁ Γ₂ Γ₁₂ : Ctx n} {x : Fin n} {t : Term n} {A : Ty} :
-      Compat H Γ₁₂ → Γ₁.Add Γ₂ Γ₁₂ → Γ₂.AllNonLin → HasType Γ₂ t A → H.vars x = none →
-      Compat (H.setVar x (some ⟨.omega, Γ₂, t, A⟩)) (Γ₁.set (.inl x) (some (.nonlin A)))
+  /-- `H ⋈ Γ₁ + Γ₂`, `x ∉ dom(H)` give `H, x ↦_r (Γ₂ ⊢ t : A) ⋈ Γ₁, x : A`
+  (the judgment `Γ₂ ⊢ t : A` is part of the heap entry `e`) -/
+  | lin {n : ℕ} {H : Heap n} {Γ₁ Γ₁₂ : Ctx n} {x : Fin n} {e : VarEntry n} :
+      Compat H Γ₁₂ → Γ₁.Add e.ctx Γ₁₂ → H.vars x = none →
+      Compat (H.setVar x (some e)) (Γ₁.set (.inl x) (some (.lin e.ty)))
+  /-- `H ⋈ Γ₁ + [Γ₂]`, `x ∉ dom(H)` give `H, x ↦_ω ([Γ₂] ⊢ t : A) ⋈ Γ₁, x : [A]` -/
+  | omega {n : ℕ} {H : Heap n} {Γ₁ Γ₁₂ : Ctx n} {x : Fin n} {e : VarEntry n} :
+      Compat H Γ₁₂ → Γ₁.Add e.ctx Γ₁₂ → e.r = .omega → e.ctx.AllNonLin → H.vars x = none →
+      Compat (H.setVar x (some e)) (Γ₁.set (.inl x) (some (.nonlin e.ty)))
 
 end LCU

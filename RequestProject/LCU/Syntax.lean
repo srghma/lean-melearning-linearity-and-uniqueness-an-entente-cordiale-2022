@@ -79,6 +79,81 @@ inductive Term : ℕ → Type where
   | prim {n : ℕ} : Prim → Term n
   | ref {n : ℕ} : ℕ → Term n
 
+/-! ## The core grammars of Section 3.1
+
+`Ty` and `Term` contain the extensions of Sections 3.3 and 3.4 (arrays, literals,
+primitives and runtime references).  The grammars of the core calculus are given
+separately, by construction, together with their embeddings. -/
+
+/-- The core types of Section 3.1: `A, B ::= A ⊸ B | A ⊗ B | 1 | !A | *A`. -/
+inductive CoreTy where
+  | lolli : CoreTy → CoreTy → CoreTy
+  | tensor : CoreTy → CoreTy → CoreTy
+  | unit : CoreTy
+  | bang : CoreTy → CoreTy
+  | star : CoreTy → CoreTy
+  deriving DecidableEq, Repr
+
+/-- The embedding of core types into the extended types. -/
+@[simp] def CoreTy.toTy : CoreTy → Ty
+  | .lolli A B => .lolli A.toTy B.toTy
+  | .tensor A B => .tensor A.toTy B.toTy
+  | .unit => .unit
+  | .bang A => .bang A.toTy
+  | .star A => .star A.toTy
+
+lemma CoreTy.toTy_injective : Function.Injective CoreTy.toTy := by
+  intro A B h
+  induction A generalizing B with
+  | lolli A₁ A₂ ih₁ ih₂ =>
+    cases B <;> simp only [CoreTy.toTy, Ty.lolli.injEq, reduceCtorEq] at h
+    rw [ih₁ h.1, ih₂ h.2]
+  | tensor A₁ A₂ ih₁ ih₂ =>
+    cases B <;> simp only [CoreTy.toTy, Ty.tensor.injEq, reduceCtorEq] at h
+    rw [ih₁ h.1, ih₂ h.2]
+  | unit => cases B <;> simp_all
+  | bang A ih => cases B <;> simp only [CoreTy.toTy, Ty.bang.injEq, reduceCtorEq] at h; rw [ih h]
+  | star A ih => cases B <;> simp only [CoreTy.toTy, Ty.star.injEq, reduceCtorEq] at h; rw [ih h]
+
+/-- The core terms of Section 3.1 (with de Bruijn indices):
+`t ::= x | λx. t | t₁ t₂ | (t₁, t₂) | let (x, y) = t₁ in t₂ | unit | let unit = t₁ in t₂
+     | !t | let! x = t₁ in t₂ | &t | copy t₁ as x in t₂ | *t`. -/
+inductive CoreTerm : ℕ → Type where
+  | var {n : ℕ} : Fin n → CoreTerm n
+  | lam {n : ℕ} : CoreTerm (n + 1) → CoreTerm n
+  | app {n : ℕ} : CoreTerm n → CoreTerm n → CoreTerm n
+  | pair {n : ℕ} : CoreTerm n → CoreTerm n → CoreTerm n
+  | letPair {n : ℕ} : CoreTerm n → CoreTerm (n + 2) → CoreTerm n
+  | unit {n : ℕ} : CoreTerm n
+  | letUnit {n : ℕ} : CoreTerm n → CoreTerm n → CoreTerm n
+  | bang {n : ℕ} : CoreTerm n → CoreTerm n
+  | letBang {n : ℕ} : CoreTerm n → CoreTerm (n + 1) → CoreTerm n
+  | borrow {n : ℕ} : CoreTerm n → CoreTerm n
+  | copy {n : ℕ} : CoreTerm n → CoreTerm (n + 1) → CoreTerm n
+  | star {n : ℕ} : CoreTerm n → CoreTerm n
+
+/-- The embedding of core terms into the extended terms. -/
+@[simp] def CoreTerm.toTerm : {n : ℕ} → CoreTerm n → Term n
+  | _, .var i => .var i
+  | _, .lam t => .lam t.toTerm
+  | _, .app t₁ t₂ => .app t₁.toTerm t₂.toTerm
+  | _, .pair t₁ t₂ => .pair t₁.toTerm t₂.toTerm
+  | _, .letPair t₁ t₂ => .letPair t₁.toTerm t₂.toTerm
+  | _, .unit => .unit
+  | _, .letUnit t₁ t₂ => .letUnit t₁.toTerm t₂.toTerm
+  | _, .bang t => .bang t.toTerm
+  | _, .letBang t₁ t₂ => .letBang t₁.toTerm t₂.toTerm
+  | _, .borrow t => .borrow t.toTerm
+  | _, .copy t₁ t₂ => .copy t₁.toTerm t₂.toTerm
+  | _, .star t => .star t.toTerm
+
+lemma CoreTerm.toTerm_injective {n : ℕ} : Function.Injective (CoreTerm.toTerm (n := n)) := by
+  intro t u h
+  induction t with
+  | var => cases u <;> simp_all
+  | unit => cases u <;> simp_all
+  | _ => cases u <;> simp at h ⊢; grind
+
 namespace Term
 
 /-! ## Renaming -/

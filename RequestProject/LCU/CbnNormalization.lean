@@ -242,4 +242,19 @@ theorem cbn_value_unique {n : ℕ} {t v₁ v₂ : Term n} (h₁ : CbnSteps t v�
       rw [CbnStep.deterministic hs hs'] at ih
       exact ih hrest' hv₂
 
+/-! ## The core calculus -/
+
+/-- Terms of the core grammar of Section 3.1 contain no array primitives. -/
+lemma CoreTerm.primFree {n : ℕ} (t : CoreTerm n) : t.toTerm.PrimFree := by
+  induction t <;> simp_all [Term.PrimFree]
+
+/-- **Termination for the core calculus.** Every well-typed closed term of the core grammar
+(Section 3.1) evaluates, in the call-by-name semantics `CbnStep`, to (the embedding of) an
+element of the value grammar `Value 0`, of the same type. -/
+theorem cbn_eval_core {Γ : Ctx 0} {t : CoreTerm 0} {A : Ty} (hr : Γ.RefsNonLin)
+    (ht : HasType Γ t.toTerm A) :
+    ∃ v : Value 0, CbnSteps t.toTerm v.toTerm ∧ HasType Γ v.toTerm A := by
+  obtain ⟨_, hs, ⟨v, rfl⟩, hv⟩ := cbn_eval hr ht t.primFree
+  exact ⟨v, hs, hv⟩
+
 end LCU

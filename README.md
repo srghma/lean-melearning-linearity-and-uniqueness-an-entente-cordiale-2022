@@ -13,24 +13,47 @@ terms. Binders bind index `0`. In `letPair t₁ t₂` (`let (x, y) = t₁ in t�
 reference) an optional linear hypothesis `x : A` or non-linear hypothesis `x : [A]`.
 Context addition (Definition 2) and `[Γ]` (Definition 1) are defined pointwise.
 
+## Grammars by construction
+
+Every grammar of the paper is an inductive type (or a structure) whose inhabitants are
+exactly the objects the grammar describes. Where a sub-grammar is used as a condition on
+terms, the predicate only says that the term is the image of an element of that type.
+
+| Grammar | Lean type | Notes |
+| --- | --- | --- |
+| core types `A ::= A ⊸ B \| A ⊗ B \| 1 \| !A \| *A` (§3.1) | `CoreTy` | embeds into the extended types `Ty` (`CoreTy.toTy`, injective) |
+| core terms (§3.1) | `CoreTerm n` | embeds into the extended terms `Term n` (`CoreTerm.toTerm`, injective); `cbn_eval_core` states evaluation for them |
+| values `v ::= (t₁, t₂) \| unit \| *t \| !t \| λx. t \| i \| a \| p` (Theorem 6) | `Value n` | `IsValue t := ∃ v : Value n, v.toTerm = t` |
+| partially applied primitives `p` | `PrimFun n` | a primitive applied to fewer arguments than its arity, each argument being a `Value`; `IsPrimFun` |
+| usage `r ::= 1 \| ω` | `Usage` | a `PartialOrder` with `1 ≤ ω` (decidable) |
+| heaps `H ::= ∅ \| H, x ↦ᵣ (Γ ⊢ t : A) \| H, a ↦ᵣ arr` | `Heap n`, `VarEntry n` | each entry contains a proof of its judgment `Γ ⊢ t : A`; only finitely many arrays are allocated |
+| arrays `arr` | `ArrObj := List Float` | finite arrays, no holes |
+| stores of the array semantics | `Store` | a structure with a proof that only finitely many references are allocated |
+| values of the array semantics | `StoreValue n`, `ReadyPrim n` | embed into `Value n` and `PrimFun n`; `AValue`, `PrimReady` |
+
+Because a heap entry carries its typing derivation, a step rule can only add derivable
+judgments to the heap. For `copy_β` this means the rule requires `Γ ⊢ *θ(v) : *A`, in a
+context that refers to the fresh copies `θ a`. The text writes this judgment in the new
+heap entry but only assumes `Γ ⊢ v : A`, which does not imply it in general.
+
 ## Files
 
 | File | Contents |
 | --- | --- |
-| `Syntax.lean` | types `Ty`, primitives, terms `Term n`, renaming and substitution |
+| `Syntax.lean` | types `Ty`, primitives, terms `Term n`, the core grammars `CoreTy` and `CoreTerm n`, renaming and substitution |
 | `Context.lean`, `CtxAlgebra.lean` | contexts, context addition and its algebra |
 | `Typing.lean` | the typing judgment `HasType` (Figure 1 plus the array primitives of §3.3) |
 | `TypingD.lean` | an equivalent system with no separate dereliction rule (`hasType_iff_hasTypeD`) |
 | `Weakening.lean` | **Lemma 3** (weakening) `HasType.weaken`, plus renaming/shifting |
 | `Substitution.lean` | **Lemma 1** `HasType.subst_lin`, **Lemma 2** `HasType.subst_nonlin` |
-| `Values.lean` | values |
+| `Values.lean` | the value grammar `Value n` and partially applied primitives `PrimFun n`, with an induction principle `IsValue.induction` |
 | `Equational.lean` | the equational theory `≡ₗ` (§3.2); every axiom preserves typing (`EqAxiom.preserves`) |
 | `Heap.lean` | the heap model (§3.4): heaps, single-step reduction `Step`, multi-step `Steps`, full β-reduction, compatibility `Compat` (**Definition 3**) |
 | `Metatheory.lean` | **Theorems 4–7** stated literally as propositions `Conservation`, `Uniqueness`, `Progress`, `EqSoundness` |
 | `Counter*.lean` | formal disproofs of these four statements (see below) |
 | `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
 | `CbnExamples.lean` | the progress and conservation counterexamples reduce to values under `CbnStep` |
-| `CbnNormalization.lean` | termination of `CbnStep` evaluation on well-typed closed terms (logical relation) |
+| `CbnNormalization.lean` | termination of `CbnStep` evaluation on well-typed closed terms (logical relation); `cbn_eval_core` for core terms |
 | `KeyIdeas.lean` | the examples of Section 2 (impossible/possible cake and coffee programs, `sip`, dereliction, borrowing, `uniqueReturn`/`uniqueBind`) |
 | `RefShift.lean` | renaming of array references (for `copy_β`) and weakening into larger non-linear contexts |
 | `ArraySemantics.lean` | a store-based semantics with mutable arrays, `AStep`, with subject reduction, progress and type safety |

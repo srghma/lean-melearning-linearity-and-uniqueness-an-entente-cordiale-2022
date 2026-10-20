@@ -39,12 +39,11 @@ theorem writeReadProg_eval (x : Float) :
       (AStep.newArray (n := 0) Store.empty 3 0 rfl)))))
   -- destructive update
   have s₂ := AStep.app (nat 0) (AStep.primArg (PrimReady.prim .readArray)
-    (AStep.writeArray (n := 0) (Function.update Store.empty 0 (some fun _ => 0)) 0 0 x
-      (fun _ => 0) (Function.update_self _ _ _)))
+    (AStep.writeArray (n := 0) (Store.empty.set 0 (some fun _ => 0)) 0 0 x
+      (fun _ => 0) (by simp)))
   -- read
-  have s₃ := AStep.readArray (n := 0) (Function.update
-    (Function.update Store.empty 0 (some fun _ => 0)) 0
-    (some (Function.update (fun _ => 0) 0 x))) 0 0 _ (Function.update_self _ _ _)
+  have s₃ := AStep.readArray (n := 0) ((Store.empty.set 0 (some fun _ => 0)).set 0
+    (some (Function.update (fun _ => 0) 0 x))) 0 0 (Function.update (fun _ => 0) 0 x) (by simp)
   rw [e] at s₃
   exact ⟨_, (((ASteps.refl _ _).tail s₁).tail s₂).tail s₃⟩
 

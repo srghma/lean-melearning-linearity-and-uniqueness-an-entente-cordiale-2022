@@ -48,15 +48,6 @@ def θ : ℕ → ℕ := fun a => a + 1
 def H₀ : Heap 0 := Heap.empty
 def H₁ : Heap 0 := H₀.setArr 0 (some ⟨.one, newArr 1⟩)
 def H₁c : Heap 0 := H₁.setArr 1 (some ⟨.one, newArr 1⟩)
-def Γv : Ctx 0 := Ctx.empty.set (.inr 0) (some (.lin .float))
-def eₓ : VarEntry 0 := ⟨.one, Γv, star (renameRefs θ (star (ref 0))), .star (.star (.array .float))⟩
-def H₂ : Heap 1 := H₁c.push eₓ
-def H₃ : Heap 1 := H₂.setVar 0 none
-noncomputable def H₄ : Heap 1 := H₃.markOmega (star (ref 1))
-def Γb : Ctx 1 := Ctx.empty.set (.inr 1) (some (.nonlin .float))
-def e_z : VarEntry 1 := ⟨.omega, Γb, star (ref 1), .star (.array .float)⟩
-noncomputable def H₅ : Heap 2 := H₄.push e_z
-
 lemma allNonLin_empty_set_nonlin {n : ℕ} (x : Fin n ⊕ ℕ) (A : Ty) :
     ((Ctx.empty : Ctx n).set x (some (.nonlin A))).AllNonLin := by
   intro y
@@ -86,6 +77,28 @@ lemma typed_star_ref {n : ℕ} (Γ : Ctx n) (b : ℕ) (h : Hyp) (hb : Γ (.inr b
         have := hrest (.inr a); rwa [Ctx.set_ne _ _ (by simpa using ha)] at this
   · intro i; have := hrest (.inl i); rwa [Ctx.set_ne _ _ (by simp)] at this
 
+/-- The context of the judgment recorded for the copy: it refers to the fresh array `1`. -/
+def Γv : Ctx 0 := Ctx.empty.set (.inr 1) (some (.lin .float))
+
+lemma typed_copy : HasType Γv (star (renameRefs θ (star (ref 0)))) (.star (.star (.array .float))) :=
+  HasType.nec (typed_star_ref Γv.refsOnly 1 (.lin .float) rfl (by
+    rintro (i | a)
+    · trivial
+    · by_cases ha : a = 1
+      · subst ha; simp
+      · simp [Ctx.set, Γv, ha])) (fun i => by simp [Γv, Ctx.set])
+
+def eₓ : VarEntry 0 :=
+  ⟨.one, Γv, star (renameRefs θ (star (ref 0))), .star (.star (.array .float)), typed_copy⟩
+def H₂ : Heap 1 := H₁c.push eₓ
+def H₃ : Heap 1 := H₂.setVar 0 none
+noncomputable def H₄ : Heap 1 := H₃.markOmega (star (ref 1))
+def Γb : Ctx 1 := Ctx.empty.set (.inr 1) (some (.nonlin .float))
+def e_z : VarEntry 1 :=
+  ⟨.omega, Γb, star (ref 1), .star (.array .float),
+    typed_star_ref Γb 1 (.nonlin .float) rfl (allNonLin_empty_set_set _ _)⟩
+noncomputable def H₅ : Heap 2 := H₄.push e_z
+
 lemma step₁ : Step H₀ prog H₁ (letBang (copy (bang (star (ref 0))) (borrow (var 0))) (var 0))
     BCtx.empty UCtx.empty := by
   have := Step.letBang (t₂ := var 0) (le_refl 0)
@@ -108,7 +121,7 @@ lemma step₂ : Step H₁ (letBang (copy (bang (star (ref 0))) (borrow (var 0)))
     (BCtx.single (Fin.last 0) (.lin (.star (.star (.array .float))))) UCtx.empty := by
   have := Step.letBang (t₂ := var 0) (Nat.zero_le 1)
     (Step.betaCopy (H := H₁) (t := borrow (var 0)) (Γ := Γv) (A := .star (.array .float))
-      (IsValue.star _) (typed_star_ref Γv 0 (.lin .float) rfl (allNonLin_empty_set_set _ _))
+      (IsValue.star _) typed_copy
       (by intro a ha; rw [refIn_star_ref] at ha; subst ha; simp [H₁, Heap.setArr])
       copyHeap)
   exact this

@@ -41,7 +41,8 @@ lemma prog_typed : HasType Ctx.empty prog (.bang .unit) := by
     (.borrow (HasTypeD.var_zero_single (.lin (.star .unit)))) (Ctx.Add.empty_left _)
 
 /-- The heap after the reduction. -/
-def H₁ : Heap 1 := (Heap.empty : Heap 0).push ⟨.one, Ctx.empty, unit, .unit⟩
+def H₁ : Heap 1 :=
+  (Heap.empty : Heap 0).push ⟨.one, Ctx.empty, unit, .unit, HasType.unitI Ctx.AllNonLin.empty⟩
 
 lemma step : Step (Heap.empty : Heap 0) prog H₁ prog' (BCtx.single (Fin.last 0) (.lin .unit))
     UCtx.empty := by
@@ -56,8 +57,8 @@ lemma compat_empty_heap {n : ℕ} {H : Heap n} {Γ : Ctx n} (hc : Compat H Γ)
   cases hc with
   | empty => rfl
   | @ref _ _ a _ _ _ _ => have := ha a; simp [Heap.setArr] at this
-  | @lin _ _ _ _ x' _ _ _ _ _ _ _ => have := hv x'; simp [Heap.setVar] at this
-  | @omega _ _ _ _ x' _ _ _ _ _ _ _ => have := hv x'; simp [Heap.setVar] at this
+  | @lin _ _ _ x' _ _ _ _ => have := hv x'; simp [Heap.setVar] at this
+  | @omega _ _ _ x' _ _ _ _ _ _ => have := hv x'; simp [Heap.setVar] at this
 
 /-- A heap with a single linear-use binding `x ↦₁ t` is compatible only with contexts
 in which `x` is a linear assumption. -/
@@ -68,19 +69,19 @@ lemma compat_single {n : ℕ} {H : Heap n} {Γ : Ctx n} (hc : Compat H Γ) {x : 
   cases hc with
   | empty => simp [Heap.empty] at hx
   | @ref _ _ a _ _ _ _ => have := ha a; simp [Heap.setArr] at this
-  | @lin Hp Γ₁ Γ₂ Γ₁₂ x' r t A hc' hadd _ hx' =>
+  | @lin Hp Γ₁ Γ₁₂ x' e' hc' hadd hx' =>
     by_cases hxx : x' = x
     · subst hxx
       simp only [Heap.setVar, Function.update_self, Option.some.injEq] at hx
       subst hx
       simp
     · have := hv x' hxx; simp [Heap.setVar] at this
-  | @omega Hp Γ₁ Γ₂ Γ₁₂ x' t A hc' hadd _ _ hx' =>
+  | @omega Hp Γ₁ Γ₁₂ x' e' hc' hadd hr _ hx' =>
     by_cases hxx : x' = x
     · subst hxx
       simp only [Heap.setVar, Function.update_self, Option.some.injEq] at hx
       subst hx
-      cases he
+      rw [hr] at he; cases he
     · have := hv x' hxx; simp [Heap.setVar] at this
 
 /-- Any typing of the reduct uses only non-linear assumptions. -/
@@ -107,8 +108,9 @@ theorem not_conservation : ¬ Conservation := by
   obtain ⟨Γ', Γs', ht, hadd, hc, -⟩ := hC Ctx.empty prog (.bang .unit) prog_typed Ctx.empty
     Ctx.empty Heap.empty (Ctx.Add.empty_left _) Compat.empty _ _ _ _ step
   have h1 : Γs' (.inl 0) = some (.lin .unit) := by
-    refine compat_single hc (x := 0) (e := ⟨.one, (Ctx.empty : Ctx 0).liftTo 1, unit, .unit⟩) ?_ rfl ?_ ?_
-    · simp [H₁, Heap.push, Heap.setVar]; rfl
+    refine compat_single hc (x := 0) (e := VarEntry.lift (Nat.le_succ 0)
+      ⟨.one, Ctx.empty, unit, .unit, HasType.unitI Ctx.AllNonLin.empty⟩) ?_ rfl ?_ ?_
+    · simp [H₁, Heap.push, Heap.setVar]
     · intro y hy; exact absurd (Subsingleton.elim y 0) hy
     · intro a; rfl
   have h2 : Γs' (.inl 0) = Γ' (.inl 0) := ((hadd (.inl 0)).left_none).symm

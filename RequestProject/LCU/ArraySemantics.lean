@@ -38,32 +38,115 @@ open Term
 /-! ## Stores -/
 
 /-- A store maps array references to arrays of floats (`none`: unallocated).
-Out-of-bounds accesses are ignored, as in the paper, so arrays are total functions. -/
-abbrev Store : Type := ℕ → Option (ℕ → Float)
+Out-of-bounds accesses are ignored, as in the paper, so arrays are total functions.
+Stores are finite by construction: only finitely many references are allocated. -/
+structure Store where
+  /-- the array allocated at a reference, if any -/
+  get : ℕ → Option (ℕ → Float)
+  /-- only finitely many references are allocated -/
+  finite : ∃ N, ∀ b, N ≤ b → get b = none
+
+instance : CoeFun Store (fun _ => ℕ → Option (ℕ → Float)) := ⟨Store.get⟩
+
+namespace Store
 
 /-- All references from `N` on are unallocated. -/
-def Store.FreshFrom (σ : Store) (N : ℕ) : Prop := ∀ b, N ≤ b → σ b = none
+def FreshFrom (σ : Store) (N : ℕ) : Prop := ∀ b, N ≤ b → σ b = none
 
-/-- The store has only finitely many allocated arrays. -/
-def Store.Finite (σ : Store) : Prop := ∃ N, σ.FreshFrom N
+/-- Update the array allocated at a reference. -/
+def set (σ : Store) (a : ℕ) (v : Option (ℕ → Float)) : Store where
+  get := Function.update σ.get a v
+  finite := by
+    obtain ⟨N, hN⟩ := σ.finite
+    refine ⟨max N (a + 1), fun b hb => ?_⟩
+    rw [Function.update_of_ne (by omega)]
+    exact hN b (by omega)
+
+@[simp] lemma set_apply (σ : Store) (a : ℕ) (v : Option (ℕ → Float)) (b : ℕ) :
+    σ.set a v b = Function.update σ.get a v b := rfl
 
 /-- Extend a store (whose references from `N` on are unallocated) with a copy of every
 array: the copy of `a` lives at `N + a`. -/
-def Store.copyShift (σ : Store) (N : ℕ) : Store := fun b => if N ≤ b then σ (b - N) else σ b
+def copyShift (σ : Store) (N : ℕ) : Store where
+  get b := if N ≤ b then σ (b - N) else σ b
+  finite := by
+    obtain ⟨M, hM⟩ := σ.finite
+    refine ⟨N + M, fun b hb => ?_⟩
+    simp only [show N ≤ b by omega, if_true]
+    exact hM _ (by omega)
+
+@[simp] lemma copyShift_apply (σ : Store) (N b : ℕ) :
+    σ.copyShift N b = if N ≤ b then σ (b - N) else σ b := rfl
 
 /-- The empty store. -/
-def Store.empty : Store := fun _ => none
+def empty : Store := ⟨fun _ => none, ⟨0, fun _ _ => rfl⟩⟩
+
+@[simp] lemma empty_apply (b : ℕ) : Store.empty b = none := rfl
+
+/-- Every store has a fresh bound. -/
+lemma exists_freshFrom (σ : Store) : ∃ N, σ.FreshFrom N := σ.finite
+
+end Store
 
 /-! ## Reduction -/
 
-/-- Partially applied primitives whose already supplied arguments are fully evaluated;
-the next argument of such a term is evaluated. -/
-inductive PrimReady : {n : ℕ} → Term n → Prop where
-  | prim {n : ℕ} (p : Prim) : PrimReady (prim p : Term n)
-  | read₁ {n : ℕ} (a : ℕ) : PrimReady (app (prim .readArray) (star (ref a)) : Term n)
-  | write₁ {n : ℕ} (a : ℕ) : PrimReady (app (prim .writeArray) (star (ref a)) : Term n)
-  | write₂ {n : ℕ} (a k : ℕ) :
-      PrimReady (app (app (prim .writeArray) (star (ref a))) (nat k) : Term n)
+/-- Partially applied primitives whose already supplied arguments are fully evaluated
+(the array argument to a reference `*a`, the index to a literal `k`); the next argument
+of such a term is evaluated.  This is a sub-grammar of the partially applied primitives
+`PrimFun` of the paper. -/
+inductive ReadyPrim (n : ℕ) : Type where
+  /-- a primitive applied to no argument -/
+  | const (p : Prim)
+  /-- `readArray (*a)` -/
+  | read₁ (a : ℕ)
+  /-- `writeArray (*a)` -/
+  | write₁ (a : ℕ)
+  /-- `writeArray (*a) k` -/
+  | write₂ (a k : ℕ)
+
+namespace ReadyPrim
+
+variable {n : ℕ}
+
+/-- The embedding into terms. -/
+@[simp] def toTerm : ReadyPrim n → Term n
+  | const p => .prim p
+  | read₁ a => .app (.prim .readArray) (.star (.ref a))
+  | write₁ a => .app (.prim .writeArray) (.star (.ref a))
+  | write₂ a k => .app (.app (.prim .writeArray) (.star (.ref a))) (.nat k)
+
+/-- The embedding into the partially applied primitives of the paper. -/
+def toPrimFun : ReadyPrim n → PrimFun n
+  | const p => .const p
+  | read₁ a => .readArray₁ (.star (.ref a))
+  | write₁ a => .writeArray₁ (.star (.ref a))
+  | write₂ a k => .writeArray₂ (.star (.ref a)) (.nat k)
+
+@[simp] lemma toPrimFun_toTerm (p : ReadyPrim n) : p.toPrimFun.toTerm = p.toTerm := by
+  cases p <;> rfl
+
+end ReadyPrim
+
+/-- `t` is (the embedding of) an element of the grammar `ReadyPrim n`. -/
+def PrimReady {n : ℕ} (t : Term n) : Prop := ∃ p : ReadyPrim n, p.toTerm = t
+
+namespace PrimReady
+
+variable {n : ℕ}
+
+lemma prim (p : Prim) : PrimReady (Term.prim p : Term n) := ⟨.const p, rfl⟩
+lemma read₁ (a : ℕ) : PrimReady (app (Term.prim .readArray) (star (ref a)) : Term n) :=
+  ⟨.read₁ a, rfl⟩
+lemma write₁ (a : ℕ) : PrimReady (app (Term.prim .writeArray) (star (ref a)) : Term n) :=
+  ⟨.write₁ a, rfl⟩
+lemma write₂ (a k : ℕ) :
+    PrimReady (app (app (Term.prim .writeArray) (star (ref a))) (nat k) : Term n) :=
+  ⟨.write₂ a k, rfl⟩
+
+lemma isPrimFun {t : Term n} : PrimReady t → IsPrimFun t
+  | ⟨p, hp⟩ => ⟨p.toPrimFun, by rw [ReadyPrim.toPrimFun_toTerm, hp]⟩
+
+end PrimReady
 
 /-- Single-step reduction `σ ⊢ t ⟶ σ' ⊢ t'` of the store-based semantics. -/
 inductive AStep : {n : ℕ} → Store → Term n → Store → Term n → Prop where
@@ -97,14 +180,14 @@ inductive AStep : {n : ℕ} → Store → Term n → Store → Term n → Prop w
   | primStar {n : ℕ} {σ σ' : Store} (p : Prim) {s s' : Term n} :
       AStep σ s σ' s' → AStep σ (app (prim p) (star s)) σ' (app (prim p) (star s'))
   | newArray {n : ℕ} (σ : Store) (k a : ℕ) : σ a = none →
-      AStep σ (app (prim .newArray) (nat k) : Term n) (Function.update σ a (some fun _ => 0))
+      AStep σ (app (prim .newArray) (nat k) : Term n) (σ.set a (some fun _ => 0))
         (star (ref a))
   | readArray {n : ℕ} (σ : Store) (a k : ℕ) (arr : ℕ → Float) : σ a = some arr →
       AStep σ (app (app (prim .readArray) (star (ref a))) (nat k) : Term n) σ
         (pair (float (arr k)) (star (ref a)))
   | writeArray {n : ℕ} (σ : Store) (a k : ℕ) (x : Float) (arr : ℕ → Float) : σ a = some arr →
       AStep σ (app (app (app (prim .writeArray) (star (ref a))) (nat k)) (float x) : Term n)
-        (Function.update σ a (some (Function.update arr k x))) (star (ref a))
+        (σ.set a (some (Function.update arr k x))) (star (ref a))
   | deleteArray {n : ℕ} (σ : Store) (a : ℕ) :
       AStep σ (app (prim .deleteArray) (star (ref a)) : Term n) σ unit
 
@@ -172,7 +255,7 @@ end Inversion
 lemma Store.FreshFrom.copyShift {σ : Store} {N : ℕ} (h : σ.FreshFrom N) :
     (σ.copyShift N).FreshFrom (N + N) := by
   intro b hb
-  simp only [Store.copyShift, show N ≤ b by omega, if_true]
+  simp only [Store.copyShift_apply, show N ≤ b by omega, if_true]
   exact h _ (by omega)
 
 /-- Reduction never deallocates arrays. -/
@@ -181,7 +264,7 @@ lemma AStep.alloc_mono {n : ℕ} {σ σ' : Store} {t t' : Term n} (hs : AStep σ
   induction hs with
   | betaCopy N u t hN =>
     intro a ha
-    simp only [Store.copyShift]
+    simp only [Store.copyShift_apply]
     split_ifs with h
     · exact absurd (hN a h) ha
     · exact ha
@@ -189,34 +272,15 @@ lemma AStep.alloc_mono {n : ℕ} {σ σ' : Store} {t t' : Term n} (hs : AStep σ
     intro a ha
     by_cases hab : a = b
     · subst hab; simp
-    · rw [Function.update_of_ne hab]; exact ha
+    · rw [Store.set_apply, Function.update_of_ne hab]; exact ha
   | writeArray b k x arr hb =>
     intro a ha
     by_cases hab : a = b
     · subst hab; simp
-    · rw [Function.update_of_ne hab]; exact ha
+    · rw [Store.set_apply, Function.update_of_ne hab]; exact ha
   | app _ _ ih | letPair _ _ ih | letUnit _ _ ih | letBang _ _ ih | borrow _ ih | copy _ _ ih
   | primArg _ _ ih | primStar _ _ ih => exact ih
   | _ => exact fun _ h => h
-
-/-- Reduction preserves finiteness of the store. -/
-lemma AStep.finite {n : ℕ} {σ σ' : Store} {t t' : Term n} (hs : AStep σ t σ' t')
-    (hσ : σ.Finite) : σ'.Finite := by
-  induction hs with
-  | betaCopy N u t hN => exact ⟨N + N, hN.copyShift⟩
-  | newArray k a ha =>
-    obtain ⟨N, hN⟩ := hσ
-    refine ⟨max N (a + 1), fun b hb => ?_⟩
-    rw [Function.update_of_ne (by omega)]
-    exact hN b (by omega)
-  | writeArray a k x arr ha =>
-    obtain ⟨N, hN⟩ := hσ
-    refine ⟨N, fun b hb => ?_⟩
-    have hab : b ≠ a := by rintro rfl; rw [hN b hb] at ha; cases ha
-    rw [Function.update_of_ne hab]; exact hN b hb
-  | app _ _ ih | letPair _ _ ih | letUnit _ _ ih | letBang _ _ ih | borrow _ ih | copy _ _ ih
-  | primArg _ _ ih | primStar _ _ ih => exact ih
-  | _ => exact hσ
 
 lemma ConfOK.mono_store {n : ℕ} {σ σ' : Store} {Γ : Ctx n} (h : ConfOK σ Γ)
     (hm : ∀ a, σ a ≠ none → σ' a ≠ none) : ConfOK σ' Γ :=
@@ -233,7 +297,7 @@ private lemma preserves_cbn {n : ℕ} {σ : Store} {Γ : Ctx n} {t t' : Term n} 
 private lemma newArray_ctx {n : ℕ} {σ : Store} {Γ : Ctx n} (hΓ : ConfOK σ Γ) {a : ℕ}
     (ha : σ a = none) (arr : ℕ → Float) :
     Γ.Sub (Γ.set (.inr a) (some (.nonlin .float))) ∧
-    ConfOK (Function.update σ a (some arr)) (Γ.set (.inr a) (some (.nonlin .float))) ∧
+    ConfOK (σ.set a (some arr)) (Γ.set (.inr a) (some (.nonlin .float))) ∧
     HasTypeD (Γ.set (.inr a) (some (.nonlin .float))) (Term.star (Term.ref a))
       (.star (.array .float)) := by
   have hfresh := hΓ.not_alloc ha
@@ -242,7 +306,7 @@ private lemma newArray_ctx {n : ℕ} {σ : Store} {Γ : Ctx n} (hΓ : ConfOK σ 
     by_cases hx : x = .inr a
     · subst hx; rw [hfresh] at e; cases e
     · rw [Ctx.set_ne _ _ hx]; exact e
-  have hΓ' : ConfOK (Function.update σ a (some arr)) (Γ.set (.inr a) (some (.nonlin .float))) := by
+  have hΓ' : ConfOK (σ.set a (some arr)) (Γ.set (.inr a) (some (.nonlin .float))) := by
     refine ⟨fun i => by rw [Ctx.set_ne _ _ (by simp)]; exact hΓ.noVars i, fun b => ?_,
       fun b h e => ?_⟩
     · by_cases hb : b = a
@@ -250,7 +314,7 @@ private lemma newArray_ctx {n : ℕ} {σ : Store} {Γ : Ctx n} (hΓ : ConfOK σ 
       · rw [Ctx.set_ne _ _ (by simpa using hb)]; exact hΓ.refsNonLin b
     · by_cases hb : b = a
       · subst hb; simp
-      · rw [Function.update_of_ne hb]
+      · rw [Store.set_apply, Function.update_of_ne hb]
         rw [Ctx.set_ne _ _ (by simpa using hb)] at e
         exact hΓ.alloc b h e
   refine ⟨hsub, hΓ', HasTypeD.star_of hΓ'.noVars ?_⟩
@@ -293,7 +357,7 @@ theorem AStep.preserves {n : ℕ} {σ σ' : Store} {t t' : Term n} (hs : AStep �
           refine ⟨fun i => hΓ.noVars i, fun b => ?_, fun b h e => ?_⟩
           · simp only [Γ', Sum.elim_inr]; split_ifs <;> exact hΓ.refsNonLin _
           · simp only [Γ', Sum.elim_inr] at e
-            simp only [Store.copyShift]
+            simp only [Store.copyShift_apply]
             split_ifs at e ⊢ <;> exact hΓ.alloc _ _ e
         have hall := hΓ'.allNonLin
         have hshift : Ctx.RefShift N Γ Γ' :=
@@ -395,21 +459,102 @@ open Term
 /-! ## Progress -/
 
 /-- Values of the store-based semantics: the values of the paper (Theorem 6), where the
-partially applied primitives have their array argument evaluated to a reference. -/
-inductive AValue : {n : ℕ} → Term n → Prop where
-  | lam {n : ℕ} (t : Term (n + 1)) : AValue (lam t)
-  | pair {n : ℕ} (t₁ t₂ : Term n) : AValue (pair t₁ t₂)
-  | unit {n : ℕ} : AValue (unit : Term n)
-  | bang {n : ℕ} (t : Term n) : AValue (bang t)
-  | star {n : ℕ} (t : Term n) : AValue (star t)
-  | nat {n : ℕ} (k : ℕ) : AValue (nat k : Term n)
-  | float {n : ℕ} (x : Float) : AValue (float x : Term n)
-  | ref {n : ℕ} (a : ℕ) : AValue (ref a : Term n)
-  | prim {n : ℕ} (p : Prim) : AValue (prim p : Term n)
-  | read₁ {n : ℕ} (a : ℕ) : AValue (app (prim .readArray) (star (ref a)) : Term n)
-  | write₁ {n : ℕ} (a : ℕ) : AValue (app (prim .writeArray) (star (ref a)) : Term n)
-  | write₂ {n : ℕ} (a k : ℕ) :
-      AValue (app (app (prim .writeArray) (star (ref a))) (nat k) : Term n)
+partially applied primitives have their arguments evaluated (`ReadyPrim`). -/
+inductive StoreValue (n : ℕ) : Type where
+  | lam (t : Term (n + 1))
+  | pair (t₁ t₂ : Term n)
+  | unit
+  | bang (t : Term n)
+  | star (t : Term n)
+  | nat (k : ℕ)
+  | float (x : Float)
+  | ref (a : ℕ)
+  | ready (p : ReadyPrim n)
+
+namespace StoreValue
+
+variable {n : ℕ}
+
+/-- The embedding into terms. -/
+@[simp] def toTerm : StoreValue n → Term n
+  | lam t => .lam t
+  | pair t₁ t₂ => .pair t₁ t₂
+  | unit => .unit
+  | bang t => .bang t
+  | star t => .star t
+  | nat k => .nat k
+  | float x => .float x
+  | ref a => .ref a
+  | ready p => p.toTerm
+
+/-- The embedding into the values of the paper. -/
+def toValue : StoreValue n → Value n
+  | lam t => .lam t
+  | pair t₁ t₂ => .pair t₁ t₂
+  | unit => .unit
+  | bang t => .bang t
+  | star t => .star t
+  | nat k => .nat k
+  | float x => .float x
+  | ref a => .ref a
+  | ready p => .prim p.toPrimFun
+
+@[simp] lemma toValue_toTerm (v : StoreValue n) : v.toValue.toTerm = v.toTerm := by
+  cases v <;> simp [toValue]
+
+end StoreValue
+
+/-- `t` is a value of the store-based semantics, i.e. (the embedding of) an element of the
+grammar `StoreValue n`. -/
+def AValue {n : ℕ} (t : Term n) : Prop := ∃ v : StoreValue n, v.toTerm = t
+
+namespace AValue
+
+variable {n : ℕ}
+
+lemma lam (t : Term (n + 1)) : AValue (Term.lam t) := ⟨.lam t, rfl⟩
+lemma pair (t₁ t₂ : Term n) : AValue (Term.pair t₁ t₂) := ⟨.pair t₁ t₂, rfl⟩
+lemma unit : AValue (Term.unit : Term n) := ⟨.unit, rfl⟩
+lemma bang (t : Term n) : AValue (Term.bang t) := ⟨.bang t, rfl⟩
+lemma star (t : Term n) : AValue (Term.star t) := ⟨.star t, rfl⟩
+lemma nat (k : ℕ) : AValue (Term.nat k : Term n) := ⟨.nat k, rfl⟩
+lemma float (x : Float) : AValue (Term.float x : Term n) := ⟨.float x, rfl⟩
+lemma ref (a : ℕ) : AValue (Term.ref a : Term n) := ⟨.ref a, rfl⟩
+lemma prim (p : Prim) : AValue (Term.prim p : Term n) := ⟨.ready (.const p), rfl⟩
+lemma read₁ (a : ℕ) : AValue (app (Term.prim .readArray) (Term.star (Term.ref a)) : Term n) :=
+  ⟨.ready (.read₁ a), rfl⟩
+lemma write₁ (a : ℕ) : AValue (app (Term.prim .writeArray) (Term.star (Term.ref a)) : Term n) :=
+  ⟨.ready (.write₁ a), rfl⟩
+lemma write₂ (a k : ℕ) :
+    AValue (app (app (Term.prim .writeArray) (Term.star (Term.ref a))) (Term.nat k) : Term n) :=
+  ⟨.ready (.write₂ a k), rfl⟩
+
+/-- Values of the store-based semantics are values of the paper. -/
+lemma isValue {t : Term n} : AValue t → IsValue t
+  | ⟨v, hv⟩ => ⟨v.toValue, by rw [StoreValue.toValue_toTerm, hv]⟩
+
+/-- Case analysis on the values of the store-based semantics. -/
+@[elab_as_elim]
+theorem cases' {motive : (t : Term n) → AValue t → Prop}
+    (lam : ∀ t : Term (n + 1), motive (.lam t) (.lam t))
+    (pair : ∀ t₁ t₂ : Term n, motive (.pair t₁ t₂) (.pair t₁ t₂))
+    (unit : motive .unit .unit)
+    (bang : ∀ t : Term n, motive (.bang t) (.bang t))
+    (star : ∀ t : Term n, motive (.star t) (.star t))
+    (nat : ∀ k : ℕ, motive (.nat k) (.nat k))
+    (float : ∀ x : Float, motive (.float x) (.float x))
+    (ref : ∀ a : ℕ, motive (.ref a) (.ref a))
+    (prim : ∀ p : Prim, motive (.prim p) (.prim p))
+    (read₁ : ∀ a : ℕ, motive _ (.read₁ a))
+    (write₁ : ∀ a : ℕ, motive _ (.write₁ a))
+    (write₂ : ∀ a k : ℕ, motive _ (.write₂ a k))
+    {t : Term n} (h : AValue t) : motive t h := by
+  obtain ⟨v, rfl⟩ := h
+  rcases v with _ | _ | _ | _ | _ | _ | _ | _ | (_ | _ | _ | _)
+  exacts [lam _, pair _ _, unit, bang _, star _, nat _, float _, ref _, prim _, read₁ _,
+    write₁ _, write₂ _ _]
+
+end AValue
 
 /-- The shape of a value determined by its type (canonical forms). -/
 def ValShape {n : ℕ} : Ty → Term n → Prop
@@ -425,7 +570,7 @@ def ValShape {n : ℕ} : Ty → Term n → Prop
 /-- **Canonical forms.** -/
 lemma AValue.shape {n : ℕ} {σ : Store} {Γ : Ctx n} (hΓ : ConfOK σ Γ) {v : Term n} {T : Ty}
     (hv : AValue v) (ht : HasTypeD Γ v T) : ValShape T v := by
-  cases hv with
+  cases hv using AValue.cases' with
   | read₁ a =>
     obtain ⟨C, h₁, -⟩ := ht.inv_app hΓ.allNonLin
     have e := h₁.inv_prim
@@ -474,7 +619,7 @@ lemma ConfOK.alloc_of_app_star {n : ℕ} {σ : Store} {Γ : Ctx n} (h : ConfOK �
 /-- `t` is a value or can take a step. -/
 def AProg {n : ℕ} (σ : Store) (t : Term n) : Prop := AValue t ∨ ∃ σ' t', AStep σ t σ' t'
 
-private lemma progress_aux {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n} {t : Term n}
+private lemma progress_aux {n : ℕ} {σ : Store} {Γ : Ctx n} {t : Term n}
     {A : Ty} (ht : HasTypeD Γ t A) (hΓ : ConfOK σ Γ) :
     AProg σ t ∧ ∀ s, t = star s → AProg σ s := by
   induction ht with
@@ -520,7 +665,7 @@ private lemma progress_aux {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n}
     refine ⟨.inr ?_, fun _ h => by cases h⟩
     rcases (ih₁ (hΓ.left hadd)).1 with hv | ⟨σ', t', hs⟩
     · obtain ⟨u, rfl⟩ := hv.shape (hΓ.left hadd) h₁
-      obtain ⟨N, hN⟩ := hσ
+      obtain ⟨N, hN⟩ := σ.exists_freshFrom
       exact ⟨_, _, .betaCopy _ N _ _ hN⟩
     · exact ⟨_, _, .copy _ hs⟩
   | app h₁ h₂ hadd ih₁ ih₂ =>
@@ -529,7 +674,7 @@ private lemma progress_aux {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n}
     have hΓ₂ := hΓ.right hadd
     rcases (ih₁ hΓ₁).1 with hv | ⟨σ', t', hs⟩
     · rcases (ih₂ hΓ₂).1 with hv₂ | ⟨σ', t', hs₂⟩
-      · cases hv with
+      · cases hv using AValue.cases' with
         | lam => exact .inr ⟨_, _, .betaLolli _ _ _⟩
         | prim p =>
           have e := h₁.inv_prim
@@ -538,7 +683,7 @@ private lemma progress_aux {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n}
             simp only [Prim.ty, Ty.lolli.injEq] at e
             obtain ⟨rfl, rfl⟩ := e
             obtain ⟨k, rfl⟩ := hv₂.shape hΓ₂ h₂
-            obtain ⟨N, hN⟩ := hσ
+            obtain ⟨N, hN⟩ := σ.exists_freshFrom
             exact .inr ⟨_, _, .newArray _ k N (hN N le_rfl)⟩
           | readArray | writeArray | deleteArray =>
             simp only [Prim.ty, Ty.lolli.injEq] at e
@@ -578,7 +723,7 @@ private lemma progress_aux {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n}
           obtain ⟨arr, harr⟩ := hΓ₁.alloc_of_app_star h₃
           exact .inr ⟨_, _, .writeArray _ a k x arr harr⟩
         | _ => cases h₁
-      · cases hv with
+      · cases hv using AValue.cases' with
         | lam => exact .inr ⟨_, _, .betaLolli _ _ _⟩
         | prim p => exact .inr ⟨_, _, .primArg (.prim p) hs₂⟩
         | read₁ a => exact .inr ⟨_, _, .primArg (.read₁ a) hs₂⟩
@@ -588,27 +733,25 @@ private lemma progress_aux {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n}
     · exact .inr ⟨_, _, .app _ hs⟩
 
 /-- **Progress** for the store-based semantics: a term that is well-typed in a context
-compatible with a finite store is a value or can take a step. -/
-theorem astep_progress {n : ℕ} {σ : Store} (hσ : σ.Finite) {Γ : Ctx n} {t : Term n} {A : Ty}
+compatible with a (necessarily finite) store is a value or can take a step. -/
+theorem astep_progress {n : ℕ} {σ : Store} {Γ : Ctx n} {t : Term n} {A : Ty}
     (hΓ : ConfOK σ Γ) (ht : HasType Γ t A) : AValue t ∨ ∃ σ' t', AStep σ t σ' t' :=
-  (progress_aux hσ (hasType_iff_hasTypeD.1 ht) hΓ).1
+  (progress_aux (hasType_iff_hasTypeD.1 ht) hΓ).1
 
 /-- Subject reduction along reduction sequences. -/
 theorem ASteps.preserves {n : ℕ} {σ σ' : Store} {t t' : Term n} (hs : ASteps σ t σ' t')
-    {Γ : Ctx n} {A : Ty} (hΓ : ConfOK σ Γ) (ht : HasType Γ t A) (hσ : σ.Finite) :
-    ∃ Γ', Γ.Sub Γ' ∧ ConfOK σ' Γ' ∧ HasType Γ' t' A ∧ σ'.Finite := by
+    {Γ : Ctx n} {A : Ty} (hΓ : ConfOK σ Γ) (ht : HasType Γ t A) :
+    ∃ Γ', Γ.Sub Γ' ∧ ConfOK σ' Γ' ∧ HasType Γ' t' A := by
   induction hs with
-  | refl => exact ⟨Γ, Ctx.Sub.refl Γ, hΓ, ht, hσ⟩
+  | refl => exact ⟨Γ, Ctx.Sub.refl Γ, hΓ, ht⟩
   | tail _ hstep ih =>
-    obtain ⟨Γ', hsub, hΓ', ht', hσ'⟩ := ih ht
+    obtain ⟨Γ', hsub, hΓ', ht'⟩ := ih ht
     obtain ⟨Γ'', hsub', hΓ'', ht''⟩ := hstep.preserves hΓ' (hasType_iff_hasTypeD.1 ht')
-    exact ⟨Γ'', hsub.trans hsub', hΓ'', hasType_iff_hasTypeD.2 ht'', hstep.finite hσ'⟩
+    exact ⟨Γ'', hsub.trans hsub', hΓ'', hasType_iff_hasTypeD.2 ht''⟩
 
 /-- `ConfOK` holds for the empty store and the empty context. -/
 lemma ConfOK.empty {n : ℕ} : ConfOK Store.empty (Ctx.empty : Ctx n) :=
   ⟨fun _ => rfl, fun _ => trivial, fun _ _ e => by cases e⟩
-
-lemma Store.empty_finite : Store.empty.Finite := ⟨0, fun _ _ => rfl⟩
 
 /-- **Syntactic type safety with arrays.** A well-typed closed program, run from the
 empty store, never gets stuck: every reachable configuration is well-typed (in a
@@ -616,7 +759,7 @@ context compatible with the store) and is either a value or can take another ste
 theorem array_type_safety {t t' : Term 0} {A : Ty} {σ : Store}
     (ht : HasType (Ctx.empty : Ctx 0) t A) (hs : ASteps Store.empty t σ t') :
     (∃ Γ, ConfOK σ Γ ∧ HasType Γ t' A) ∧ (AValue t' ∨ ∃ σ'' t'', AStep σ t' σ'' t'') := by
-  obtain ⟨Γ, -, hΓ, ht', hσ⟩ := hs.preserves ConfOK.empty ht Store.empty_finite
-  exact ⟨⟨Γ, hΓ, ht'⟩, astep_progress hσ hΓ ht'⟩
+  obtain ⟨Γ, -, hΓ, ht'⟩ := hs.preserves ConfOK.empty ht
+  exact ⟨⟨Γ, hΓ, ht'⟩, astep_progress hΓ ht'⟩
 
 end LCU

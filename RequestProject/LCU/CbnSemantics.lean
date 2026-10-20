@@ -319,7 +319,7 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | app h₁ _ hadd ih₁ _ =>
     right
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · cases hv with
+    · induction hv using IsValue.induction with
       | lam t => exact ⟨_, .betaLolli _ _⟩
       | prim => exact hp.1.elim
       | readArray₁ _ => exact hp.1.1.elim
@@ -330,7 +330,7 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | tensorE h₁ _ hadd ih₁ _ =>
     right
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · cases hv with
+    · induction hv using IsValue.induction with
       | pair => exact ⟨_, .betaTensor _ _ _⟩
       | prim => exact hp.1.elim
       | readArray₁ _ => exact hp.1.1.elim
@@ -341,7 +341,7 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | unitE h₁ _ hadd ih₁ _ =>
     right
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · cases hv with
+    · induction hv using IsValue.induction with
       | unit => exact ⟨_, .betaUnit _⟩
       | prim => exact hp.1.elim
       | readArray₁ _ => exact hp.1.1.elim
@@ -352,7 +352,7 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | bangE h₁ _ hadd ih₁ _ =>
     right
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · cases hv with
+    · induction hv using IsValue.induction with
       | bang => exact ⟨_, .betaBang _ _⟩
       | prim => exact hp.1.elim
       | readArray₁ _ => exact hp.1.1.elim
@@ -363,7 +363,7 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | copy h₁ _ hadd ih₁ _ =>
     right
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · cases hv with
+    · induction hv using IsValue.induction with
       | bang => exact ⟨_, .betaCopy _ _⟩
       | prim => exact hp.1.elim
       | readArray₁ _ => exact hp.1.1.elim
@@ -374,7 +374,7 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | borrow h₁ ih₁ =>
     right
     rcases ih₁ hΓ hp with hv | ⟨t', hs⟩
-    · cases hv with
+    · induction hv using IsValue.induction with
       | star => exact ⟨_, .betaBorrow _⟩
       | prim => exact hp.elim
       | readArray₁ _ => exact hp.1.elim
@@ -397,14 +397,14 @@ theorem cbn_type_safety {Γ : Ctx 0} {t t' : Term 0} {A : Ty} (hr : Γ.RefsNonLi
 /-- Values are normal forms. -/
 theorem IsValue.not_cbnStep {n : ℕ} {v t : Term n} (hv : IsValue v) : ¬ CbnStep v t := by
   intro hs
-  induction hv generalizing t with
-  | readArray₁ _ ih =>
+  induction hv using IsValue.induction generalizing t with
+  | readArray₁ _ _ ih =>
     cases hs with
     | app _ h => cases h
-  | writeArray₁ _ ih =>
+  | writeArray₁ _ _ ih =>
     cases hs with
     | app _ h => cases h
-  | writeArray₂ _ _ ih₁ ih₂ =>
+  | writeArray₂ _ _ _ _ ih₁ ih₂ =>
     cases hs with
     | app _ h =>
       cases h with
