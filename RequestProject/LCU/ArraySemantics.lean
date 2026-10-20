@@ -320,10 +320,7 @@ private lemma newArray_ctx {n : ℕ} {σ : Store} {Γ : Ctx n} (hΓ : ConfOK σ 
   refine ⟨hsub, hΓ', HasTypeD.star_of hΓ'.noVars ?_⟩
   refine HasTypeD.ref (h := .nonlin .float) (by simp) ?_
   rw [Ctx.set_set]
-  intro x
-  by_cases hx : x = .inr a
-  · subst hx; simp
-  · rw [Ctx.set_ne _ _ hx]; exact hΓ.allNonLin x
+  exact hΓ.allNonLin.set _ trivial
 
 /-- **Subject reduction** for the store-based semantics: a reduction step of a term that
 is well-typed in a context compatible with the store yields a term of the same type, in
@@ -332,11 +329,8 @@ theorem AStep.preserves {n : ℕ} {σ σ' : Store} {t t' : Term n} (hs : AStep �
     {Γ : Ctx n} {A : Ty} (hΓ : ConfOK σ Γ) (ht : HasTypeD Γ t A) :
     ∃ Γ', Γ.Sub Γ' ∧ ConfOK σ' Γ' ∧ HasTypeD Γ' t' A := by
   induction hs generalizing Γ A with
-  | betaLolli t u => exact preserves_cbn (.betaLolli t u) hΓ ht
-  | betaTensor t₁ t₂ t => exact preserves_cbn (.betaTensor t₁ t₂ t) hΓ ht
-  | betaUnit t => exact preserves_cbn (.betaUnit t) hΓ ht
-  | betaBang u t => exact preserves_cbn (.betaBang u t) hΓ ht
-  | betaBorrow t => exact preserves_cbn (.betaBorrow t) hΓ ht
+  | betaLolli | betaTensor | betaUnit | betaBang | betaBorrow =>
+    exact preserves_cbn (by constructor) hΓ ht
   | betaCopy N u t hN =>
     cases ht with
     | copy h₁ h₂ hadd =>
@@ -624,14 +618,11 @@ private lemma progress_aux {n : ℕ} {σ : Store} {Γ : Ctx n} {t : Term n}
     AProg σ t ∧ ∀ s, t = star s → AProg σ s := by
   induction ht with
   | var hi _ => rw [hΓ.noVars] at hi; cases hi
-  | abs _ _ => exact ⟨.inl (.lam _), fun _ h => by cases h⟩
-  | tensorI _ _ _ _ _ => exact ⟨.inl (.pair _ _), fun _ h => by cases h⟩
-  | unitI _ => exact ⟨.inl .unit, fun _ h => by cases h⟩
-  | bangI _ _ _ => exact ⟨.inl (.bang _), fun _ h => by cases h⟩
-  | natI _ => exact ⟨.inl (.nat _), fun _ h => by cases h⟩
-  | floatI _ => exact ⟨.inl (.float _), fun _ h => by cases h⟩
-  | prim _ => exact ⟨.inl (.prim _), fun _ h => by cases h⟩
-  | ref _ _ => exact ⟨.inl (.ref _), fun _ h => by cases h⟩
+  | abs _ _ | tensorI _ _ _ _ _ | unitI _ | bangI _ _ _ | natI _ | floatI _ | prim _ | ref _ _ =>
+    refine ⟨.inl ?_, fun _ h => by cases h⟩
+    first
+      | exact .lam _ | exact .pair _ _ | exact .unit | exact .bang _
+      | exact .nat _ | exact .float _ | exact .prim _ | exact .ref _
   | nec _ _ ih =>
     refine ⟨.inl (.star _), fun s h => ?_⟩
     cases h
@@ -642,32 +633,16 @@ private lemma progress_aux {n : ℕ} {σ : Store} {Γ : Ctx n} {t : Term n}
     · obtain ⟨u, rfl⟩ := hv.shape hΓ h₁
       exact ⟨_, _, .betaBorrow _ _⟩
     · exact ⟨_, _, .borrow hs⟩
-  | tensorE h₁ _ hadd ih₁ _ =>
-    refine ⟨.inr ?_, fun _ h => by cases h⟩
-    rcases (ih₁ (hΓ.left hadd)).1 with hv | ⟨σ', t', hs⟩
-    · obtain ⟨u₁, u₂, rfl⟩ := hv.shape (hΓ.left hadd) h₁
-      exact ⟨_, _, .betaTensor _ _ _ _⟩
-    · exact ⟨_, _, .letPair _ hs⟩
-  | unitE h₁ _ hadd ih₁ _ =>
-    refine ⟨.inr ?_, fun _ h => by cases h⟩
-    rcases (ih₁ (hΓ.left hadd)).1 with hv | ⟨σ', t', hs⟩
-    · have e : _ = _ := hv.shape (hΓ.left hadd) h₁
-      subst e
-      exact ⟨_, _, .betaUnit _ _⟩
-    · exact ⟨_, _, .letUnit _ hs⟩
-  | bangE h₁ _ hadd ih₁ _ =>
-    refine ⟨.inr ?_, fun _ h => by cases h⟩
-    rcases (ih₁ (hΓ.left hadd)).1 with hv | ⟨σ', t', hs⟩
-    · obtain ⟨u, rfl⟩ := hv.shape (hΓ.left hadd) h₁
-      exact ⟨_, _, .betaBang _ _ _⟩
-    · exact ⟨_, _, .letBang _ hs⟩
+  | tensorE h₁ _ hadd ih₁ _ | unitE h₁ _ hadd ih₁ _ | bangE h₁ _ hadd ih₁ _
   | copy h₁ _ hadd ih₁ _ =>
     refine ⟨.inr ?_, fun _ h => by cases h⟩
     rcases (ih₁ (hΓ.left hadd)).1 with hv | ⟨σ', t', hs⟩
-    · obtain ⟨u, rfl⟩ := hv.shape (hΓ.left hadd) h₁
+    · have hshape := hv.shape (hΓ.left hadd) h₁
+      -- `hshape` determines the head constructor of the value
+      obtain ⟨_, _, rfl⟩ := hshape
       obtain ⟨N, hN⟩ := σ.exists_freshFrom
-      exact ⟨_, _, .betaCopy _ N _ _ hN⟩
-    · exact ⟨_, _, .copy _ hs⟩
+      exact ⟨_, _, by first | exact .betaCopy _ N _ _ hN | constructor⟩
+    · exact ⟨_, _, by constructor; exact hs⟩
   | app h₁ h₂ hadd ih₁ ih₂ =>
     refine ⟨?_, fun _ h => by cases h⟩
     have hΓ₁ := hΓ.left hadd

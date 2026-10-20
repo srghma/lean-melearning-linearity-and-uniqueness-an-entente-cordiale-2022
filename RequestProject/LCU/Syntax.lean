@@ -304,4 +304,23 @@ lemma subst2_eq {n : ℕ} (s₁ s₂ : Term n) (t : Term (n + 2)) :
 
 end Term
 
+/-- Renaming of array references `θ(t)`. -/
+def renameRefs (θ : ℕ → ℕ) : {n : ℕ} → Term n → Term n
+  | _, .var i => .var i
+  | _, .lam t => .lam (renameRefs θ t)
+  | _, .app t₁ t₂ => .app (renameRefs θ t₁) (renameRefs θ t₂)
+  | _, .pair t₁ t₂ => .pair (renameRefs θ t₁) (renameRefs θ t₂)
+  | _, .letPair t₁ t₂ => .letPair (renameRefs θ t₁) (renameRefs θ t₂)
+  | _, .unit => .unit
+  | _, .letUnit t₁ t₂ => .letUnit (renameRefs θ t₁) (renameRefs θ t₂)
+  | _, .bang t => .bang (renameRefs θ t)
+  | _, .letBang t₁ t₂ => .letBang (renameRefs θ t₁) (renameRefs θ t₂)
+  | _, .borrow t => .borrow (renameRefs θ t)
+  | _, .copy t₁ t₂ => .copy (renameRefs θ t₁) (renameRefs θ t₂)
+  | _, .star t => .star (renameRefs θ t)
+  | _, .nat k => .nat k
+  | _, .float x => .float x
+  | _, .prim p => .prim p
+  | _, .ref a => .ref (θ a)
+
 end LCU

@@ -135,9 +135,6 @@ lemma subst_split {n m : ℕ} {ρ : Fin n → Fin m} {i : Fin m} {Δ₁ Δ₂ Δ
   obtain ⟨C₁, C₂, hc₁, hc₂, hc⟩ := Ctx.Add.interchange h₁₂ (hadd.remove ρ) hadd'
   exact ⟨Γ₁', Γ₂', C₁, C₂, h₁, h₂, hc₁, hc₂, hc⟩
 
-lemma HypAdd.some_of_nonLin' {h : Hyp} {d c : Option Hyp} (hx : HypAdd d (some h) c)
-    (hd : NonLin d) : c = some h := hx.comm.some_of_nonLin hd
-
 /-- Removing a variable from a context whose other assumptions are non-linear. -/
 lemma Ctx.remove_allNonLin {n m : ℕ} {ρ : Fin n → Fin m} {i : Fin m} {σ : Fin m → Term n}
     (hs : SubstSetup ρ i σ) {Δ : Ctx m} (hΔ : (Δ.set (.inl i) none).AllNonLin) :
@@ -147,6 +144,16 @@ lemma Ctx.remove_allNonLin {n m : ℕ} {ρ : Fin n → Fin m} {i : Fin m} {σ : 
     rwa [Ctx.set_ne _ _ (by simpa using hs.ne j)] at this
   · have := hΔ (.inr a)
     rwa [Ctx.set_ne _ _ (by simp)] at this
+
+/-- Removing a variable from a context whose other assumptions are non-linear, keeping
+the assumption of one name. -/
+lemma Ctx.remove_set_allNonLin {n m : ℕ} {ρ : Fin n → Fin m} (hinj : Function.Injective ρ)
+    {Δ : Ctx m} {y : Fin n ⊕ ℕ} {h : Option Hyp} (hΔ : (Δ.set (Sum.map ρ id y) h).AllNonLin) :
+    ((Δ.remove ρ).set y h).AllNonLin := by
+  have e : ∀ z, Δ.remove ρ z = Δ (Sum.map ρ id z) := by rintro (j | a) <;> rfl
+  refine Ctx.AllNonLin.set' (fun z hz => ?_) (by simpa using hΔ (Sum.map ρ id y))
+  rw [e]
+  exact hΔ.of_set ((Sum.map_injective.2 ⟨hinj, Function.injective_id⟩).ne hz)
 
 lemma Ctx.AllNonLin.remove {n m : ℕ} {ρ : Fin n → Fin m} {Δ : Ctx m} (hΔ : Δ.AllNonLin) :
     (Δ.remove ρ).AllNonLin := by
@@ -174,101 +181,63 @@ theorem subst_gen {m : ℕ} {Δ : Ctx m} {t : Term m} {B : Ty} (ht : HasTypeD Δ
       · exact hsub.2.weaken hrem hadd
     · obtain ⟨j, rfl⟩ := hs.surj k hki
       rw [hs.var]
-      have hi : NonLin (Δ (.inl i)) := by
-        have := hrest (.inl i); rwa [Ctx.set_ne _ _ (by simpa using (Ne.symm hki))] at this
-      have hΓ' := hsub.allNonLin hi
-      refine HasTypeD.var (h := h) ?_ ?_
-      · have e : Δ.remove ρ (.inl j) = some h := hk
-        have := hadd (.inl j); rw [e] at this
-        exact this.some_of_nonLin' (hΓ' _)
-      · intro y
-        by_cases hy : y = .inl j
-        · subst hy; simp
-        · rw [Ctx.set_ne _ _ hy]
-          refine (hadd y).nonLin_of (hΓ' y) ?_
-          rcases y with y | a
-          · have := hrest (.inl (ρ y))
-            rwa [Ctx.set_ne _ _ (by simpa [hs.inj.eq_iff] using hy)] at this
-          · have := hrest (.inr a)
-            rwa [Ctx.set_ne _ _ (by simp)] at this
+      have hΓ' := hsub.allNonLin (hrest.of_set (by simpa using Ne.symm hki))
+      obtain ⟨h₁, h₂⟩ :=
+        hadd.comm.weaken_name hΓ' (x := .inl j) hk (Ctx.remove_set_allNonLin hs.inj hrest)
+      exact .var h₁ h₂
   | abs _ ih =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd
     refine HasTypeD.abs (ih hs.up hsub.shift ?_)
     rw [Ctx.remove_cons]
     exact hadd.cons (.noneLeft _)
-  | app _ _ hadd ih₁ ih₂ =>
+  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | tensorE _ _ hadd ih₁ ih₂
+  | unitE _ _ hadd ih₁ ih₂ | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd'
     obtain ⟨_, _, _, _, h₁, h₂, a₁, a₂, a⟩ := subst_split hadd hsub hadd'
-    exact .app (ih₁ hs h₁ a₁) (ih₂ hs h₂ a₂) a
-  | tensorI _ _ hadd ih₁ ih₂ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd'
-    obtain ⟨_, _, _, _, h₁, h₂, a₁, a₂, a⟩ := subst_split hadd hsub hadd'
-    exact .tensorI (ih₁ hs h₁ a₁) (ih₂ hs h₂ a₂) a
-  | tensorE _ _ hadd ih₁ ih₂ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd'
-    obtain ⟨_, _, _, _, h₁, h₂, a₁, a₂, a⟩ := subst_split hadd hsub hadd'
-    refine .tensorE (ih₁ hs h₁ a₁) (ih₂ hs.up.up h₂.shift.shift ?_) a
-    rw [Ctx.remove_cons, Ctx.remove_cons]
-    exact (a₂.cons (.noneLeft _)).cons (.noneLeft _)
-  | unitI hΔ =>
+    split_rule (ih₁ hs h₁ a₁)
+      (ih₂ (by first | exact hs | exact hs.up | exact hs.up.up)
+        (by first | exact h₂ | exact h₂.shift | exact h₂.shift.shift)
+        (by (try simp only [Ctx.remove_cons])
+            first | exact a₂ | exact a₂.cons (.noneLeft _)
+                  | exact (a₂.cons (.noneLeft _)).cons (.noneLeft _))) a
+  | unitI hΔ | natI hΔ | floatI hΔ | prim hΔ =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd
-    exact .unitI (Ctx.AllNonLin.of_add hadd (hsub.allNonLin (hΔ _)) hΔ.remove)
-  | unitE _ _ hadd ih₁ ih₂ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd'
-    obtain ⟨_, _, _, _, h₁, h₂, a₁, a₂, a⟩ := subst_split hadd hsub hadd'
-    exact .unitE (ih₁ hs h₁ a₁) (ih₂ hs h₂ a₂) a
+    constructor; exact Ctx.AllNonLin.of_add hadd (hsub.allNonLin (hΔ _)) hΔ.remove
   | bangI hΔ _ ih =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd
     exact .bangI (Ctx.AllNonLin.of_add hadd (hsub.allNonLin (hΔ _)) hΔ.remove)
       (ih hs hsub hadd)
-  | bangE _ _ hadd ih₁ ih₂ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd'
-    obtain ⟨_, _, _, _, h₁, h₂, a₁, a₂, a⟩ := subst_split hadd hsub hadd'
-    refine .bangE (ih₁ hs h₁ a₁) (ih₂ hs.up h₂.shift ?_) a
-    rw [Ctx.remove_cons]
-    exact a₂.cons (.noneLeft _)
   | borrow _ ih =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd
     exact .borrow (ih hs hsub hadd)
-  | copy _ _ hadd ih₁ ih₂ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd'
-    obtain ⟨_, _, _, _, h₁, h₂, a₁, a₂, a⟩ := subst_split hadd hsub hadd'
-    refine .copy (ih₁ hs h₁ a₁) (ih₂ hs.up h₂.shift ?_) a
-    rw [Ctx.remove_cons]
-    exact a₂.cons (.noneLeft _)
   | @nec m Δ t A _ hΔ ih =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd
     have hΓ' := hsub.allNonLin (hΔ i)
     refine .nec (ih hs (Γ' := Γ'.refsOnly) hΓ'.refsOnly ?_) ?_
     · rw [Ctx.remove_refsOnly]; exact hadd.refsOnly
     · refine Ctx.VarsNonLin.of_add hadd hΓ'.varsNonLin (fun j => hΔ _)
-  | natI hΔ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd
-    exact .natI (Ctx.AllNonLin.of_add hadd (hsub.allNonLin (hΔ _)) hΔ.remove)
-  | floatI hΔ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd
-    exact .floatI (Ctx.AllNonLin.of_add hadd (hsub.allNonLin (hΔ _)) hΔ.remove)
-  | prim hΔ =>
-    intro n ρ i σ Γ' Γ'' hs hsub hadd
-    exact .prim (Ctx.AllNonLin.of_add hadd (hsub.allNonLin (hΔ _)) hΔ.remove)
   | @ref m Δ a h ha hrest =>
     intro n ρ i σ Γ' Γ'' hs hsub hadd
-    have hi : NonLin (Δ (.inl i)) := by
-      have := hrest (.inl i); rwa [Ctx.set_ne _ _ (by simp)] at this
-    have hΓ' := hsub.allNonLin hi
-    have e : Δ.remove ρ (.inr a) = some h := ha
-    have hx := hadd (.inr a); rw [e] at hx
-    refine HasTypeD.ref (h := h) (hx.some_of_nonLin' (hΓ' _)) ?_
-    intro y
-    by_cases hy : y = .inr a
-    · subst hy; simp
-    · rw [Ctx.set_ne _ _ hy]
-      refine (hadd y).nonLin_of (hΓ' y) ?_
-      rcases y with y | b
-      · have := hrest (.inl (ρ y))
-        rwa [Ctx.set_ne _ _ (by simp)] at this
-      · have := hrest (.inr b)
-        rwa [Ctx.set_ne _ _ (by simpa using hy)] at this
+    have hΓ' := hsub.allNonLin (hrest.of_set (by simp))
+    obtain ⟨h₁, h₂⟩ :=
+      hadd.comm.weaken_name hΓ' (x := .inr a) ha (Ctx.remove_set_allNonLin hs.inj hrest)
+    exact .ref h₁ h₂
+
+lemma subst_lin {n : ℕ} {Γ' Γ Γ'' : Ctx n} {t' : Term n} {t : Term (n + 1)} {A B : Ty}
+    (ht' : HasTypeD Γ' t' A) (ht : HasTypeD (Γ.cons (some (.lin A))) t B)
+    (hadd : Γ'.Add Γ Γ'') : HasTypeD Γ'' (Term.subst1 t' t) B :=
+  ht.subst_gen (SubstSetup.zero t') ht' (by rwa [Ctx.remove_succ_cons])
+
+lemma subst_nonlin {n : ℕ} {Γ' Γ Γ'' : Ctx n} {t' : Term n} {t : Term (n + 1)} {A B : Ty}
+    (hΓ' : Γ'.AllNonLin) (ht' : HasTypeD Γ' t' A)
+    (ht : HasTypeD (Γ.cons (some (.nonlin A))) t B)
+    (hadd : Γ'.Add Γ Γ'') : HasTypeD Γ'' (Term.subst1 t' t) B :=
+  ht.subst_gen (SubstSetup.zero t') ⟨hΓ', ht'⟩ (by rwa [Ctx.remove_succ_cons])
+
+lemma subst_none {n : ℕ} {Γ : Ctx n} {s : Term n} {t : Term (n + 1)} {B : Ty}
+    (ht : HasTypeD (Γ.cons none) t B) : HasTypeD Γ (Term.subst1 s t) B :=
+  ht.subst_gen (SubstSetup.zero s) (Γ' := Ctx.empty) Ctx.AllNonLin.empty
+    (by rw [Ctx.remove_succ_cons]; exact Ctx.Add.empty_left _)
 
 end HasTypeD
 
@@ -280,8 +249,7 @@ theorem subst_lin {n : ℕ} {Γ' Γ Γ'' : Ctx n} {t' : Term n} {t : Term (n + 1
     (ht' : HasType Γ' t' A) (ht : HasType (Γ.cons (some (.lin A))) t B)
     (hadd : Γ'.Add Γ Γ'') : HasType Γ'' (Term.subst1 t' t) B := by
   rw [hasType_iff_hasTypeD] at *
-  refine ht.subst_gen (SubstSetup.zero t') (Γ' := Γ') ht' ?_
-  rwa [Ctx.remove_succ_cons]
+  exact ht'.subst_lin ht hadd
 
 /-- **Lemma 2 (Non-linear substitution).** If `[Γ'] ⊢ t' : A` and `Γ, x : [A] ⊢ t : B`
 then `[Γ'] + Γ ⊢ [t'/x]t : B`. -/
@@ -289,15 +257,13 @@ theorem subst_nonlin {n : ℕ} {Γ' Γ Γ'' : Ctx n} {t' : Term n} {t : Term (n 
     (hΓ' : Γ'.AllNonLin) (ht' : HasType Γ' t' A) (ht : HasType (Γ.cons (some (.nonlin A))) t B)
     (hadd : Γ'.Add Γ Γ'') : HasType Γ'' (Term.subst1 t' t) B := by
   rw [hasType_iff_hasTypeD] at *
-  refine ht.subst_gen (SubstSetup.zero t') (Γ' := Γ') ⟨hΓ', ht'⟩ ?_
-  rwa [Ctx.remove_succ_cons]
+  exact HasTypeD.subst_nonlin hΓ' ht' ht hadd
 
 /-- Substitution for a variable which does not occur in the context (strengthening). -/
 theorem subst_none {n : ℕ} {Γ : Ctx n} {s : Term n} {t : Term (n + 1)} {B : Ty}
     (ht : HasType (Γ.cons none) t B) : HasType Γ (Term.subst1 s t) B := by
   rw [hasType_iff_hasTypeD] at *
-  refine ht.subst_gen (SubstSetup.zero s) (Γ' := Ctx.empty) Ctx.AllNonLin.empty ?_
-  rw [Ctx.remove_succ_cons]; exact Ctx.Add.empty_left _
+  exact ht.subst_none
 
 end HasType
 

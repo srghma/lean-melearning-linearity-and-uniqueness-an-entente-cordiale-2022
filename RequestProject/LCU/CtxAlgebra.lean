@@ -37,16 +37,15 @@ lemma idem (h : NonLin a) : HypAdd a a a := by
   · exact absurd h (not_nonLin_lin A)
   · exact .nonlin A
 
-/-- Internal tactic: close a goal `∃ x, HypAdd _ _ x ∧ HypAdd _ _ _` by trying
-all combinations of constructors. -/
-macro "hyp_add2" : tactic => `(tactic| first | exact ⟨_, HypAdd.noneLeft _, HypAdd.noneLeft _⟩ | exact ⟨_, HypAdd.noneLeft _, HypAdd.noneRight _⟩ | exact ⟨_, HypAdd.noneLeft _, HypAdd.nonlin _⟩ | exact ⟨_, HypAdd.noneLeft _, HypAdd.none_right _⟩ | exact ⟨_, HypAdd.noneRight _, HypAdd.noneLeft _⟩ | exact ⟨_, HypAdd.noneRight _, HypAdd.noneRight _⟩ | exact ⟨_, HypAdd.noneRight _, HypAdd.nonlin _⟩ | exact ⟨_, HypAdd.noneRight _, HypAdd.none_right _⟩ | exact ⟨_, HypAdd.nonlin _, HypAdd.noneLeft _⟩ | exact ⟨_, HypAdd.nonlin _, HypAdd.noneRight _⟩ | exact ⟨_, HypAdd.nonlin _, HypAdd.nonlin _⟩ | exact ⟨_, HypAdd.nonlin _, HypAdd.none_right _⟩ | exact ⟨_, HypAdd.none_right _, HypAdd.noneLeft _⟩ | exact ⟨_, HypAdd.none_right _, HypAdd.noneRight _⟩ | exact ⟨_, HypAdd.none_right _, HypAdd.nonlin _⟩ | exact ⟨_, HypAdd.none_right _, HypAdd.none_right _⟩)
-
-/-- Internal tactic: as `hyp_add2` with two witnesses and three summands. -/
-macro "hyp_add3" : tactic => `(tactic| first | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneLeft _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneLeft _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneLeft _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneLeft _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneRight _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneRight _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneRight _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.noneRight _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.nonlin _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.nonlin _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.nonlin _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.nonlin _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.none_right _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.none_right _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.none_right _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneLeft _, HypAdd.none_right _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneLeft _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneLeft _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneLeft _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneLeft _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneRight _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneRight _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneRight _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.noneRight _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.nonlin _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.nonlin _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.nonlin _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.nonlin _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.none_right _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.none_right _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.none_right _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.noneRight _, HypAdd.none_right _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneLeft _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneLeft _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneLeft _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneLeft _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneRight _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneRight _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneRight _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.noneRight _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.nonlin _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.nonlin _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.nonlin _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.nonlin _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.none_right _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.none_right _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.none_right _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.nonlin _, HypAdd.none_right _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneLeft _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneLeft _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneLeft _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneLeft _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneRight _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneRight _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneRight _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.noneRight _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.nonlin _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.nonlin _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.nonlin _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.nonlin _, HypAdd.none_right _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.none_right _, HypAdd.noneLeft _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.none_right _, HypAdd.noneRight _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.none_right _, HypAdd.nonlin _⟩ | exact ⟨_, _, HypAdd.none_right _, HypAdd.none_right _, HypAdd.none_right _⟩)
+/-- Internal tactic: close a goal `∃ x, HypAdd _ _ x ∧ ...` built from `HypAdd`
+facts by greedily introducing witnesses and applying the constructors. -/
+macro "hyp_add" : tactic => `(tactic| repeat' first
+  | refine ⟨_, ?_⟩ | refine ⟨?_, ?_⟩
+  | exact .noneLeft _ | exact .noneRight _ | exact .nonlin _ | exact none_right _)
 
 lemma assoc (h₁ : HypAdd a b ab) (h₂ : HypAdd ab c abc) :
     ∃ bc, HypAdd b c bc ∧ HypAdd a bc abc := by
-  cases h₁ <;> cases h₂ <;> hyp_add2
+  cases h₁ <;> cases h₂ <;> hyp_add
 
 lemma assoc' (h₁ : HypAdd b c bc) (h₂ : HypAdd a bc abc) :
     ∃ ab, HypAdd a b ab ∧ HypAdd ab c abc := by
@@ -55,7 +54,7 @@ lemma assoc' (h₁ : HypAdd b c bc) (h₂ : HypAdd a bc abc) :
 
 lemma interchange (h₁ : HypAdd a₁ a₂ a) (h₂ : HypAdd b₁ b₂ b) (h : HypAdd a b c) :
     ∃ c₁ c₂, HypAdd a₁ b₁ c₁ ∧ HypAdd a₂ b₂ c₂ ∧ HypAdd c₁ c₂ c := by
-  cases h₁ <;> cases h₂ <;> cases h <;> hyp_add3
+  cases h₁ <;> cases h₂ <;> cases h <;> hyp_add
 
 lemma nonLin_iff (h : HypAdd a b c) : NonLin c ↔ NonLin a ∧ NonLin b := by
   cases h <;> simp
@@ -71,6 +70,14 @@ lemma eq_none (h : HypAdd a b none) : a = none ∧ b = none := by
 lemma eq_lin {A : Ty} (h : HypAdd a b (some (.lin A))) :
     (a = some (.lin A) ∧ b = none) ∨ (a = none ∧ b = some (.lin A)) := by
   cases h <;> simp
+
+lemma some_of_nonLin {h : Hyp} (hx : HypAdd (some h) b c) (hb : NonLin b) : c = some h := by
+  cases hx with
+  | noneRight => rfl
+  | nonlin => rfl
+
+lemma some_of_nonLin' {h : Hyp} (hx : HypAdd a (some h) c) (ha : NonLin a) : c = some h :=
+  hx.comm.some_of_nonLin ha
 
 lemma left_none (h : HypAdd none b c) : b = c := by cases h; rfl
 lemma right_none (h : HypAdd a none c) : a = c := by cases h; all_goals rfl
@@ -169,6 +176,10 @@ lemma Add.cons {h₁ h₂ h : Option Hyp} (hΓ : Γ₁.Add Γ₂ Γ) (hh : HypAd
     · exact hΓ _
   · exact hΓ _
 
+lemma Add.cons_none (hΓ : Γ₁.Add Γ₂ Γ) (h₀ : Option Hyp) :
+    (Γ₁.cons h₀).Add (Γ₂.cons none) (Γ.cons h₀) :=
+  hΓ.cons (HypAdd.none_right _)
+
 lemma Add.of_cons {h₁ h₂ h : Option Hyp} (hΓ : (Γ₁.cons h₁).Add (Γ₂.cons h₂) (Γ.cons h)) :
     Γ₁.Add Γ₂ Γ ∧ HypAdd h₁ h₂ h := by
   refine ⟨?_, hΓ (.inl 0)⟩
@@ -234,6 +245,9 @@ lemma AllNonLin.cons {h : Option Hyp} (hΓ : Γ.AllNonLin) (hh : NonLin h) :
     · exact hΓ _
   · exact hΓ _
 
+lemma AllNonLin.cons_none (hΓ : Γ.AllNonLin) : (Γ.cons none).AllNonLin :=
+  hΓ.cons trivial
+
 lemma AllNonLin.of_cons {h : Option Hyp} (hΓ : (Γ.cons h).AllNonLin) :
     Γ.AllNonLin ∧ NonLin h := by
   refine ⟨?_, hΓ (.inl 0)⟩
@@ -248,6 +262,21 @@ lemma set_set (Γ : Ctx n) (x : Fin n ⊕ ℕ) (h h' : Option Hyp) :
 lemma set_eq_self {Γ : Ctx n} {x : Fin n ⊕ ℕ} {h : Option Hyp} (e : Γ x = h) :
     Γ.set x h = Γ := by
   subst e; simp [Ctx.set]
+
+lemma AllNonLin.of_set {x y : Fin n ⊕ ℕ} {h : Option Hyp} (hΓ : (Γ.set x h).AllNonLin)
+    (hy : y ≠ x) : NonLin (Γ y) := by
+  have := hΓ y; rwa [Ctx.set_ne _ _ hy] at this
+
+lemma AllNonLin.set' {x : Fin n ⊕ ℕ} {h : Option Hyp} (hΓ : ∀ y, y ≠ x → NonLin (Γ y))
+    (hh : NonLin h) : (Γ.set x h).AllNonLin := by
+  intro y
+  by_cases hy : y = x
+  · subst hy; simpa using hh
+  · rw [Ctx.set_ne _ _ hy]; exact hΓ y hy
+
+lemma AllNonLin.set (hΓ : Γ.AllNonLin) (x : Fin n ⊕ ℕ) {h : Option Hyp} (hh : NonLin h) :
+    (Γ.set x h).AllNonLin :=
+  AllNonLin.set' (fun y _ => hΓ y) hh
 
 lemma set_comm (Γ : Ctx n) {x y : Fin n ⊕ ℕ} (hxy : x ≠ y) (h h' : Option Hyp) :
     (Γ.set x h).set y h' = (Γ.set y h').set x h := by

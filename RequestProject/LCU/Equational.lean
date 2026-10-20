@@ -99,103 +99,51 @@ def FreeIn : {n : ℕ} → Fin n → Term n → Prop
   | _, _, .prim _ => False
   | _, _, .ref _ => False
 
-lemma freeIn_rename {n m : ℕ} (ρ : Fin n → Fin m) (t : Term n) :
-    ∀ j, FreeIn j (t.rename ρ) → ∃ i, ρ i = j := by
-  induction t generalizing m with
-  | var i => intro j h; simp only [Term.rename, FreeIn] at h; exact ⟨i, h.symm⟩
-  | lam t ih =>
-    intro j h; simp only [Term.rename, FreeIn] at h
-    obtain ⟨i, hi⟩ := ih _ _ h
+lemma Ren.exists_of_up {n m : ℕ} {ρ : Fin n → Fin m} {j : Fin m} :
+    (∃ i, Ren.up ρ i = j.succ) → ∃ i, ρ i = j
+  | ⟨i, hi⟩ => by
     cases i using Fin.cases with
     | zero => exact absurd hi (Fin.succ_ne_zero j).symm
     | succ i => exact ⟨i, by simpa using hi⟩
-  | app t₁ t₂ ih₁ ih₂ => intro j h; simp only [Term.rename, FreeIn] at h; rcases h with h | h; exacts [ih₁ _ _ h, ih₂ _ _ h]
-  | pair t₁ t₂ ih₁ ih₂ => intro j h; simp only [Term.rename, FreeIn] at h; rcases h with h | h; exacts [ih₁ _ _ h, ih₂ _ _ h]
-  | letPair t₁ t₂ ih₁ ih₂ =>
-    intro j h; simp only [Term.rename, FreeIn] at h; rcases h with h | h
+
+lemma freeIn_rename {n m : ℕ} (ρ : Fin n → Fin m) (t : Term n) :
+    ∀ j, FreeIn j (t.rename ρ) → ∃ i, ρ i = j := by
+  induction t generalizing m with
+  | var i => intro j h; exact ⟨i, (h : j = ρ i).symm⟩
+  | lam _ ih => intro j h; exact Ren.exists_of_up (ih _ _ h)
+  | bang _ ih | borrow _ ih | star _ ih => intro j h; exact ih _ _ h
+  | app _ _ ih₁ ih₂ | pair _ _ ih₁ ih₂ | letPair _ _ ih₁ ih₂ | letUnit _ _ ih₁ ih₂
+  | letBang _ _ ih₁ ih₂ | copy _ _ ih₁ ih₂ =>
+    intro j h
+    rcases h with h | h
     · exact ih₁ _ _ h
-    · obtain ⟨i, hi⟩ := ih₂ _ _ h
-      cases i using Fin.cases with
-      | zero => exact absurd hi (Fin.succ_ne_zero _).symm
-      | succ i =>
-        cases i using Fin.cases with
-        | zero =>
-          rw [Ren.up_succ, Ren.up_zero] at hi
-          exact absurd (Fin.succ_injective _ hi) (Fin.succ_ne_zero j).symm
-        | succ i => exact ⟨i, by simpa using hi⟩
-  | unit => intro j h; simp only [Term.rename, FreeIn] at h
-  | letUnit t₁ t₂ ih₁ ih₂ => intro j h; simp only [Term.rename, FreeIn] at h; rcases h with h | h; exacts [ih₁ _ _ h, ih₂ _ _ h]
-  | bang t ih => intro j h; simp only [Term.rename, FreeIn] at h; exact ih _ _ h
-  | letBang t₁ t₂ ih₁ ih₂ =>
-    intro j h; simp only [Term.rename, FreeIn] at h; rcases h with h | h
-    · exact ih₁ _ _ h
-    · obtain ⟨i, hi⟩ := ih₂ _ _ h
-      cases i using Fin.cases with
-      | zero => exact absurd hi (Fin.succ_ne_zero j).symm
-      | succ i => exact ⟨i, by simpa using hi⟩
-  | borrow t ih => intro j h; simp only [Term.rename, FreeIn] at h; exact ih _ _ h
-  | copy t₁ t₂ ih₁ ih₂ =>
-    intro j h; simp only [Term.rename, FreeIn] at h; rcases h with h | h
-    · exact ih₁ _ _ h
-    · obtain ⟨i, hi⟩ := ih₂ _ _ h
-      cases i using Fin.cases with
-      | zero => exact absurd hi (Fin.succ_ne_zero j).symm
-      | succ i => exact ⟨i, by simpa using hi⟩
-  | star t ih => intro j h; simp only [Term.rename, FreeIn] at h; exact ih _ _ h
-  | nat => intro j h; simp only [Term.rename, FreeIn] at h
-  | float => intro j h; simp only [Term.rename, FreeIn] at h
-  | prim => intro j h; simp only [Term.rename, FreeIn] at h
-  | ref => intro j h; simp only [Term.rename, FreeIn] at h
+    · first
+        | exact ih₂ _ _ h
+        | exact Ren.exists_of_up (ih₂ _ _ h)
+        | exact Ren.exists_of_up (Ren.exists_of_up (ih₂ _ _ h))
+  | _ => intro j h; exact h.elim
 
 /-- Linear variables occur free in well-typed terms. -/
 theorem HasTypeD.freeIn_of_lin {n : ℕ} {Γ : Ctx n} {t : Term n} {B : Ty}
     (ht : HasTypeD Γ t B) : ∀ {i : Fin n} {A : Ty}, Γ (.inl i) = some (.lin A) → FreeIn i t := by
   induction ht with
   | var hi hrest =>
-    intro i A h; simp only [FreeIn]
-    have := Ctx.AllNonLin.set_not_lin hrest h
-    simp only [Sum.inl.injEq] at this
-    exact this
-  | abs _ ih => intro i A h; simp only [FreeIn]; exact ih (i := i.succ) h
-  | app _ _ hadd ih₁ ih₂ =>
-    intro i A h; simp only [FreeIn]
+    intro i A h
+    simpa using Ctx.AllNonLin.set_not_lin hrest h
+  | abs _ ih => intro i A h; exact ih (i := i.succ) h
+  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | tensorE _ _ hadd ih₁ ih₂
+  | unitE _ _ hadd ih₁ ih₂ | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
+    intro i A h
     have := hadd (.inl i); rw [h] at this
     rcases this.eq_lin with ⟨h1, _⟩ | ⟨_, h2⟩
-    exacts [Or.inl (ih₁ h1), Or.inr (ih₂ h2)]
-  | tensorI _ _ hadd ih₁ ih₂ =>
-    intro i A h; simp only [FreeIn]
-    have := hadd (.inl i); rw [h] at this
-    rcases this.eq_lin with ⟨h1, _⟩ | ⟨_, h2⟩
-    exacts [Or.inl (ih₁ h1), Or.inr (ih₂ h2)]
-  | tensorE _ _ hadd ih₁ ih₂ =>
-    intro i A h; simp only [FreeIn]
-    have := hadd (.inl i); rw [h] at this
-    rcases this.eq_lin with ⟨h1, _⟩ | ⟨_, h2⟩
-    exacts [Or.inl (ih₁ h1), Or.inr (ih₂ (i := i.succ.succ) h2)]
-  | unitI hΓ => intro i A h; simp only [FreeIn]; exact (hΓ.not_lin h).elim
-  | unitE _ _ hadd ih₁ ih₂ =>
-    intro i A h; simp only [FreeIn]
-    have := hadd (.inl i); rw [h] at this
-    rcases this.eq_lin with ⟨h1, _⟩ | ⟨_, h2⟩
-    exacts [Or.inl (ih₁ h1), Or.inr (ih₂ h2)]
-  | bangI hΓ _ _ => intro i A h; simp only [FreeIn]; exact (hΓ.not_lin h).elim
-  | bangE _ _ hadd ih₁ ih₂ =>
-    intro i A h; simp only [FreeIn]
-    have := hadd (.inl i); rw [h] at this
-    rcases this.eq_lin with ⟨h1, _⟩ | ⟨_, h2⟩
-    exacts [Or.inl (ih₁ h1), Or.inr (ih₂ (i := i.succ) h2)]
-  | borrow _ ih => intro i A h; simp only [FreeIn]; exact ih h
-  | copy _ _ hadd ih₁ ih₂ =>
-    intro i A h; simp only [FreeIn]
-    have := hadd (.inl i); rw [h] at this
-    rcases this.eq_lin with ⟨h1, _⟩ | ⟨_, h2⟩
-    exacts [Or.inl (ih₁ h1), Or.inr (ih₂ (i := i.succ) h2)]
-  | nec _ hΓ _ => intro i A h; simp only [FreeIn]; have := hΓ i; rw [h] at this; exact this.elim
-  | natI hΓ => intro i A h; simp only [FreeIn]; exact (hΓ.not_lin h).elim
-  | floatI hΓ => intro i A h; simp only [FreeIn]; exact (hΓ.not_lin h).elim
-  | prim hΓ => intro i A h; simp only [FreeIn]; exact (hΓ.not_lin h).elim
+    · exact Or.inl (ih₁ h1)
+    · exact Or.inr (ih₂ h2)
+  | unitI hΓ | bangI hΓ _ _ | natI hΓ | floatI hΓ | prim hΓ =>
+    intro i A h; exact (hΓ.not_lin h).elim
+  | borrow _ ih => intro i A h; exact ih h
+  | nec _ hΓ _ => intro i A h; have := hΓ i; rw [h] at this; exact this.elim
   | ref _ hrest =>
-    intro i A h; simp only [FreeIn]
+    intro i A h
     have := Ctx.AllNonLin.set_not_lin hrest h
     simp at this
 
@@ -211,23 +159,6 @@ theorem HasTypeD.unrename {n m : ℕ} {ρ : Fin n → Fin m} {i : Fin m} {σ : F
 /-! ## Typability of the axioms -/
 
 namespace HasTypeD
-
-lemma subst_lin {n : ℕ} {Γ' Γ Γ'' : Ctx n} {t' : Term n} {t : Term (n + 1)} {A B : Ty}
-    (ht' : HasTypeD Γ' t' A) (ht : HasTypeD (Γ.cons (some (.lin A))) t B)
-    (hadd : Γ'.Add Γ Γ'') : HasTypeD Γ'' (Term.subst1 t' t) B :=
-  hasType_iff_hasTypeD.1 (HasType.subst_lin (hasType_iff_hasTypeD.2 ht')
-    (hasType_iff_hasTypeD.2 ht) hadd)
-
-lemma subst_nonlin {n : ℕ} {Γ' Γ Γ'' : Ctx n} {t' : Term n} {t : Term (n + 1)} {A B : Ty}
-    (hΓ' : Γ'.AllNonLin) (ht' : HasTypeD Γ' t' A)
-    (ht : HasTypeD (Γ.cons (some (.nonlin A))) t B)
-    (hadd : Γ'.Add Γ Γ'') : HasTypeD Γ'' (Term.subst1 t' t) B :=
-  hasType_iff_hasTypeD.1 (HasType.subst_nonlin hΓ' (hasType_iff_hasTypeD.2 ht')
-    (hasType_iff_hasTypeD.2 ht) hadd)
-
-lemma subst_none {n : ℕ} {Γ : Ctx n} {s : Term n} {t : Term (n + 1)} {B : Ty}
-    (ht : HasTypeD (Γ.cons none) t B) : HasTypeD Γ (Term.subst1 s t) B :=
-  hasType_iff_hasTypeD.1 (HasType.subst_none (hasType_iff_hasTypeD.2 ht))
 
 lemma weaken' {n : ℕ} {Γ Δ Γ' : Ctx n} {t : Term n} {A : Ty} (ht : HasTypeD Γ t A)
     (hΔ : Δ.AllNonLin) (hadd : Δ.Add Γ Γ') : HasTypeD Γ' t A := ht.weaken hΔ hadd.comm
@@ -250,10 +181,6 @@ lemma HasTypeD.var_inv {n : ℕ} {Δ : Ctx n} {i : Fin n} {B : Ty}
     ∃ h', Δ (.inl i) = some h' ∧ h'.ty = B ∧ (Δ.set (.inl i) none).AllNonLin := by
   cases h with
   | var hi hrest => exact ⟨_, hi, rfl, hrest⟩
-
-lemma Ctx.AllNonLin.of_set {n : ℕ} {Δ : Ctx n} {x y : Fin n ⊕ ℕ} {h : Option Hyp}
-    (hΔ : (Δ.set x h).AllNonLin) (hy : y ≠ x) : NonLin (Δ y) := by
-  have := hΔ y; rwa [Ctx.set_ne _ _ hy] at this
 
 lemma Ctx.remove_succ {n : ℕ} (Δ : Ctx (n + 1)) : Δ.remove Fin.succ = Δ.tail := by
   funext x; rcases x with j | a <;> rfl

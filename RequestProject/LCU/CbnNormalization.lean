@@ -28,29 +28,10 @@ namespace CbnSteps
 
 variable {n : ℕ}
 
-lemma app {t t' : Term n} (u : Term n) (h : CbnSteps t t') :
-    CbnSteps (Term.app t u) (Term.app t' u) :=
-  Relation.ReflTransGen.lift (fun s => Term.app s u) (fun _ _ hs => CbnStep.app u hs) h
-
-lemma letPair {t t' : Term n} (u : Term (n + 2)) (h : CbnSteps t t') :
-    CbnSteps (Term.letPair t u) (Term.letPair t' u) :=
-  Relation.ReflTransGen.lift (fun s => Term.letPair s u) (fun _ _ hs => CbnStep.letPair u hs) h
-
-lemma letUnit {t t' : Term n} (u : Term n) (h : CbnSteps t t') :
-    CbnSteps (Term.letUnit t u) (Term.letUnit t' u) :=
-  Relation.ReflTransGen.lift (fun s => Term.letUnit s u) (fun _ _ hs => CbnStep.letUnit u hs) h
-
-lemma letBang {t t' : Term n} (u : Term (n + 1)) (h : CbnSteps t t') :
-    CbnSteps (Term.letBang t u) (Term.letBang t' u) :=
-  Relation.ReflTransGen.lift (fun s => Term.letBang s u) (fun _ _ hs => CbnStep.letBang u hs) h
-
-lemma borrow {t t' : Term n} (h : CbnSteps t t') :
-    CbnSteps (Term.borrow t) (Term.borrow t') :=
-  Relation.ReflTransGen.lift Term.borrow (fun _ _ hs => CbnStep.borrow hs) h
-
-lemma copy {t t' : Term n} (u : Term (n + 1)) (h : CbnSteps t t') :
-    CbnSteps (Term.copy t u) (Term.copy t' u) :=
-  Relation.ReflTransGen.lift (fun s => Term.copy s u) (fun _ _ hs => CbnStep.copy u hs) h
+/-- Multi-step reduction is closed under any one-step congruence `f`. -/
+lemma congr {t t' : Term n} (f : Term n → Term n) (hf : ∀ a b, CbnStep a b → CbnStep (f a) (f b))
+    (h : CbnSteps t t') : CbnSteps (f t) (f t') :=
+  Relation.ReflTransGen.lift f hf h
 
 lemma trans {t₁ t₂ t₃ : Term n} (h₁ : CbnSteps t₁ t₂) (h₂ : CbnSteps t₂ t₃) :
     CbnSteps t₁ t₃ := Relation.ReflTransGen.trans h₁ h₂
@@ -173,34 +154,34 @@ theorem HasTypeD.reducible {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : Ha
   | app _ _ hadd ih₁ ih₂ =>
     obtain ⟨b, hs, hb⟩ := ih₁ hp.1 (hσ.left hadd)
     exact (hb _ (ih₂ hp.2 (hσ.right hadd))).of_steps
-      ((hs.app _).trans (CbnSteps.single (.betaLolli _ _)))
+      ((hs.congr _ fun _ _ => .app _).trans (CbnSteps.single (.betaLolli _ _)))
   | tensorI _ _ hadd ih₁ ih₂ =>
     exact ⟨_, _, CbnSteps.refl' _, ih₁ hp.1 (hσ.left hadd), ih₂ hp.2 (hσ.right hadd)⟩
   | tensorE _ _ hadd ih₁ ih₂ =>
     obtain ⟨u₁, u₂, hs, hu₁, hu₂⟩ := ih₁ hp.1 (hσ.left hadd)
     have := ih₂ hp.2 (((hσ.right hadd).cons (h := .lin _) hu₁).cons (h := .lin _) hu₂)
     rw [← subst2_subst_up_up] at this
-    exact this.of_steps ((hs.letPair _).trans (CbnSteps.single (.betaTensor _ _ _)))
+    exact this.of_steps ((hs.congr _ fun _ _ => .letPair _).trans (CbnSteps.single (.betaTensor _ _ _)))
   | unitI _ => exact CbnSteps.refl' _
   | unitE _ _ hadd ih₁ ih₂ =>
     have hs : CbnSteps _ unit := ih₁ hp.1 (hσ.left hadd)
     exact (ih₂ hp.2 (hσ.right hadd)).of_steps
-      ((hs.letUnit _).trans (CbnSteps.single (.betaUnit _)))
+      ((hs.congr _ fun _ _ => .letUnit _).trans (CbnSteps.single (.betaUnit _)))
   | bangI _ _ ih => exact ⟨_, CbnSteps.refl' _, ih hp hσ⟩
   | bangE _ _ hadd ih₁ ih₂ =>
     obtain ⟨u, hs, hu⟩ := ih₁ hp.1 (hσ.left hadd)
     have := ih₂ hp.2 ((hσ.right hadd).cons (h := .nonlin _) hu)
     rw [← subst1_subst_up] at this
-    exact this.of_steps ((hs.letBang _).trans (CbnSteps.single (.betaBang _ _)))
+    exact this.of_steps ((hs.congr _ fun _ _ => .letBang _).trans (CbnSteps.single (.betaBang _ _)))
   | borrow _ ih =>
     obtain ⟨u, hs, hu⟩ := ih hp hσ
-    exact ⟨u, hs.borrow.trans (CbnSteps.single (.betaBorrow _)), hu⟩
+    exact ⟨u, (hs.congr _ fun _ _ => .borrow).trans (CbnSteps.single (.betaBorrow _)), hu⟩
   | copy _ _ hadd ih₁ ih₂ =>
     obtain ⟨u, hs, hu⟩ := ih₁ hp.1 (hσ.left hadd)
     have := ih₂ hp.2 ((hσ.right hadd).cons (h := .lin (.star _))
       (u := star u) ⟨u, CbnSteps.refl' _, hu⟩)
     rw [← subst1_subst_up] at this
-    exact this.of_steps ((hs.copy _).trans (CbnSteps.single (.betaCopy _ _)))
+    exact this.of_steps ((hs.congr _ fun _ _ => .copy _).trans (CbnSteps.single (.betaCopy _ _)))
   | nec _ _ ih => exact ⟨_, CbnSteps.refl' _, ih hp (RedSubst.refsOnly _ σ)⟩
   | natI _ => exact ⟨_, CbnSteps.refl' _⟩
   | floatI _ => exact ⟨_, CbnSteps.refl' _⟩

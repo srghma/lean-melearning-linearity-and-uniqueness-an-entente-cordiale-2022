@@ -49,19 +49,13 @@ def H₀ : Heap 0 := Heap.empty
 def H₁ : Heap 0 := H₀.setArr 0 (some ⟨.one, newArr 1⟩)
 def H₁c : Heap 0 := H₁.setArr 1 (some ⟨.one, newArr 1⟩)
 lemma allNonLin_empty_set_nonlin {n : ℕ} (x : Fin n ⊕ ℕ) (A : Ty) :
-    ((Ctx.empty : Ctx n).set x (some (.nonlin A))).AllNonLin := by
-  intro y
-  by_cases hy : y = x
-  · subst hy; simp
-  · rw [Ctx.set_ne _ _ hy]; trivial
+    ((Ctx.empty : Ctx n).set x (some (.nonlin A))).AllNonLin :=
+  Ctx.AllNonLin.empty.set x trivial
 
 lemma allNonLin_empty_set_set {n : ℕ} (x : Fin n ⊕ ℕ) (h : Option Hyp) :
     (((Ctx.empty : Ctx n).set x h).set x none).AllNonLin := by
   rw [Ctx.set_set]
-  intro y
-  by_cases hy : y = x
-  · subst hy; simp
-  · rw [Ctx.set_ne _ _ hy]; trivial
+  exact Ctx.AllNonLin.empty.set x trivial
 
 lemma refIn_star_ref {n : ℕ} (a b : ℕ) : RefIn a (star (ref b) : Term n) ↔ a = b := Iff.rfl
 

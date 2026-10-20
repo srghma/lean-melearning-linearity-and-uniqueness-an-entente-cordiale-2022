@@ -112,6 +112,13 @@ lemma Add.der {Γ₁ Γ₂ Γ : Ctx n} (hadd : Γ₁.Add Γ₂ Γ) {x : Fin n �
 
 end Ctx
 
+/-- Internal tactic: `split_rule h₁ h₂ hadd` applies whichever of the context-splitting
+rules `app`, `tensorI`, `tensorE`, `unitE`, `bangE`, `copy` fits the goal. -/
+macro "split_rule " h₁:term:max h₂:term:max hadd:term:max : tactic => `(tactic| first
+  | exact HasTypeD.app $h₁ $h₂ $hadd | exact HasTypeD.tensorI $h₁ $h₂ $hadd
+  | exact HasTypeD.tensorE $h₁ $h₂ $hadd | exact HasTypeD.unitE $h₁ $h₂ $hadd
+  | exact HasTypeD.bangE $h₁ $h₂ $hadd | exact HasTypeD.copy $h₁ $h₂ $hadd)
+
 namespace HasTypeD
 
 /-- Dereliction is admissible in the dereliction-free system, for variables and
@@ -120,56 +127,28 @@ theorem der {n : ℕ} {Γ : Ctx n} {t : Term n} {B : Ty} (ht : HasTypeD Γ t B) 
     ∀ {x : Fin n ⊕ ℕ} {A : Ty}, Γ x = some (.lin A) →
       HasTypeD (Γ.set x (some (.nonlin A))) t B := by
   induction ht with
-  | @var n Γ i h hi hrest =>
+  | var hi hrest | ref hi hrest =>
     intro x A hx
-    have := Ctx.AllNonLin.set_not_lin hrest hx
-    subst this
+    obtain rfl := Ctx.AllNonLin.set_not_lin hrest hx
     rw [hi] at hx; cases hx
-    exact HasTypeD.var (h := .nonlin A) (by simp) (by rw [Ctx.set_set]; exact hrest)
-  | @abs n Γ t A' B ht ih =>
+    first
+    | exact HasTypeD.var (h := .nonlin A) (by simp) (by rw [Ctx.set_set]; exact hrest)
+    | exact HasTypeD.ref (h := .nonlin A) (by simp) (by rw [Ctx.set_set]; exact hrest)
+  | abs _ ih =>
     intro x A hx
     refine HasTypeD.abs ?_
     rw [Ctx.cons_set]
     exact ih (by rw [Ctx.cons_liftName]; exact hx)
-  | app h₁ h₂ hadd ih₁ ih₂ =>
+  | app h₁ h₂ hadd ih₁ ih₂ | tensorI h₁ h₂ hadd ih₁ ih₂ | tensorE h₁ h₂ hadd ih₁ ih₂
+  | unitE h₁ h₂ hadd ih₁ ih₂ | bangE h₁ h₂ hadd ih₁ ih₂ | copy h₁ h₂ hadd ih₁ ih₂ =>
     intro x A hx
     rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
-    · exact HasTypeD.app (ih₁ hl) h₂ hd
-    · exact HasTypeD.app h₁ (ih₂ hl) hd
-  | tensorI h₁ h₂ hadd ih₁ ih₂ =>
-    intro x A hx
-    rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
-    · exact HasTypeD.tensorI (ih₁ hl) h₂ hd
-    · exact HasTypeD.tensorI h₁ (ih₂ hl) hd
-  | tensorE h₁ h₂ hadd ih₁ ih₂ =>
-    intro x A hx
-    rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
-    · exact HasTypeD.tensorE (ih₁ hl) h₂ hd
-    · refine HasTypeD.tensorE h₁ ?_ hd
-      rw [Ctx.cons_set, Ctx.cons_set]
-      exact ih₂ (by rw [Ctx.cons_liftName, Ctx.cons_liftName]; exact hl)
-  | unitI hΓ => intro x A hx; exact (hΓ.not_lin hx).elim
-  | unitE h₁ h₂ hadd ih₁ ih₂ =>
-    intro x A hx
-    rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
-    · exact HasTypeD.unitE (ih₁ hl) h₂ hd
-    · exact HasTypeD.unitE h₁ (ih₂ hl) hd
-  | bangI hΓ _ _ => intro x A hx; exact (hΓ.not_lin hx).elim
-  | bangE h₁ h₂ hadd ih₁ ih₂ =>
-    intro x A hx
-    rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
-    · exact HasTypeD.bangE (ih₁ hl) h₂ hd
-    · refine HasTypeD.bangE h₁ ?_ hd
-      rw [Ctx.cons_set]
-      exact ih₂ (by rw [Ctx.cons_liftName]; exact hl)
+    · split_rule (ih₁ hl) h₂ hd
+    · split_rule h₁
+        (by (try simp only [Ctx.cons_set]); exact ih₂ (by simpa only [Ctx.cons_liftName])) hd
+  | unitI hΓ | bangI hΓ _ _ | natI hΓ | floatI hΓ | prim hΓ =>
+    intro x A hx; exact (hΓ.not_lin hx).elim
   | borrow _ ih => intro x A hx; exact HasTypeD.borrow (ih hx)
-  | copy h₁ h₂ hadd ih₁ ih₂ =>
-    intro x A hx
-    rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
-    · exact HasTypeD.copy (ih₁ hl) h₂ hd
-    · refine HasTypeD.copy h₁ ?_ hd
-      rw [Ctx.cons_set]
-      exact ih₂ (by rw [Ctx.cons_liftName]; exact hl)
   | @nec n Γ t A' _ hΓ ih =>
     intro x A hx
     rcases x with i | a
@@ -177,15 +156,6 @@ theorem der {n : ℕ} {Γ : Ctx n} {t : Term n} {B : Ty} (ht : HasTypeD Γ t B) 
     · refine HasTypeD.nec ?_ (hΓ.set_inr a _)
       rw [Ctx.refsOnly_set_inr]
       exact ih (by simpa using hx)
-  | natI hΓ => intro x A hx; exact (hΓ.not_lin hx).elim
-  | floatI hΓ => intro x A hx; exact (hΓ.not_lin hx).elim
-  | prim hΓ => intro x A hx; exact (hΓ.not_lin hx).elim
-  | @ref n Γ a h ha hrest =>
-    intro x A hx
-    have := Ctx.AllNonLin.set_not_lin hrest hx
-    subst this
-    rw [ha] at hx; cases hx
-    exact HasTypeD.ref (h := .nonlin A) (by simp) (by rw [Ctx.set_set]; exact hrest)
 
 end HasTypeD
 
@@ -196,22 +166,8 @@ theorem hasType_iff_hasTypeD {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
   · intro h
     induction h with
     | var hi hrest => exact HasTypeD.var (h := .lin _) hi hrest
-    | abs _ ih => exact .abs ih
-    | app _ _ hadd ih₁ ih₂ => exact .app ih₁ ih₂ hadd
-    | tensorI _ _ hadd ih₁ ih₂ => exact .tensorI ih₁ ih₂ hadd
-    | tensorE _ _ hadd ih₁ ih₂ => exact .tensorE ih₁ ih₂ hadd
-    | unitI hΓ => exact .unitI hΓ
-    | unitE _ _ hadd ih₁ ih₂ => exact .unitE ih₁ ih₂ hadd
     | der _ hi ih => exact ih.der hi
-    | bangI hΓ _ ih => exact .bangI hΓ ih
-    | bangE _ _ hadd ih₁ ih₂ => exact .bangE ih₁ ih₂ hadd
-    | borrow _ ih => exact .borrow ih
-    | copy _ _ hadd ih₁ ih₂ => exact .copy ih₁ ih₂ hadd
-    | nec _ hΓ ih => exact .nec ih hΓ
-    | natI hΓ => exact .natI hΓ
-    | floatI hΓ => exact .floatI hΓ
-    | prim hΓ => exact .prim hΓ
-    | ref ha hrest => exact .ref ha hrest
+    | _ => constructor <;> assumption
   · intro h
     induction h with
     | @var n Γ i h hi hrest =>
@@ -223,20 +179,6 @@ theorem hasType_iff_hasTypeD {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
         rw [e]
         show HasType _ _ A
         exact HasType.der (HasType.var (by simp) (by rw [Ctx.set_set]; exact hrest)) (by simp)
-    | abs _ ih => exact .abs ih
-    | app _ _ hadd ih₁ ih₂ => exact .app ih₁ ih₂ hadd
-    | tensorI _ _ hadd ih₁ ih₂ => exact .tensorI ih₁ ih₂ hadd
-    | tensorE _ _ hadd ih₁ ih₂ => exact .tensorE ih₁ ih₂ hadd
-    | unitI hΓ => exact .unitI hΓ
-    | unitE _ _ hadd ih₁ ih₂ => exact .unitE ih₁ ih₂ hadd
-    | bangI hΓ _ ih => exact .bangI hΓ ih
-    | bangE _ _ hadd ih₁ ih₂ => exact .bangE ih₁ ih₂ hadd
-    | borrow _ ih => exact .borrow ih
-    | copy _ _ hadd ih₁ ih₂ => exact .copy ih₁ ih₂ hadd
-    | nec _ hΓ ih => exact .nec ih hΓ
-    | natI hΓ => exact .natI hΓ
-    | floatI hΓ => exact .floatI hΓ
-    | prim hΓ => exact .prim hΓ
-    | ref ha hrest => exact .ref ha hrest
+    | _ => constructor <;> assumption
 
 end LCU

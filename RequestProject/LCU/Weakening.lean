@@ -135,11 +135,14 @@ lemma renCtx_succ (Γ : Ctx n) {h : Option Hyp} (hh : NonLin h) :
 
 end Ctx
 
-lemma HypAdd.some_of_nonLin {h : Hyp} {d c : Option Hyp} (hx : HypAdd (some h) d c)
-    (hd : NonLin d) : c = some h := by
-  cases hx with
-  | noneRight => rfl
-  | nonlin => rfl
+/-- Adding a non-linear context preserves the side conditions of the variable rule. -/
+lemma Ctx.Add.weaken_name {n : ℕ} {Γ Δ Γ' : Ctx n} (hadd : Γ.Add Δ Γ') (hΔ : Δ.AllNonLin)
+    {x : Fin n ⊕ ℕ} {h : Hyp} (hx : Γ x = some h) (hrest : (Γ.set x none).AllNonLin) :
+    Γ' x = some h ∧ (Γ'.set x none).AllNonLin := by
+  have := hadd x
+  rw [hx] at this
+  exact ⟨this.some_of_nonLin (hΔ _), Ctx.AllNonLin.of_add
+    (hadd.set (h₁ := none) (h₂ := none) (h := none) (.noneLeft _)) hrest (hΔ.set x trivial)⟩
 
 namespace HasTypeD
 
@@ -148,112 +151,52 @@ theorem rename {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasTypeD Γ t 
     ∀ {m : ℕ} {ρ : Fin n → Fin m} {Γ' : Ctx m}, Ctx.RenCtx ρ Γ Γ' →
       HasTypeD Γ' (t.rename ρ) A := by
   induction ht with
-  | @var n Γ i h hi hrest =>
+  | var hi hrest =>
     intro m ρ Γ' hρ
-    refine HasTypeD.var (by rw [hρ.map]; exact hi) ?_
-    exact (hρ.set i none).allNonLin hrest
+    exact .var (by rw [hρ.map]; exact hi) ((hρ.set _ none).allNonLin hrest)
+  | ref ha hrest =>
+    intro m ρ Γ' hρ
+    exact .ref (by rw [hρ.refs]; exact ha) ((hρ.set_inr _ none).allNonLin hrest)
   | abs _ ih => intro m ρ Γ' hρ; exact .abs (ih (hρ.cons _))
-  | app _ _ hadd ih₁ ih₂ =>
+  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | tensorE _ _ hadd ih₁ ih₂
+  | unitE _ _ hadd ih₁ ih₂ | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
     intro m ρ Γ' hρ
     obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hρ.split hadd
-    exact .app (ih₁ h₁) (ih₂ h₂) hadd'
-  | tensorI _ _ hadd ih₁ ih₂ =>
-    intro m ρ Γ' hρ
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hρ.split hadd
-    exact .tensorI (ih₁ h₁) (ih₂ h₂) hadd'
-  | tensorE _ _ hadd ih₁ ih₂ =>
-    intro m ρ Γ' hρ
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hρ.split hadd
-    exact .tensorE (ih₁ h₁) (ih₂ ((h₂.cons _).cons _)) hadd'
-  | unitI hΓ => intro m ρ Γ' hρ; exact .unitI (hρ.allNonLin hΓ)
-  | unitE _ _ hadd ih₁ ih₂ =>
-    intro m ρ Γ' hρ
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hρ.split hadd
-    exact .unitE (ih₁ h₁) (ih₂ h₂) hadd'
+    split_rule (ih₁ h₁) (ih₂ (by (repeat apply Ctx.RenCtx.cons); exact h₂)) hadd'
+  | unitI hΓ | natI hΓ | floatI hΓ | prim hΓ =>
+    intro m ρ Γ' hρ; constructor; exact hρ.allNonLin hΓ
   | bangI hΓ _ ih => intro m ρ Γ' hρ; exact .bangI (hρ.allNonLin hΓ) (ih hρ)
-  | bangE _ _ hadd ih₁ ih₂ =>
-    intro m ρ Γ' hρ
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hρ.split hadd
-    exact .bangE (ih₁ h₁) (ih₂ (h₂.cons _)) hadd'
   | borrow _ ih => intro m ρ Γ' hρ; exact .borrow (ih hρ)
-  | copy _ _ hadd ih₁ ih₂ =>
-    intro m ρ Γ' hρ
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hρ.split hadd
-    exact .copy (ih₁ h₁) (ih₂ (h₂.cons _)) hadd'
   | nec _ hΓ ih => intro m ρ Γ' hρ; exact .nec (ih hρ.refsOnly) (hρ.varsNonLin hΓ)
-  | natI hΓ => intro m ρ Γ' hρ; exact .natI (hρ.allNonLin hΓ)
-  | floatI hΓ => intro m ρ Γ' hρ; exact .floatI (hρ.allNonLin hΓ)
-  | prim hΓ => intro m ρ Γ' hρ; exact .prim (hρ.allNonLin hΓ)
-  | @ref n Γ a h ha hrest =>
-    intro m ρ Γ' hρ
-    refine HasTypeD.ref (by rw [hρ.refs]; exact ha) ?_
-    exact (hρ.set_inr a none).allNonLin hrest
 
 /-- Lemma 3 (weakening is admissible), dereliction-free version. -/
 theorem weaken {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasTypeD Γ t A) :
     ∀ {Δ Γ' : Ctx n}, Δ.AllNonLin → Γ.Add Δ Γ' → HasTypeD Γ' t A := by
+  suffices ∀ {Δ Γ' : Ctx n}, Γ.Add Δ Γ' → Δ.AllNonLin → HasTypeD Γ' t A from
+    fun {_ _} hΔ hadd => this hadd hΔ
   induction ht with
-  | @var n Γ i h hi hrest =>
-    intro Δ Γ' hΔ hadd
-    have hx := hadd (.inl i)
-    rw [hi] at hx
-    have hΔi := hΔ (.inl i)
-    refine HasTypeD.var (h := h) ?_ ?_
-    · exact hx.some_of_nonLin (hΔ _)
-    · have := hadd.set (x := .inl i) (h₁ := none) (h₂ := none) (h := none) (.noneLeft _)
-      exact Ctx.AllNonLin.of_add this hrest (fun y => by
-        by_cases hy : y = .inl i
-        · subst hy; simp
-        · rw [Ctx.set_ne _ _ hy]; exact hΔ y)
+  | var hi hrest | ref hi hrest =>
+    intro Δ Γ' hadd hΔ
+    obtain ⟨h₁, h₂⟩ := hadd.weaken_name hΔ hi hrest
+    first | exact .var h₁ h₂ | exact .ref h₁ h₂
   | abs _ ih =>
-    intro Δ Γ' hΔ hadd
-    exact .abs (ih (hΔ.cons nonLin_none) (hadd.cons (HypAdd.none_right _)))
-  | app _ _ hadd ih₁ ih₂ =>
-    intro Δ Γ' hΔ hadd'
+    intro Δ Γ' hadd hΔ
+    exact .abs (ih (hadd.cons (HypAdd.none_right _)) (hΔ.cons nonLin_none))
+  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | tensorE _ _ hadd ih₁ ih₂
+  | unitE _ _ hadd ih₁ ih₂ | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
+    intro Δ Γ' hadd' hΔ
     obtain ⟨C₁, C₂, h₁, h₂, h⟩ := Ctx.Add.interchange hadd (Ctx.Add.idem hΔ) hadd'
-    exact .app (ih₁ hΔ h₁) (ih₂ hΔ h₂) h
-  | tensorI _ _ hadd ih₁ ih₂ =>
-    intro Δ Γ' hΔ hadd'
-    obtain ⟨C₁, C₂, h₁, h₂, h⟩ := Ctx.Add.interchange hadd (Ctx.Add.idem hΔ) hadd'
-    exact .tensorI (ih₁ hΔ h₁) (ih₂ hΔ h₂) h
-  | tensorE _ _ hadd ih₁ ih₂ =>
-    intro Δ Γ' hΔ hadd'
-    obtain ⟨C₁, C₂, h₁, h₂, h⟩ := Ctx.Add.interchange hadd (Ctx.Add.idem hΔ) hadd'
-    refine .tensorE (ih₁ hΔ h₁) (ih₂ ((hΔ.cons nonLin_none).cons nonLin_none)
-      ((h₂.cons (HypAdd.none_right _)).cons (HypAdd.none_right _))) h
-  | unitI hΓ => intro Δ Γ' hΔ hadd; exact .unitI (Ctx.AllNonLin.of_add hadd hΓ hΔ)
-  | unitE _ _ hadd ih₁ ih₂ =>
-    intro Δ Γ' hΔ hadd'
-    obtain ⟨C₁, C₂, h₁, h₂, h⟩ := Ctx.Add.interchange hadd (Ctx.Add.idem hΔ) hadd'
-    exact .unitE (ih₁ hΔ h₁) (ih₂ hΔ h₂) h
+    split_rule (ih₁ h₁ hΔ)
+      (ih₂ (by first | exact h₂ | exact h₂.cons_none _ | exact (h₂.cons_none _).cons_none _)
+        (by first | exact hΔ | exact hΔ.cons_none | exact hΔ.cons_none.cons_none)) h
+  | unitI hΓ | natI hΓ | floatI hΓ | prim hΓ =>
+    intro Δ Γ' hadd hΔ; constructor; exact Ctx.AllNonLin.of_add hadd hΓ hΔ
   | bangI hΓ _ ih =>
-    intro Δ Γ' hΔ hadd; exact .bangI (Ctx.AllNonLin.of_add hadd hΓ hΔ) (ih hΔ hadd)
-  | bangE _ _ hadd ih₁ ih₂ =>
-    intro Δ Γ' hΔ hadd'
-    obtain ⟨C₁, C₂, h₁, h₂, h⟩ := Ctx.Add.interchange hadd (Ctx.Add.idem hΔ) hadd'
-    exact .bangE (ih₁ hΔ h₁) (ih₂ (hΔ.cons nonLin_none) (h₂.cons (HypAdd.none_right _))) h
-  | borrow _ ih => intro Δ Γ' hΔ hadd; exact .borrow (ih hΔ hadd)
-  | copy _ _ hadd ih₁ ih₂ =>
-    intro Δ Γ' hΔ hadd'
-    obtain ⟨C₁, C₂, h₁, h₂, h⟩ := Ctx.Add.interchange hadd (Ctx.Add.idem hΔ) hadd'
-    exact .copy (ih₁ hΔ h₁) (ih₂ (hΔ.cons nonLin_none) (h₂.cons (HypAdd.none_right _))) h
+    intro Δ Γ' hadd hΔ; exact .bangI (Ctx.AllNonLin.of_add hadd hΓ hΔ) (ih hadd hΔ)
+  | borrow _ ih => intro Δ Γ' hadd hΔ; exact .borrow (ih hadd hΔ)
   | nec _ hΓ ih =>
-    intro Δ Γ' hΔ hadd
-    exact .nec (ih hΔ.refsOnly hadd.refsOnly) (Ctx.VarsNonLin.of_add hadd hΓ hΔ.varsNonLin)
-  | natI hΓ => intro Δ Γ' hΔ hadd; exact .natI (Ctx.AllNonLin.of_add hadd hΓ hΔ)
-  | floatI hΓ => intro Δ Γ' hΔ hadd; exact .floatI (Ctx.AllNonLin.of_add hadd hΓ hΔ)
-  | prim hΓ => intro Δ Γ' hΔ hadd; exact .prim (Ctx.AllNonLin.of_add hadd hΓ hΔ)
-  | @ref n Γ a h ha hrest =>
-    intro Δ Γ' hΔ hadd
-    have hx := hadd (.inr a)
-    rw [ha] at hx
-    refine HasTypeD.ref (h := h) ?_ ?_
-    · exact hx.some_of_nonLin (hΔ _)
-    · have := hadd.set (x := .inr a) (h₁ := none) (h₂ := none) (h := none) (.noneLeft _)
-      exact Ctx.AllNonLin.of_add this hrest (fun y => by
-        by_cases hy : y = .inr a
-        · subst hy; simp
-        · rw [Ctx.set_ne _ _ hy]; exact hΔ y)
+    intro Δ Γ' hadd hΔ
+    exact .nec (ih hadd.refsOnly hΔ.refsOnly) (Ctx.VarsNonLin.of_add hadd hΓ hΔ.varsNonLin)
 
 end HasTypeD
 

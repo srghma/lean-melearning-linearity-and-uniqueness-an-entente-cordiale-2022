@@ -23,23 +23,7 @@ open Term
 /-! ## Renaming array references -/
 
 /-- Rename every array reference `a` to `N + a`. -/
-def Term.shiftRefs (N : ℕ) : {n : ℕ} → Term n → Term n
-  | _, var i => var i
-  | _, lam t => lam (t.shiftRefs N)
-  | _, app t₁ t₂ => app (t₁.shiftRefs N) (t₂.shiftRefs N)
-  | _, pair t₁ t₂ => pair (t₁.shiftRefs N) (t₂.shiftRefs N)
-  | _, letPair t₁ t₂ => letPair (t₁.shiftRefs N) (t₂.shiftRefs N)
-  | _, unit => unit
-  | _, letUnit t₁ t₂ => letUnit (t₁.shiftRefs N) (t₂.shiftRefs N)
-  | _, bang t => bang (t.shiftRefs N)
-  | _, letBang t₁ t₂ => letBang (t₁.shiftRefs N) (t₂.shiftRefs N)
-  | _, borrow t => borrow (t.shiftRefs N)
-  | _, copy t₁ t₂ => copy (t₁.shiftRefs N) (t₂.shiftRefs N)
-  | _, star t => star (t.shiftRefs N)
-  | _, nat k => nat k
-  | _, float x => float x
-  | _, prim p => prim p
-  | _, ref a => ref (N + a)
+abbrev Term.shiftRefs (N : ℕ) {n : ℕ} (t : Term n) : Term n := renameRefs (N + ·) t
 
 namespace Ctx
 
@@ -125,31 +109,14 @@ theorem HasTypeD.shiftRefs {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : Ha
   | var hi hrest =>
     exact .var (by rw [hs.vars]; exact hi) ((hs.set_inl _ none).allNonLin hrest)
   | abs _ ih => exact .abs (ih (hs.cons _))
-  | app _ _ hadd ih₁ ih₂ =>
+  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | tensorE _ _ hadd ih₁ ih₂
+  | unitE _ _ hadd ih₁ ih₂ | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
     obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hs.split hadd
-    exact .app (ih₁ h₁) (ih₂ h₂) hadd'
-  | tensorI _ _ hadd ih₁ ih₂ =>
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hs.split hadd
-    exact .tensorI (ih₁ h₁) (ih₂ h₂) hadd'
-  | tensorE _ _ hadd ih₁ ih₂ =>
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hs.split hadd
-    exact .tensorE (ih₁ h₁) (ih₂ ((h₂.cons _).cons _)) hadd'
-  | unitI hΓ => exact .unitI (hs.allNonLin hΓ)
-  | unitE _ _ hadd ih₁ ih₂ =>
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hs.split hadd
-    exact .unitE (ih₁ h₁) (ih₂ h₂) hadd'
+    split_rule (ih₁ h₁) (ih₂ (by (repeat apply Ctx.RefShift.cons); exact h₂)) hadd'
+  | unitI hΓ | natI hΓ | floatI hΓ | prim hΓ => constructor; exact hs.allNonLin hΓ
   | bangI hΓ _ ih => exact .bangI (hs.allNonLin hΓ) (ih hs)
-  | bangE _ _ hadd ih₁ ih₂ =>
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hs.split hadd
-    exact .bangE (ih₁ h₁) (ih₂ (h₂.cons _)) hadd'
   | borrow _ ih => exact .borrow (ih hs)
-  | copy _ _ hadd ih₁ ih₂ =>
-    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hs.split hadd
-    exact .copy (ih₁ h₁) (ih₂ (h₂.cons _)) hadd'
   | nec _ hΓ ih => exact .nec (ih hs.refsOnly) (hs.varsNonLin hΓ)
-  | natI hΓ => exact .natI (hs.allNonLin hΓ)
-  | floatI hΓ => exact .floatI (hs.allNonLin hΓ)
-  | prim hΓ => exact .prim (hs.allNonLin hΓ)
   | ref ha hrest =>
     exact .ref (by rw [hs.map]; exact ha) ((hs.set_inr _ none).allNonLin hrest)
 
@@ -199,7 +166,7 @@ theorem HasTypeD.mono_cons {n : ℕ} {Γ Γ' : Ctx n} {h : Option Hyp} {t : Term
     (ht : HasTypeD (Γ.cons h) t A) (hs : Γ.Sub Γ') (hΓ' : Γ'.AllNonLin) :
     HasTypeD (Γ'.cons h) t A := by
   obtain ⟨Δ, hΔ, hadd⟩ := hs.exists_add (fun x _ => hΓ' x)
-  exact ht.weaken (hΔ.cons nonLin_none) (hadd.cons (HypAdd.none_right _))
+  exact ht.weaken hΔ.cons_none (hadd.cons_none _)
 
 /-- Weakening under two binders into a larger context whose additional assumptions are
 non-linear. -/
@@ -207,7 +174,6 @@ theorem HasTypeD.mono_cons₂ {n : ℕ} {Γ Γ' : Ctx n} {h₁ h₂ : Option Hyp
     {A : Ty} (ht : HasTypeD ((Γ.cons h₁).cons h₂) t A) (hs : Γ.Sub Γ') (hΓ' : Γ'.AllNonLin) :
     HasTypeD ((Γ'.cons h₁).cons h₂) t A := by
   obtain ⟨Δ, hΔ, hadd⟩ := hs.exists_add (fun x _ => hΓ' x)
-  exact ht.weaken ((hΔ.cons nonLin_none).cons nonLin_none)
-    ((hadd.cons (HypAdd.none_right _)).cons (HypAdd.none_right _))
+  exact ht.weaken hΔ.cons_none.cons_none ((hadd.cons_none _).cons_none _)
 
 end LCU

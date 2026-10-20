@@ -40,35 +40,17 @@ theorem HasTypeD.ne_none_of_freeIn {n : ℕ} {Γ : Ctx n} {t : Term n} {B : Ty}
   induction ht with
   | var hi _ => intro i h; simp only [FreeIn] at h; subst h; simp [hi]
   | abs _ ih => intro i h; simpa using ih (i := i.succ) h
-  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | unitE _ _ hadd ih₁ ih₂ =>
+  | app _ _ hadd ih₁ ih₂ | tensorI _ _ hadd ih₁ ih₂ | tensorE _ _ hadd ih₁ ih₂
+  | unitE _ _ hadd ih₁ ih₂ | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
     intro i h e
     have hx := hadd (.inl i); rw [e] at hx
     obtain ⟨e₁, e₂⟩ := hx.eq_none
     rcases h with h | h
     · exact ih₁ h e₁
     · exact ih₂ h e₂
-  | tensorE _ _ hadd ih₁ ih₂ =>
-    intro i h e
-    have hx := hadd (.inl i); rw [e] at hx
-    obtain ⟨e₁, e₂⟩ := hx.eq_none
-    rcases h with h | h
-    · exact ih₁ h e₁
-    · exact ih₂ (i := i.succ.succ) h (by simpa using e₂)
-  | bangE _ _ hadd ih₁ ih₂ | copy _ _ hadd ih₁ ih₂ =>
-    intro i h e
-    have hx := hadd (.inl i); rw [e] at hx
-    obtain ⟨e₁, e₂⟩ := hx.eq_none
-    rcases h with h | h
-    · exact ih₁ h e₁
-    · exact ih₂ (i := i.succ) h (by simpa using e₂)
-  | unitI _ => intro i h; exact h.elim
-  | bangI _ _ ih => intro i h; exact ih h
-  | borrow _ ih => intro i h; exact ih h
+  | bangI _ _ ih | borrow _ ih => intro i h; exact ih h
   | nec _ _ ih => intro i h; exact absurd rfl (ih h)
-  | natI _ => intro i h; exact h.elim
-  | floatI _ => intro i h; exact h.elim
-  | prim _ => intro i h; exact h.elim
-  | ref _ _ => intro i h; exact h.elim
+  | unitI _ | natI _ | floatI _ | prim _ | ref _ _ => intro i h; exact h.elim
 
 /-! ## Impossible programs: no contraction of linear or unique values -/
 
@@ -121,17 +103,11 @@ section Possible
 variable (A B : Ty)
 
 private lemma var_nonlin {n : ℕ} {Γ : Ctx n} (hΓ : Γ.AllNonLin) {i : Fin n} {h : Hyp}
-    (hi : Γ (.inl i) = some h) : HasTypeD Γ (var i) h.ty := by
-  refine .var hi fun x => ?_
-  by_cases hx : x = .inl i
-  · subst hx; simp
-  · rw [Ctx.set_ne _ _ hx]; exact hΓ x
+    (hi : Γ (.inl i) = some h) : HasTypeD Γ (var i) h.ty :=
+  .var hi (hΓ.set _ trivial)
 
 private lemma allNonLin_cons_nonlin {n : ℕ} {Γ : Ctx n} (hΓ : Γ.AllNonLin) (A : Ty) :
     (Γ.cons (some (.nonlin A))).AllNonLin := Ctx.AllNonLin.cons hΓ (nonLin_nonlin A)
-
-private lemma allNonLin_cons_none {n : ℕ} {Γ : Ctx n} (hΓ : Γ.AllNonLin) :
-    (Γ.cons none).AllNonLin := Ctx.AllNonLin.cons hΓ nonLin_none
 
 /-- Dereliction: `λx. let! y = x in y : !A ⊸ A`. -/
 theorem derelict_hasType :
@@ -196,7 +172,7 @@ theorem possible_cake (Cake Happy : Ty) :
   rw [hasType_iff_hasTypeD]
   have hc : (cakeCtx Cake Happy).AllNonLin :=
     allNonLin_cons_nonlin (allNonLin_cons_nonlin Ctx.AllNonLin.empty _) _
-  have hΘ := allNonLin_cons_nonlin (allNonLin_cons_none hc) Cake
+  have hΘ := allNonLin_cons_nonlin hc.cons_none Cake
   refine .abs (.bangE (Γ₁ := (Ctx.empty : Ctx 2).cons (some (.lin (.bang Cake))))
     (HasTypeD.var_zero_single (n := 2) (.lin (.bang Cake)))
     (.tensorI (.app (var_nonlin hΘ (i := 3) rfl) (var_nonlin hΘ (i := 0) rfl) (Ctx.Add.idem hΘ))
@@ -214,7 +190,7 @@ theorem sip_hasType (Coffee Awake : Ty) :
   rw [hasType_iff_hasTypeD]
   have hc := allNonLin_cons_nonlin (allNonLin_cons_nonlin
     (Ctx.AllNonLin.empty (n := 0)) (Coffee ⊸ Awake)) (Coffee ⊸ Coffee)
-  have hΘ := allNonLin_cons_nonlin (allNonLin_cons_none hc) Coffee
+  have hΘ := allNonLin_cons_nonlin hc.cons_none Coffee
   refine .abs (.bangE (Γ₁ := (Ctx.empty : Ctx 2).cons (some (.lin (.star Coffee))))
     (.borrow (HasTypeD.var_zero_single (n := 2) (.lin (.star Coffee))))
     (.tensorI (.app (var_nonlin hΘ (i := 2) rfl) (var_nonlin hΘ (i := 0) rfl) (Ctx.Add.idem hΘ))

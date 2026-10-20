@@ -66,59 +66,33 @@ def Term.PrimFree : {n : ℕ} → Term n → Prop
 lemma Term.PrimFree.rename {n m : ℕ} {t : Term n} (ht : t.PrimFree) (ρ : Fin n → Fin m) :
     (t.rename ρ).PrimFree := by
   induction t generalizing m with
-  | var => trivial
   | prim => exact ht.elim
-  | lam t ih => exact ih ht _
-  | bang t ih => exact ih ht _
-  | borrow t ih => exact ih ht _
-  | star t ih => exact ih ht _
-  | app _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
-  | pair _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
-  | letPair _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
-  | letUnit _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
-  | letBang _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
-  | copy _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
+  | lam _ ih | bang _ ih | borrow _ ih | star _ ih => exact ih ht _
+  | app _ _ ih₁ ih₂ | pair _ _ ih₁ ih₂ | letPair _ _ ih₁ ih₂ | letUnit _ _ ih₁ ih₂
+  | letBang _ _ ih₁ ih₂ | copy _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
   | _ => trivial
 
 lemma Term.PrimFree.subst {n m : ℕ} {t : Term n} (ht : t.PrimFree) {σ : Fin n → Term m}
     (hσ : ∀ i, (σ i).PrimFree) : (t.subst σ).PrimFree := by
   have hup : ∀ {n m : ℕ} {σ : Fin n → Term m}, (∀ i, (σ i).PrimFree) →
-      ∀ i, (Subst.up σ i).PrimFree := by
-    intro n m σ hσ i
-    cases i using Fin.cases with
-    | zero => trivial
-    | succ i => exact (hσ i).rename _
+      ∀ i, (Subst.up σ i).PrimFree := fun hσ i => Fin.cases trivial (fun i => (hσ i).rename _) i
   induction t generalizing m with
   | var i => exact hσ i
   | prim => exact ht.elim
   | lam t ih => exact ih ht (hup hσ)
-  | bang t ih => exact ih ht hσ
-  | borrow t ih => exact ih ht hσ
-  | star t ih => exact ih ht hσ
-  | app _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 hσ⟩
-  | pair _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 hσ⟩
-  | letPair _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 (hup (hup hσ))⟩
-  | letUnit _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 hσ⟩
-  | letBang _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 (hup hσ)⟩
-  | copy _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 (hup hσ)⟩
+  | bang _ ih | borrow _ ih | star _ ih => exact ih ht hσ
+  | app _ _ ih₁ ih₂ | pair _ _ ih₁ ih₂ | letPair _ _ ih₁ ih₂ | letUnit _ _ ih₁ ih₂
+  | letBang _ _ ih₁ ih₂ | copy _ _ ih₁ ih₂ =>
+    exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 (by first | exact hσ | exact hup hσ | exact hup (hup hσ))⟩
   | _ => trivial
 
 lemma Term.PrimFree.subst1 {n : ℕ} {s : Term n} {t : Term (n + 1)} (hs : s.PrimFree)
-    (ht : t.PrimFree) : (Term.subst1 s t).PrimFree := by
-  refine ht.subst fun i => ?_
-  cases i using Fin.cases with
-  | zero => exact hs
-  | succ i => trivial
+    (ht : t.PrimFree) : (Term.subst1 s t).PrimFree :=
+  ht.subst (Fin.cases hs fun _ => trivial)
 
 lemma Term.PrimFree.subst2 {n : ℕ} {s₁ s₂ : Term n} {t : Term (n + 2)} (hs₁ : s₁.PrimFree)
-    (hs₂ : s₂.PrimFree) (ht : t.PrimFree) : (Term.subst2 s₁ s₂ t).PrimFree := by
-  refine ht.subst fun i => ?_
-  cases i using Fin.cases with
-  | zero => exact hs₂
-  | succ i =>
-    cases i using Fin.cases with
-    | zero => exact hs₁
-    | succ i => trivial
+    (hs₂ : s₂.PrimFree) (ht : t.PrimFree) : (Term.subst2 s₁ s₂ t).PrimFree :=
+  ht.subst (Fin.cases hs₂ (Fin.cases hs₁ fun _ => trivial))
 
 /-! ## The reduction relation -/
 
@@ -185,6 +159,11 @@ lemma Ctx.NoVars.allNonLin {n : ℕ} {Γ : Ctx n} (hΓ : Γ.NoVars) (hr : Γ.Ref
 variable assumptions whose array references are non-linear. -/
 theorem CbnStep.preserves {n : ℕ} {t t' : Term n} (hs : CbnStep t t') {Γ : Ctx n} {A : Ty}
     (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) (ht : HasType Γ t A) : HasType Γ t' A := by
+  -- reducing the eliminated subterm `u` of an elimination form `Γ₁ + Γ₂ ⊢ E[u]`
+  have cong : ∀ {Γ Γ₁ Γ₂ : Ctx n} {u u' : Term n} {B : Ty}, Γ.NoVars → Γ.RefsNonLin →
+      (∀ {Γ : Ctx n} {A : Ty}, Γ.NoVars → Γ.RefsNonLin → HasType Γ u A → HasType Γ u' A) →
+      HasTypeD Γ₁ u B → Γ₁.Add Γ₂ Γ → HasTypeD Γ₁ u' B := fun hΓ hr ih h hadd =>
+    hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd) (hasType_iff_hasTypeD.2 h))
   induction hs generalizing Γ A with
   | betaLolli t u => exact EqAxiom.preserves (.betaLolli t u) ht
   | betaTensor t₁ t₂ t => exact EqAxiom.preserves (.betaTensor t₁ t₂ t) ht
@@ -209,41 +188,26 @@ theorem CbnStep.preserves {n : ℕ} {t t' : Term n} (hs : CbnStep t t') {Γ : Ct
           hasType_iff_hasTypeD.2 (.nec (by rw [hΓ₁.refsOnly_eq]; exact hu)
             (fun i => by rw [hΓ₁ i]; trivial))
         exact hstar.subst_lin (hasType_iff_hasTypeD.2 h₂) hadd
-  | app u _ ih =>
-    rw [hasType_iff_hasTypeD] at *
-    cases ht with
-    | app h₁ h₂ hadd =>
-      exact .app (hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd)
-        (hasType_iff_hasTypeD.2 h₁))) h₂ hadd
-  | letPair u _ ih =>
-    rw [hasType_iff_hasTypeD] at *
-    cases ht with
-    | tensorE h₁ h₂ hadd =>
-      exact .tensorE (hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd)
-        (hasType_iff_hasTypeD.2 h₁))) h₂ hadd
-  | letUnit u _ ih =>
-    rw [hasType_iff_hasTypeD] at *
-    cases ht with
-    | unitE h₁ h₂ hadd =>
-      exact .unitE (hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd)
-        (hasType_iff_hasTypeD.2 h₁))) h₂ hadd
-  | letBang u _ ih =>
-    rw [hasType_iff_hasTypeD] at *
-    cases ht with
-    | bangE h₁ h₂ hadd =>
-      exact .bangE (hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd)
-        (hasType_iff_hasTypeD.2 h₁))) h₂ hadd
+  | app _ _ ih =>
+    rw [hasType_iff_hasTypeD] at ht ⊢
+    cases ht with | app h₁ h₂ hadd => exact .app (cong hΓ hr ih h₁ hadd) h₂ hadd
+  | letPair _ _ ih =>
+    rw [hasType_iff_hasTypeD] at ht ⊢
+    cases ht with | tensorE h₁ h₂ hadd => exact .tensorE (cong hΓ hr ih h₁ hadd) h₂ hadd
+  | letUnit _ _ ih =>
+    rw [hasType_iff_hasTypeD] at ht ⊢
+    cases ht with | unitE h₁ h₂ hadd => exact .unitE (cong hΓ hr ih h₁ hadd) h₂ hadd
+  | letBang _ _ ih =>
+    rw [hasType_iff_hasTypeD] at ht ⊢
+    cases ht with | bangE h₁ h₂ hadd => exact .bangE (cong hΓ hr ih h₁ hadd) h₂ hadd
+  | copy _ _ ih =>
+    rw [hasType_iff_hasTypeD] at ht ⊢
+    cases ht with | copy h₁ h₂ hadd => exact .copy (cong hΓ hr ih h₁ hadd) h₂ hadd
   | borrow _ ih =>
     rw [hasType_iff_hasTypeD] at *
     cases ht with
     | borrow h =>
       exact .borrow (hasType_iff_hasTypeD.1 (ih hΓ hr (hasType_iff_hasTypeD.2 h)))
-  | copy u _ ih =>
-    rw [hasType_iff_hasTypeD] at *
-    cases ht with
-    | copy h₁ h₂ hadd =>
-      exact .copy (hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd)
-        (hasType_iff_hasTypeD.2 h₁))) h₂ hadd
 
 /-- Reduction preserves primitive-freeness. -/
 theorem CbnStep.primFree {n : ℕ} {t t' : Term n} (hs : CbnStep t t') (ht : t.PrimFree) :
@@ -255,12 +219,9 @@ theorem CbnStep.primFree {n : ℕ} {t t' : Term n} (hs : CbnStep t t') (ht : t.P
   | betaBang u t => exact Term.PrimFree.subst1 (s := u) ht.1 ht.2
   | betaBorrow t => exact ht
   | betaCopy u t => exact Term.PrimFree.subst1 (s := star u) ht.1 ht.2
-  | app u _ ih => exact ⟨ih ht.1, ht.2⟩
-  | letPair u _ ih => exact ⟨ih ht.1, ht.2⟩
-  | letUnit u _ ih => exact ⟨ih ht.1, ht.2⟩
-  | letBang u _ ih => exact ⟨ih ht.1, ht.2⟩
+  | app _ _ ih | letPair _ _ ih | letUnit _ _ ih | letBang _ _ ih | copy _ _ ih =>
+    exact ⟨ih ht.1, ht.2⟩
   | borrow _ ih => exact ih ht
-  | copy u _ ih => exact ⟨ih ht.1, ht.2⟩
 
 theorem CbnSteps.preserves {n : ℕ} {t t' : Term n} (hs : CbnSteps t t') {Γ : Ctx n} {A : Ty}
     (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) (ht : HasType Γ t A) : HasType Γ t' A := by
@@ -316,71 +277,26 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | floatI _ => exact .inl (.float _)
   | ref _ _ => exact .inl (.ref _)
   | prim _ => exact hp.elim
-  | app h₁ _ hadd ih₁ _ =>
+  | app h₁ _ hadd ih₁ _ | tensorE h₁ _ hadd ih₁ _ | unitE h₁ _ hadd ih₁ _
+  | bangE h₁ _ hadd ih₁ _ | copy h₁ _ hadd ih₁ _ =>
     right
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
     · induction hv using IsValue.induction with
-      | lam t => exact ⟨_, .betaLolli _ _⟩
       | prim => exact hp.1.elim
       | readArray₁ _ => exact hp.1.1.elim
       | writeArray₁ _ => exact hp.1.1.elim
       | writeArray₂ _ _ => exact hp.1.1.1.elim
-      | _ => cases h₁
-    · exact ⟨_, .app _ hs⟩
-  | tensorE h₁ _ hadd ih₁ _ =>
-    right
-    rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · induction hv using IsValue.induction with
-      | pair => exact ⟨_, .betaTensor _ _ _⟩
-      | prim => exact hp.1.elim
-      | readArray₁ _ => exact hp.1.1.elim
-      | writeArray₁ _ => exact hp.1.1.elim
-      | writeArray₂ _ _ => exact hp.1.1.1.elim
-      | _ => cases h₁
-    · exact ⟨_, .letPair _ hs⟩
-  | unitE h₁ _ hadd ih₁ _ =>
-    right
-    rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · induction hv using IsValue.induction with
-      | unit => exact ⟨_, .betaUnit _⟩
-      | prim => exact hp.1.elim
-      | readArray₁ _ => exact hp.1.1.elim
-      | writeArray₁ _ => exact hp.1.1.elim
-      | writeArray₂ _ _ => exact hp.1.1.1.elim
-      | _ => cases h₁
-    · exact ⟨_, .letUnit _ hs⟩
-  | bangE h₁ _ hadd ih₁ _ =>
-    right
-    rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · induction hv using IsValue.induction with
-      | bang => exact ⟨_, .betaBang _ _⟩
-      | prim => exact hp.1.elim
-      | readArray₁ _ => exact hp.1.1.elim
-      | writeArray₁ _ => exact hp.1.1.elim
-      | writeArray₂ _ _ => exact hp.1.1.1.elim
-      | _ => cases h₁
-    · exact ⟨_, .letBang _ hs⟩
-  | copy h₁ _ hadd ih₁ _ =>
-    right
-    rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · induction hv using IsValue.induction with
-      | bang => exact ⟨_, .betaCopy _ _⟩
-      | prim => exact hp.1.elim
-      | readArray₁ _ => exact hp.1.1.elim
-      | writeArray₁ _ => exact hp.1.1.elim
-      | writeArray₂ _ _ => exact hp.1.1.1.elim
-      | _ => cases h₁
-    · exact ⟨_, .copy _ hs⟩
+      | _ => first | (cases h₁; done) | exact ⟨_, by constructor⟩
+    · exact ⟨_, by constructor; exact hs⟩
   | borrow h₁ ih₁ =>
     right
     rcases ih₁ hΓ hp with hv | ⟨t', hs⟩
     · induction hv using IsValue.induction with
-      | star => exact ⟨_, .betaBorrow _⟩
       | prim => exact hp.elim
       | readArray₁ _ => exact hp.1.elim
       | writeArray₁ _ => exact hp.1.elim
       | writeArray₂ _ _ => exact hp.1.1.elim
-      | _ => cases h₁
+      | _ => first | (cases h₁; done) | exact ⟨_, by constructor⟩
     · exact ⟨_, .borrow hs⟩
 
 /-- **Syntactic type safety** for closed terms: a well-typed closed primitive-free term
@@ -415,41 +331,8 @@ theorem IsValue.not_cbnStep {n : ℕ} {v t : Term n} (hv : IsValue v) : ¬ CbnSt
 theorem CbnStep.deterministic {n : ℕ} {t t₁ t₂ : Term n} (h₁ : CbnStep t t₁)
     (h₂ : CbnStep t t₂) : t₁ = t₂ := by
   induction h₁ generalizing t₂ with
-  | betaLolli => cases h₂ with
-    | betaLolli => rfl
-    | app _ h => cases h
-  | betaTensor => cases h₂ with
-    | betaTensor => rfl
-    | letPair _ h => cases h
-  | betaUnit => cases h₂ with
-    | betaUnit => rfl
-    | letUnit _ h => cases h
-  | betaBang => cases h₂ with
-    | betaBang => rfl
-    | letBang _ h => cases h
-  | betaBorrow => cases h₂ with
-    | betaBorrow => rfl
-    | borrow h => cases h
-  | betaCopy => cases h₂ with
-    | betaCopy => rfl
-    | copy _ h => cases h
-  | app _ h ih => cases h₂ with
-    | betaLolli => cases h
-    | app _ h' => rw [ih h']
-  | letPair _ h ih => cases h₂ with
-    | betaTensor => cases h
-    | letPair _ h' => rw [ih h']
-  | letUnit _ h ih => cases h₂ with
-    | betaUnit => cases h
-    | letUnit _ h' => rw [ih h']
-  | letBang _ h ih => cases h₂ with
-    | betaBang => cases h
-    | letBang _ h' => rw [ih h']
-  | borrow h ih => cases h₂ with
-    | betaBorrow => cases h
-    | borrow h' => rw [ih h']
-  | copy _ h ih => cases h₂ with
-    | betaCopy => cases h
-    | copy _ h' => rw [ih h']
+  | app _ h ih | letPair _ h ih | letUnit _ h ih | letBang _ h ih | borrow h ih | copy _ h ih =>
+    cases h₂ <;> first | (cases h; done) | (rename_i h'; rw [ih h'])
+  | _ => cases h₂ <;> first | rfl | (rename_i h; cases h)
 
 end LCU

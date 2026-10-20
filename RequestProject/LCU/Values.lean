@@ -127,34 +127,31 @@ variable {n : ℕ}
 
 /-! ### Terms outside the value grammar -/
 
+/-- Internal tactic: prove `¬ IsValue t` for a term `t` whose head is not a value former. -/
+macro "not_value" : tactic =>
+  `(tactic| (rintro ⟨v, hv⟩; (cases v <;> try simp at hv); rename_i f; cases f <;> simp at hv))
+
 lemma not_isValue_var (i : Fin n) : ¬ IsValue (Term.var i) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 lemma not_isValue_letPair (t₁ : Term n) (t₂ : Term (n + 2)) : ¬ IsValue (Term.letPair t₁ t₂) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 lemma not_isValue_letUnit (t₁ t₂ : Term n) : ¬ IsValue (Term.letUnit t₁ t₂) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 lemma not_isValue_letBang (t₁ : Term n) (t₂ : Term (n + 1)) : ¬ IsValue (Term.letBang t₁ t₂) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 lemma not_isValue_borrow (t : Term n) : ¬ IsValue (Term.borrow t) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 lemma not_isValue_copy (t₁ : Term n) (t₂ : Term (n + 1)) : ¬ IsValue (Term.copy t₁ t₂) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 /-- A β-redex is not a value. -/
 lemma not_isValue_app_lam (t : Term (n + 1)) (u : Term n) : ¬ IsValue (Term.app (.lam t) u) := by
-  rintro ⟨v, hv⟩; cases v <;> try simp at hv
-  rename_i f; cases f <;> simp at hv
+  not_value
 
 end
 

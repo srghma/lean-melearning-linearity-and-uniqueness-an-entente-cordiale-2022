@@ -1,23 +1,22 @@
-# Summary of changes for run 4cc4945b-f8d0-4151-8f07-e63fe5c3bdb4
-I made the project build faster without changing any definitions or theorem statements. A from-scratch build of the project's own files went from about 1 min 47 s to about 43 s on this machine.
+# Summary of changes for run 76352643-5294-4f92-a239-b6c7225e842e
+I refactored the project to cut down on duplicated code. No registered definition or theorem statement changed, so the Properties table still applies as it was. The whole project builds with no errors, no warnings and no `sorry`. I spot-checked the main results (`array_type_safety`, `cbn_eval_core`, the substitution and weakening lemmas, determinism, the counterexamples, `possible_cake`) and they use only the standard axioms. Across the 14 files I touched, the diff is 290 lines added and 711 removed; the `RequestProject/LCU` files went from 5457 to about 5000 lines.
 
-**Where the time went.** I timed and profiled each file. Most of each file's time was spent loading all of Mathlib, about 6–7 s per file. That cost was paid in all 23 files, one after another, because they import each other in a chain. The only real proof work that stood out was in `RequestProject/LCU/Syntax.lean`, where five lemmas took 3–4.5 s each.
+**Shared helpers I added**
+- **`split_rule h₁ h₂ hadd`** (in `TypingD.lean`): one tactic that applies whichever of the six context-splitting typing rules fits (`app`, `tensorI`, `tensorE`, `unitE`, `bangE`, `copy`). Proofs by induction on typing used to repeat a near-identical case for each of these rules. Those cases are now one shared case in `der`, `rename`, `weaken`, `shiftRefs`, `subst_gen`, `freeIn_of_lin` and `ne_none_of_freeIn`. Rules that differ only in which literal or primitive they type (`unitI`, `natI`, `floatI`, `prim`) are also handled together.
+- **`hyp_add`** (in `CtxAlgebra.lean`): a 3-line tactic that replaces two very long hand-written lists of constructor combinations (`hyp_add2` and `hyp_add3`).
+- **New context lemmas** in `CtxAlgebra.lean`: `AllNonLin.set`, `AllNonLin.set'`, `AllNonLin.of_set`, `AllNonLin.cons_none`, `Add.cons_none`, `HypAdd.some_of_nonLin`. Each replaces the same small argument that had been re-proved by hand in several files.
+- **Variable/reference rule side conditions:** these are now proved once, in `Ctx.Add.weaken_name` and `Ctx.remove_set_allNonLin`. The variable and array-reference cases of weakening and substitution now just call them.
+- **`not_value`** (in `Values.lean`): one tactic for the seven "this term is not a value" lemmas, which all had the same proof.
+- **`CbnSteps.congr`** (in `CbnNormalization.lean`): one lemma replacing six per-constructor congruence lemmas.
 
-**What I changed**
-- **Smaller imports.** `Syntax.lean` and `Granule.lean` were the only files that imported Mathlib directly, and both used `import Mathlib`. They now import only what they need:
-  - `Syntax.lean`: `Mathlib.Data.Fin.Tuple.Basic`, `Mathlib.Data.Fintype.Defs` and `Mathlib.Algebra.Ring.Defs`.
-  - `Granule.lean`: `Mathlib.Algebra.Ring.Defs`, `Mathlib.Tactic.DeriveFintype`, `Mathlib.Data.Fintype.Basic` and `Mathlib.Order.Basic`.
-  
-  Load time per file dropped from about 6 s to about 1.7 s, and every later file in the chain benefits.
-- **Faster proofs in `Syntax.lean`.** The renaming/substitution lemmas (`rename_id`, `rename_rename`, `subst_var`, `subst_ren`, `subst_rename`, `rename_subst`, `subst_subst`) used `induction t <;> simp_all [...]`. That searched the full simp lemma set across all 16 term cases. They now use `simp only` with just the definitions and lemmas they need. Each lemma dropped from up to about 4.5 s to about 0.8 s, and the file went from about 13 s to about 5 s.
+**Definitions merged**
+- `Term.shiftRefs N` (array semantics) duplicated the heap model's `renameRefs`. `renameRefs` now lives in `Syntax.lean`, and `shiftRefs N` is defined as `renameRefs (N + ·)`.
+- The dereliction-free substitution lemmas (`HasTypeD.subst_lin`, `subst_nonlin`, `subst_none`) are now proved directly in `Substitution.lean`. Lemmas 1 and 2 (`HasType.subst_lin`/`subst_nonlin`) follow from them, which removes the wrapper lemmas that used to go back and forth in `Equational.lean`.
 
-**Checks**
-- The whole project builds with no errors and no `sorry`.
-- `#print axioms` shows only the standard axioms for `cbn_eval_core` (`propext`, `Classical.choice`, `Quot.sound`) and `Term.subst_subst` (`propext`, `Quot.sound`).
-- The Properties table did not need updating, since no statements changed.
+**Other compactions:** many proofs now treat structurally identical cases together. This applies to `hasType_iff_hasTypeD`, the term traversals (`PrimFree`, `freeIn_rename`), subject reduction, progress, determinism, and the store-based progress and preservation proofs.
 
 **Left as is**
-- `RequestProject/Main.lean` still does `import Mathlib` and contains only option settings. It doesn't hold up the other files, so I didn't touch it.
-- The proof of `HypAdd.interchange` in `CtxAlgebra.lean` uses a long backtracking tactic. It takes about 1.3 s, which wasn't worth reworking.
+- The paper's typing judgment `HasType` and the dereliction-free `HasTypeD` still have two parallel lists of rules. Merging them into one parametrised definition would change how the registered `HasType` definition reads, so I didn't do it.
+- Several elimination-form cases (in `CbnStep.preserves` and `AStep.preserves`) still each have their own case. Merging them would rely on the order in which Lean names the inverted hypotheses, and that order differs between typing rules, so it would be fragile.
 
-The changes are committed and pushed.
+All changes are committed and pushed.
