@@ -1,0 +1,102 @@
+module
+public import RequestProject.LCU.Context
+
+/-!
+# Typing rules of the LCU calculus (Figure 1, Section 3.3 and runtime rules)
+
+`HasType Γ t A` formalises the judgment `Γ ⊢ t : A`.
+
+The rules are exactly those of Figure 1, plus the axiomatic rules for the array
+primitives of Section 3.3 (with built-in weakening) and typing of numeric literals.
+We additionally include the runtime rule for array references `a` (Section 3.4):
+the paper only says these are "akin to a variable rule" (the precise rules are in an
+appendix that is not part of the provided text), so we choose:
+
+* `[Γ], a : Array A ⊢ a : Array A` (and likewise `[Γ], a : [Array A] ⊢ a : Array A`).
+
+Moreover, in the rule `nec` the premise `∅ ⊢ t : A` is read as "no *variable*
+assumptions"; the array references of the conclusion are passed on to the premise.
+For source programs (contexts without array references) all of these rules coincide
+with the paper's.
+-/
+
+@[expose] public section
+
+namespace LCU
+
+/-- Types of the array primitives (Section 3.3):
+```
+newArray    : ℕ ⊸ *(Array 𝔽)
+readArray   : *(Array 𝔽) ⊸ ℕ ⊸ 𝔽 ⊗ *(Array 𝔽)
+writeArray  : *(Array 𝔽) ⊸ ℕ ⊸ 𝔽 ⊸ *(Array 𝔽)
+deleteArray : *(Array 𝔽) ⊸ 1
+``` -/
+def Prim.ty : Prim → Ty
+  | .newArray => .nat ⊸ .star (.array .float)
+  | .readArray => .star (.array .float) ⊸ .nat ⊸ (.float ⊗ .star (.array .float))
+  | .writeArray => .star (.array .float) ⊸ .nat ⊸ .float ⊸ .star (.array .float)
+  | .deleteArray => .star (.array .float) ⊸ .unit
+
+open Term in
+/-- The typing judgment `Γ ⊢ t : A` of the LCU calculus. -/
+inductive HasType : {n : ℕ} → Ctx n → Term n → Ty → Prop where
+  /-- `[Γ], x : A ⊢ x : A` -/
+  | var {n : ℕ} {Γ : Ctx n} {i : Fin n} {A : Ty} :
+      Γ (.inl i) = some (.lin A) → (Γ.set (.inl i) none).AllNonLin →
+      HasType Γ (var i) A
+  /-- `Γ, x : A ⊢ t : B` gives `Γ ⊢ λx. t : A ⊸ B` -/
+  | abs {n : ℕ} {Γ : Ctx n} {t : Term (n + 1)} {A B : Ty} :
+      HasType (Γ.cons (some (.lin A))) t B → HasType Γ (lam t) (A ⊸ B)
+  /-- `Γ₁ ⊢ t₁ : A ⊸ B` and `Γ₂ ⊢ t₂ : A` give `Γ₁ + Γ₂ ⊢ t₁ t₂ : B` -/
+  | app {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ t₂ : Term n} {A B : Ty} :
+      HasType Γ₁ t₁ (A ⊸ B) → HasType Γ₂ t₂ A → Γ₁.Add Γ₂ Γ → HasType Γ (app t₁ t₂) B
+  /-- `⊗I` -/
+  | tensorI {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ t₂ : Term n} {A B : Ty} :
+      HasType Γ₁ t₁ A → HasType Γ₂ t₂ B → Γ₁.Add Γ₂ Γ → HasType Γ (pair t₁ t₂) (A ⊗ B)
+  /-- `⊗E`: `Γ₁ ⊢ t₁ : A ⊗ B` and `Γ₂, x : A, y : B ⊢ t₂ : C` give
+  `Γ₁ + Γ₂ ⊢ let (x, y) = t₁ in t₂ : C` -/
+  | tensorE {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ : Term n} {t₂ : Term (n + 2)} {A B C : Ty} :
+      HasType Γ₁ t₁ (A ⊗ B) → HasType ((Γ₂.cons (some (.lin A))).cons (some (.lin B))) t₂ C →
+      Γ₁.Add Γ₂ Γ → HasType Γ (letPair t₁ t₂) C
+  /-- `1I`: `[Γ] ⊢ unit : 1` -/
+  | unitI {n : ℕ} {Γ : Ctx n} : Γ.AllNonLin → HasType Γ unit .unit
+  /-- `1E` -/
+  | unitE {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ t₂ : Term n} {B : Ty} :
+      HasType Γ₁ t₁ .unit → HasType Γ₂ t₂ B → Γ₁.Add Γ₂ Γ → HasType Γ (letUnit t₁ t₂) B
+  /-- dereliction: `Γ, x : A ⊢ t : B` gives `Γ, x : [A] ⊢ t : B` -/
+  | der {n : ℕ} {Γ : Ctx n} {t : Term n} {i : Fin n} {A B : Ty} :
+      HasType Γ t B → Γ (.inl i) = some (.lin A) →
+      HasType (Γ.set (.inl i) (some (.nonlin A))) t B
+  /-- `!I`: `[Γ] ⊢ t : A` gives `[Γ] ⊢ !t : !A` -/
+  | bangI {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+      Γ.AllNonLin → HasType Γ t A → HasType Γ (bang t) (.bang A)
+  /-- `!E`: `Γ₁ ⊢ t₁ : !A` and `Γ₂, x : [A] ⊢ t₂ : B` give
+  `Γ₁ + Γ₂ ⊢ let! x = t₁ in t₂ : B` -/
+  | bangE {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ : Term n} {t₂ : Term (n + 1)} {A B : Ty} :
+      HasType Γ₁ t₁ (.bang A) → HasType (Γ₂.cons (some (.nonlin A))) t₂ B →
+      Γ₁.Add Γ₂ Γ → HasType Γ (letBang t₁ t₂) B
+  /-- borrow: `Γ ⊢ t : *A` gives `Γ ⊢ &t : !A` -/
+  | borrow {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+      HasType Γ t (.star A) → HasType Γ (borrow t) (.bang A)
+  /-- copy: `Γ₁ ⊢ t₁ : !A` and `Γ₂, x : *A ⊢ t₂ : !B` give
+  `Γ₁ + Γ₂ ⊢ copy t₁ as x in t₂ : !B` -/
+  | copy {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ : Term n} {t₂ : Term (n + 1)} {A B : Ty} :
+      HasType Γ₁ t₁ (.bang A) → HasType (Γ₂.cons (some (.lin (.star A)))) t₂ (.bang B) →
+      Γ₁.Add Γ₂ Γ → HasType Γ (copy t₁ t₂) (.bang B)
+  /-- necessitation: `∅ ⊢ t : A` gives `[Γ] ⊢ *t : *A` -/
+  | nec {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+      HasType Γ.refsOnly t A → Γ.VarsNonLin → HasType Γ (star t) (.star A)
+  /-- natural number literals: `[Γ] ⊢ k : ℕ` -/
+  | natI {n : ℕ} {Γ : Ctx n} {k : ℕ} : Γ.AllNonLin → HasType Γ (nat k) .nat
+  /-- float literals: `[Γ] ⊢ x : 𝔽` -/
+  | floatI {n : ℕ} {Γ : Ctx n} {x : Float} : Γ.AllNonLin → HasType Γ (float x) .float
+  /-- array primitives: `[Γ] ⊢ p : Prim.ty p` -/
+  | prim {n : ℕ} {Γ : Ctx n} {p : Prim} : Γ.AllNonLin → HasType Γ (prim p) p.ty
+  /-- runtime array references: `[Γ], a : Array A ⊢ a : Array A` -/
+  | ref {n : ℕ} {Γ : Ctx n} {a : ℕ} {h : Hyp} :
+      Γ (.inr a) = some h → (Γ.set (.inr a) none).AllNonLin →
+      HasType Γ (ref a) (.array h.ty)
+
+@[inherit_doc] notation:40 Γ " ⊢ " t " ∶ " A => HasType Γ t A
+
+end LCU
