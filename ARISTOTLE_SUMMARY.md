@@ -1,34 +1,28 @@
-# Summary of changes for run 83d9b41c-c1f3-4dbc-88b3-bafecb299d45
-I moved the formalisation into one directory per paper section, split the longer files, added a reading guide, and added comments throughout. No theorem statement or proof changed. The whole project still builds with no errors, no warnings and no `sorry`. I re-checked the axioms of `array_type_safety`, `cbn_eval_core`, `not_uniqueness`, `HasType.subst_lin` and `possible_cake`: they use only `propext`, `Classical.choice` and `Quot.sound`.
+# Summary of changes for run 8177784b-a0d8-431e-9137-5a3ec513bcd3
+I formalized the second paper, *Functional Ownership through Fractional Uniqueness* (`paper.typ`), and reorganized the project so the two papers keep their code apart. The whole project builds with no `sorry`. The FOFU results I registered use only the standard axioms `propext`, `Classical.choice` and `Quot.sound`. Several of the paper's §6.3 theorems turned out to be false as stated; details are below.
 
-**New layout** (under `RequestProject/LCU/`; `RequestProject/LCU.lean` imports everything):
-- `Sec2_KeyIdeas/`: `KeyIdeas.lean`
-- `Sec3_1_Calculus/`: `Syntax`, `RenameSubst`, `Context`, `CtxAlgebra`, `Typing`, `TypingD`, `Weakening`, `Substitution`, `Values`, `FreeVars`
-- `Sec3_2_Equational/`: `Equational` (the definitions), `EqAxiomTyping` (the axioms preserve typing)
-- `Sec3_4_HeapModel/`: `Heap`
-- `Sec3_5_Metatheory/`: `Metatheory` and the four `Counter*` files
-- `Sec4_Implementation/`: `Granule`
-- `Ext1_CallByName/` (beyond the paper): `CbnSemantics`, `CbnExamples`, `CbnNormalization`
-- `Ext2_MutableArrays/` (§3.3 and beyond): `RefShift`, `ArraySemantics`, `ArrayPreservation`, `ArrayProgress`, `ArrayExamples`
+**Layout**
+- `RequestProject/Common/` holds the code both papers use: the de Bruijn infrastructure (`DeBruijn.lean`, with `Term n`-style scoping and `Fin n` variables) and the preordered-semiring grades (`Grades/PreorderedSemiring.lean`). The first paper's code (`RequestProject/LCU/`) now imports it from there, and comments mark the reuse in both papers' files.
+- `RequestProject/FOFU/` (namespace `FOFU`, root module `RequestProject/FOFU.lean`) holds the second paper's code, in one subdirectory per section: `Sec3_CoreCalculus`, `Sec4_Uniqueness`, `Sec5_Fractional`, `Sec5_1_Equational`, `Sec5_2_Distributive`, `Sec6_1_Preliminaries`, `Sec6_2_Reduction` and `Sec6_3_Theorems`. The core calculus has graded types, so its syntax and typing rules are separate definitions, not copies of the first paper's.
+- I renamed the old reading guide to `READING_GUIDE-linearity-and-uniqueness.md` and added `READING_GUIDE-functional-ownership-through-fractional-uniqueness.md`, which maps the paper's sections and results to Lean names. `README.md` now covers both papers.
 
-**Files split:**
-- `Syntax` → `Syntax` + `RenameSubst` (renaming and substitution).
-- `Equational` → `Equational` + `FreeVars` + `EqAxiomTyping`.
-- `ArraySemantics` (740 lines) → `ArraySemantics` (definitions) + `ArrayPreservation` (subject reduction) + `ArrayProgress` (progress and type safety).
-- The four counterexample files used to import each other in a chain; each now imports only `Metatheory`.
+**Proved**
+- Lemma 6.2, linear substitution (`HasType.subst_lin`).
+- Lemma 6.3, graded substitution (`HasType.subst_grd`).
+- Example 6.5, heap compatibility (`example_6_5`). The paper leaves the typing of `v₁` implicit; I assumed `∅ ⊢ v₁ : A`.
+- Typing of the code examples: `exampleNat`, `exampleMove`, `exampleShare`, `exampleBorrow`, `exampleReborrow`, `exampleArray`, `exampleClone`, `exampleReference` and `examplePartial`. A few are stated in a context supplying the functions they call, or with `Colour` replaced by a general type. `exampleGraded` is not formalized; the reading guide explains why.
 
-**Reading guide:** `READING_GUIDE.md` covers:
-- the de Bruijn and context conventions you need first;
-- a table mapping each directory to its paper section;
-- a table mapping every numbered item of the paper (Definitions 1–3, Figure 1, Lemmas 1–3, Theorems 4–7, the §2 examples, §4.1) to its Lean name and file;
-- two reading paths: statements only, or the full development in dependency order, with infrastructure files marked as skippable on a first read;
-- a dependency diagram and some tips for browsing.
+**Disproved**
+§6.3 is formalized for two versions of heap compatibility (Definition 6.4): the rules as printed, and a repaired version with one extra rule for resource entries. Each counterexample is a machine-checked proof that the statement is false:
+- Theorem 6.6 (Progress) is false for both versions. `split (*())` is well typed but stuck.
+- Theorem 6.7 (Preservation) is false for both versions. With the printed rules, `newArray 3` produces a heap that is compatible with no context. With the repaired rules, `⤳splitRef` removes a reference from the heap while the reduced term still mentions it.
+- Lemma 6.8, Theorem 6.9 and Corollary 6.10 are false for the repaired version.
+- Theorem 6.11 (equational soundness) is false for both versions, whatever relation on final heaps and values is used.
 
-The file table in `README.md` now follows the new layout and points to the guide.
+**Holds only vacuously**
+- Corollary 6.10 with the printed rules (`uniqueness_literal`). Under those rules no compatible heap contains a resource identifier, and the statement only talks about such identifiers.
 
-**Comments added:**
-- Module docstrings now list main definitions and results, with implementation notes where useful. For example, `TypingD` explains why the dereliction-free system exists, `Substitution` explains why the lemma is generalised to any variable, and `Metatheory` has a table pointing each of Theorems 4–7 to its disproof.
-- Longer files are divided by section headers.
-- About 150 previously undocumented lemmas and definitions now have docstrings. These include each step and intermediate heap of the uniqueness counterexample, the context-algebra laws, and the inversion and progress helpers. The `HasType` docstring also explains how the paper's rules are encoded.
+**Still open**
+- Lemma 6.8 and Theorem 6.9 with the printed rules: the part about newly created identifiers is neither proved nor disproved.
 
-The Properties table now points to the new file locations, and every entry keeps its earlier status. Everything is committed and pushed.
+The Properties table now has entries for the second paper with these statuses, each linked to its line in `paper.typ`. The 30 existing first-paper entries are unchanged, but their line links were written against the first paper's text and probably no longer match, since `paper.typ` now holds the second paper.

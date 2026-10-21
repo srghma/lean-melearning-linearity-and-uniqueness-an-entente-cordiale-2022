@@ -55,14 +55,8 @@ variable {ρ : Fin n → Fin m} {Γ : Ctx n} {Γ' : Ctx m}
 /-- Renamings extend under binders (along `Ren.up ρ`). -/
 lemma cons (hρ : RenCtx ρ Γ Γ') (h : Option Hyp) :
     RenCtx (Term.Ren.up ρ) (Γ.cons h) (Γ'.cons h) where
-  inj := by
-    intro i j e
-    cases i using Fin.cases <;> cases j using Fin.cases
-    · rfl
-    · exact absurd e.symm (Fin.succ_ne_zero _)
-    · exact absurd e (Fin.succ_ne_zero _)
-    · simp only [Ren.up_succ, Fin.succ_inj] at e
-      rw [hρ.inj e]
+  -- injectivity of lifted renamings is shared with FOFU (`Common/DeBruijn.lean`)
+  inj := DeBruijn.Ren.up_injective hρ.inj
   map := by
     intro i; cases i using Fin.cases
     · rfl

@@ -1,12 +1,23 @@
-# Reading guide
+# Reading guide: *Linearity and Uniqueness: An Entente Cordiale*
 
 This guide explains how the Lean formalisation of *Linearity and Uniqueness: An Entente
-Cordiale* (`paper.typ`) is organised and suggests an order for reading it. All Lean files
+Cordiale* (the first paper of this project; its source was the earlier `paper.typ`, which
+now contains the second paper) is organised and suggests an order for reading it.  The
+second paper, *Functional Ownership through Fractional Uniqueness*, has its own guide,
+`READING_GUIDE-functional-ownership-through-fractional-uniqueness.md`. All Lean files
 live in `RequestProject/LCU/`, in the namespace `LCU`. `RequestProject/LCU.lean` imports
 everything, so `import RequestProject.LCU` gives access to the whole development.
 
 The project builds with no `sorry`. For the overall results (including which theorems of
 the paper turned out to be false as stated), see `README.md`.
+
+**Shared code.** The two formalisations do not share files.  The few definitions that both
+use live in `RequestProject/Common/`:
+
+* `Common/DeBruijn.lean`: lifting of variable renamings under binders (`DeBruijn.Ren.up`
+  and its laws); re-exported in the `LCU` namespace by `Sec3_1_Calculus/RenameSubst.lean`.
+* `Common/Grades/PreorderedSemiring.lean`: the class of pre-ordered semirings of grades;
+  the `{0, 1, ω}` semiring of §4.1 is an instance (`Sec4_Implementation/Granule.lean`).
 
 ## Conventions you need first
 

@@ -1,5 +1,6 @@
 module
 public import RequestProject.LCU.Sec3_1_Calculus.Syntax
+public import RequestProject.Common.DeBruijn
 
 /-!
 # Renaming and substitution of de Bruijn terms
@@ -29,13 +30,12 @@ namespace Term
 
 /-! ## Renaming -/
 
-/-- Lifting a renaming under a binder. -/
-def Ren.up {n m : ℕ} (ρ : Fin n → Fin m) : Fin (n + 1) → Fin (m + 1) :=
-  Fin.cases 0 (fun i => (ρ i).succ)
-
-@[simp] lemma Ren.up_zero {n m : ℕ} (ρ : Fin n → Fin m) : Ren.up ρ 0 = 0 := rfl
-@[simp] lemma Ren.up_succ {n m : ℕ} (ρ : Fin n → Fin m) (i : Fin n) :
-    Ren.up ρ i.succ = (ρ i).succ := rfl
+/- Lifting a renaming under a binder (`Ren.up`) and its basic laws are shared with the
+FOFU formalisation: they live in `RequestProject/Common/DeBruijn.lean` (namespace
+`DeBruijn`) and are re-exported here so that `Ren.up`, `Term.Ren.up`, `Ren.up_zero`,
+`Ren.up_succ`, `Ren.up_id` and `Ren.up_comp` keep working unchanged in this
+development. -/
+export DeBruijn (Ren.up Ren.up_zero Ren.up_succ Ren.up_id Ren.up_comp)
 
 /-- Simultaneous renaming of free variables. -/
 def rename : {n m : ℕ} → (Fin n → Fin m) → Term n → Term m
@@ -95,13 +95,6 @@ def subst2 {n : ℕ} (s₁ s₂ : Term n) (t : Term (n + 2)) : Term n :=
   subst (Fin.cons s₂ (Fin.cons s₁ var)) t
 
 /-! ## Basic lemmas about renaming and substitution -/
-
-lemma Ren.up_id {n : ℕ} : Ren.up (id : Fin n → Fin n) = id := by
-  funext i; cases i using Fin.cases <;> rfl
-
-lemma Ren.up_comp {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) :
-    Ren.up (ρ' ∘ ρ) = Ren.up ρ' ∘ Ren.up ρ := by
-  funext i; cases i using Fin.cases <;> rfl
 
 /-- Renaming along the identity does nothing. -/
 lemma rename_id {n : ℕ} (t : Term n) : rename id t = t := by

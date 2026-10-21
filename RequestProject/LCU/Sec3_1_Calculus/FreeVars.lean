@@ -46,12 +46,8 @@ def FreeIn : {n : ℕ} → Fin n → Term n → Prop
   | _, _, .prim _ => False
   | _, _, .ref _ => False
 
-lemma Ren.exists_of_up {n m : ℕ} {ρ : Fin n → Fin m} {j : Fin m} :
-    (∃ i, Ren.up ρ i = j.succ) → ∃ i, ρ i = j
-  | ⟨i, hi⟩ => by
-    cases i using Fin.cases with
-    | zero => exact absurd hi (Fin.succ_ne_zero j).symm
-    | succ i => exact ⟨i, by simpa using hi⟩
+-- `Ren.exists_of_up` is shared with the FOFU formalisation (`RequestProject/Common/DeBruijn.lean`).
+open DeBruijn (Ren.exists_of_up)
 
 lemma freeIn_rename {n m : ℕ} (ρ : Fin n → Fin m) (t : Term n) :
     ∀ j, FreeIn j (t.rename ρ) → ∃ i, ρ i = j := by

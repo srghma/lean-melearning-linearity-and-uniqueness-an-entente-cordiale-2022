@@ -36,5 +36,6 @@ directories by section of the paper (`Sec2_…`, `Sec3_1_…`, …); the directo
 `Ext1_…` and `Ext2_…` contain material that goes beyond the paper (a repaired
 call-by-name semantics and a store-based semantics for mutable arrays).
 
-See `READING_GUIDE.md` at the root of the project for a suggested reading order.
+See `READING_GUIDE-linearity-and-uniqueness.md` at the root of the project for a suggested
+reading order.
 -/

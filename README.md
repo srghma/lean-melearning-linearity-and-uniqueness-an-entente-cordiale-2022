@@ -1,10 +1,67 @@
-# Formalisation of *Linearity and Uniqueness: An Entente Cordiale* (LCU calculus)
+# Formalisations of two papers on linearity, uniqueness and ownership
 
-This is a Lean 4 / Mathlib formalisation of the paper in `paper.typ`. All files live in
-`RequestProject/LCU/` under the namespace `LCU`. The whole project builds with no `sorry`,
-and the only axioms used are the standard `propext`, `Classical.choice` and `Quot.sound`.
+This Lean 4 / Mathlib project formalises two papers:
 
-## Representation
+1. *Linearity and Uniqueness: An Entente Cordiale* (the LCU calculus), in
+   `RequestProject/LCU/`, namespace `LCU`. Reading guide:
+   `READING_GUIDE-linearity-and-uniqueness.md`.
+2. *Functional Ownership through Fractional Uniqueness* (Marshall and Orchard, the paper in
+   `paper.typ`), in `RequestProject/FOFU/`, namespace `FOFU`. Reading guide:
+   `READING_GUIDE-functional-ownership-through-fractional-uniqueness.md`.
+
+The two formalisations do not share files. Code used by both lives in
+`RequestProject/Common/`:
+
+* `Common/DeBruijn.lean`: lifting a renaming of de Bruijn variables under a binder
+  (`DeBruijn.Ren.up`) and its laws;
+* `Common/Grades/PreorderedSemiring.lean`: the class of pre-ordered semirings of grades,
+  with the instance for `ℕ`. The `{0, 1, ω}` semiring of the first paper is an instance,
+  and the second paper's calculus is parameterised by it.
+
+`RequestProject/LCU.lean` and `RequestProject/FOFU.lean` import the respective
+developments. In both, terms are intrinsically scoped de Bruijn terms: `Term n` (or
+`Term R n`) has `n` free variables, `Term.var : Fin n → Term n`, and `Term 0` is the type
+of closed terms. The whole project builds with no `sorry`, and the only axioms used are
+the standard `propext`, `Classical.choice` and `Quot.sound`.
+
+## *Functional Ownership through Fractional Uniqueness*
+
+The directories of `RequestProject/FOFU/` follow the sections of the paper:
+`Sec3_CoreCalculus/`, `Sec4_Uniqueness/`, `Sec5_Fractional/`, `Sec5_1_Equational/`,
+`Sec5_2_Distributive/`, `Sec6_1_Preliminaries/`, `Sec6_2_Reduction/` and
+`Sec6_3_Theorems/`. The reading guide maps every item of the paper to its Lean name and
+lists the formalisation choices.
+
+* **Calculus.** Types, terms, contexts with partial addition and scaling, and the typing
+  rules of all sections (`HasType`), over an arbitrary pre-ordered semiring of grades.
+  Values, heaps, the reduction relation of §6.2 (`Step`, `Steps`), heap compatibility
+  (Definition 6.4, `Compat`) and the equational theory (`Equiv`).
+* **Examples.** The example derivation of §3 (`exampleNat_typing`), `exampleMove`,
+  `exampleShare`, `exampleBorrow`, `exampleReborrow`, `exampleArray`, `exampleClone`,
+  `exampleReference`, `examplePartial` (all with `ℕ` grades), and Example 6.5
+  (`example_6_5`).
+* **Lemmas 6.2 and 6.3 (substitution) are proved**: `HasType.subst_lin` and
+  `HasType.subst_grd`. The proof uses a dereliction-free version of the typing judgment
+  (`hasType_iff_hasTypeD`), the algebra of contexts, identifier substitution, renaming,
+  weakening by zero-graded assumptions and approximation of whole contexts.
+* **Theorems 6.6–6.11** are stated literally (`Statements.lean`) for two variants of
+  Definition 6.4: as printed, and with a garbage-collection rule for resource entries
+  (as printed, no heap with a resource entry is compatible with any context). Progress
+  (`not_progress`), preservation (`not_preservation_literal`, `not_preservation_gc`) and
+  soundness with respect to `≡` (`not_eqSoundness`) are false for both variants. Borrow
+  safety, multi-reduction borrow safety and uniqueness are false for the repaired
+  variant (`not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_uniqueness_gc`).
+  For the printed variant, uniqueness holds vacuously (`uniqueness_literal`), and the
+  two borrow-safety statements remain open. These results concern the rules as printed
+  in the provided text, not necessarily the full rule set in the paper's appendices.
+
+## *Linearity and Uniqueness: An Entente Cordiale*
+
+This part formalises the first paper of the project (its source was the earlier
+`paper.typ`; that file now contains the second paper). All files live in
+`RequestProject/LCU/` under the namespace `LCU`.
+
+### Representation
 
 Terms use de Bruijn indices and are intrinsically scoped: `Term n` is the type of terms
 with `n` free variables, `Term.var : Fin n → Term n`, and `Term 0` is the type of closed
@@ -13,7 +70,7 @@ terms. Binders bind index `0`. In `letPair t₁ t₂` (`let (x, y) = t₁ in t�
 reference) an optional linear hypothesis `x : A` or non-linear hypothesis `x : [A]`.
 Context addition (Definition 2) and `[Γ]` (Definition 1) are defined pointwise.
 
-## Grammars by construction
+### Grammars by construction
 
 Every grammar of the paper is an inductive type (or a structure) whose inhabitants are
 exactly the objects the grammar describes. Where a sub-grammar is used as a condition on
@@ -36,10 +93,10 @@ judgments to the heap. For `copy_β` this means the rule requires `Γ ⊢ *θ(v)
 context that refers to the fresh copies `θ a`. The text writes this judgment in the new
 heap entry but only assumes `Γ ⊢ v : A`, which does not imply it in general.
 
-## Files
+### Files
 
-The files are grouped into directories by section of the paper; `READING_GUIDE.md`
-explains the layout, maps every numbered definition, lemma and theorem of the paper to
+The files are grouped into directories by section of the paper;
+`READING_GUIDE-linearity-and-uniqueness.md` explains the layout, maps every numbered definition, lemma and theorem of the paper to
 its Lean name, and suggests reading orders. `RequestProject/LCU.lean` imports everything.
 
 | Directory (under `RequestProject/LCU/`) | Files | Contents |
@@ -66,7 +123,7 @@ its Lean name, and suggests reading orders. `RequestProject/LCU.lean` imports ev
 | | `ArrayPreservation.lean`, `ArrayProgress.lean` | subject reduction, progress and type safety for `AStep` |
 | | `ArrayExamples.lean` | an example run: `readArray (writeArray (newArray 3) 0 x) 0` evaluates to `(x, *a)` |
 
-## Reconstruction choices
+### Reconstruction choices
 
 The provided text leaves out a few rules: the runtime typing rule for array references
 (found in the paper's appendix) and some heap-model rules. We reconstructed them as
@@ -75,7 +132,7 @@ passes the array references of its conclusion to its premise. For source program
 array references), the typing rules are exactly the paper's. The heap-model rules we
 reconstructed are documented in the docstring of `Heap.lean`.
 
-## Results on Theorems 4–7
+### Results on Theorems 4–7
 
 Read literally against the rules in the text, all four metatheorems are **false**. We proved
 each negation in Lean:
@@ -95,7 +152,7 @@ each negation in Lean:
 These counterexamples point to gaps or imprecision in the rules as written in the
 provided text. They do not necessarily apply to the full rule set in the paper's appendix.
 
-## A repaired call-by-name semantics with type safety
+### A repaired call-by-name semantics with type safety
 
 `CbnSemantics.lean` gives a substitution-based call-by-name reduction `CbnStep`. It
 follows the heap rules, but substitutes instead of allocating heap bindings:
@@ -114,7 +171,7 @@ array references are non-linear (for example closed terms in the empty context),
 The restriction to terms with no free variables is needed. `not_cbnStep_preserves_open`
 shows that with `x : [1]`, the term `copy !x as y in &y : !1` steps to the untypable `&(*x)`.
 
-## Termination of call-by-name evaluation
+### Termination of call-by-name evaluation
 
 `CbnNormalization.lean` proves that `CbnStep` evaluation terminates. It uses a unary
 logical relation `Reducible A t`, and the fundamental lemma `HasTypeD.reducible`.
@@ -125,7 +182,7 @@ logical relation `Reducible A t`, and the fundamental lemma `HasTypeD.reducible`
   non-linear);
 * `cbn_value_unique`: the value is unique.
 
-## The examples of Section 2
+### The examples of Section 2
 
 `KeyIdeas.lean` checks the typing claims of the paper's Key Ideas section in LCU. The
 types `Cake`, `Happy`, `Coffee` and `Awake` are arbitrary. The functions `eat`, `have`,
@@ -140,7 +197,7 @@ types `Cake`, `Happy`, `Coffee` and `Awake` are arbitrary. The functions `eat`, 
   `unique_to_linear_hasType` (`*A ⊸ A`), `bang_contract_hasType` (`!A ⊸ !A ⊗ !A`),
   `bang_weaken_hasType` (`!A ⊸ 1`) and `uniqueBind_hasType` (`(*A ⊸ !B) ⊸ !A ⊸ !B`).
 
-## Mutable arrays: a store-based semantics with type safety
+### Mutable arrays: a store-based semantics with type safety
 
 `Ext2_MutableArrays/` extends the call-by-name semantics with a store of mutable float
 arrays. The reduction `σ ⊢ t ⟶ σ' ⊢ t'` (`AStep`) uses these rules:

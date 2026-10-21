@@ -3,6 +3,7 @@ public import Mathlib.Algebra.Ring.Defs
 public import Mathlib.Tactic.DeriveFintype
 public import Mathlib.Data.Fintype.Basic
 public import Mathlib.Order.Basic
+public import RequestProject.Common.Grades.PreorderedSemiring
 
 /-!
 # The none-one-tons semiring `{0, 1, ω}` (Section 4.1)
@@ -18,7 +19,9 @@ a partial order with respect to which addition and multiplication are monotone.
 
 This file is independent of the rest of the formalisation (it does not import the LCU
 calculus); it only checks the algebraic claims about the grades that Granule uses
-for the non-linear modality.
+for the non-linear modality.  It also registers `{0, 1, ω}` as an instance of the
+class `Grades.PreorderedSemiring` shared with the second paper (see
+`RequestProject/Common/Grades/PreorderedSemiring.lean`).
 -/
 
 @[expose] public section
@@ -112,6 +115,14 @@ theorem many_mul_many : many * many = many := rfl
 
 /-- `0` and `1` are incomparable: discarding and linear use are distinct. -/
 theorem zero_one_incomparable : ¬ (0 : NOT) ≤ 1 ∧ ¬ (1 : NOT) ≤ 0 := by decide
+
+/-- `{0, 1, ω}` is a pre-ordered semiring in the sense shared by both papers
+(`Grades.PreorderedSemiring`, in `RequestProject/Common/Grades/PreorderedSemiring.lean`).
+In particular it can be used as the grade semiring of the FOFU calculus of
+*Functional Ownership through Fractional Uniqueness*. -/
+instance : Grades.PreorderedSemiring NOT where
+  add_mono := add_le_add'
+  mul_mono := mul_le_mul'
 
 end NOT
 
