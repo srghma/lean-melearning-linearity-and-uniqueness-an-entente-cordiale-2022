@@ -1,22 +1,34 @@
-# Summary of changes for run 76352643-5294-4f92-a239-b6c7225e842e
-I refactored the project to cut down on duplicated code. No registered definition or theorem statement changed, so the Properties table still applies as it was. The whole project builds with no errors, no warnings and no `sorry`. I spot-checked the main results (`array_type_safety`, `cbn_eval_core`, the substitution and weakening lemmas, determinism, the counterexamples, `possible_cake`) and they use only the standard axioms. Across the 14 files I touched, the diff is 290 lines added and 711 removed; the `RequestProject/LCU` files went from 5457 to about 5000 lines.
+# Summary of changes for run 83d9b41c-c1f3-4dbc-88b3-bafecb299d45
+I moved the formalisation into one directory per paper section, split the longer files, added a reading guide, and added comments throughout. No theorem statement or proof changed. The whole project still builds with no errors, no warnings and no `sorry`. I re-checked the axioms of `array_type_safety`, `cbn_eval_core`, `not_uniqueness`, `HasType.subst_lin` and `possible_cake`: they use only `propext`, `Classical.choice` and `Quot.sound`.
 
-**Shared helpers I added**
-- **`split_rule h₁ h₂ hadd`** (in `TypingD.lean`): one tactic that applies whichever of the six context-splitting typing rules fits (`app`, `tensorI`, `tensorE`, `unitE`, `bangE`, `copy`). Proofs by induction on typing used to repeat a near-identical case for each of these rules. Those cases are now one shared case in `der`, `rename`, `weaken`, `shiftRefs`, `subst_gen`, `freeIn_of_lin` and `ne_none_of_freeIn`. Rules that differ only in which literal or primitive they type (`unitI`, `natI`, `floatI`, `prim`) are also handled together.
-- **`hyp_add`** (in `CtxAlgebra.lean`): a 3-line tactic that replaces two very long hand-written lists of constructor combinations (`hyp_add2` and `hyp_add3`).
-- **New context lemmas** in `CtxAlgebra.lean`: `AllNonLin.set`, `AllNonLin.set'`, `AllNonLin.of_set`, `AllNonLin.cons_none`, `Add.cons_none`, `HypAdd.some_of_nonLin`. Each replaces the same small argument that had been re-proved by hand in several files.
-- **Variable/reference rule side conditions:** these are now proved once, in `Ctx.Add.weaken_name` and `Ctx.remove_set_allNonLin`. The variable and array-reference cases of weakening and substitution now just call them.
-- **`not_value`** (in `Values.lean`): one tactic for the seven "this term is not a value" lemmas, which all had the same proof.
-- **`CbnSteps.congr`** (in `CbnNormalization.lean`): one lemma replacing six per-constructor congruence lemmas.
+**New layout** (under `RequestProject/LCU/`; `RequestProject/LCU.lean` imports everything):
+- `Sec2_KeyIdeas/`: `KeyIdeas.lean`
+- `Sec3_1_Calculus/`: `Syntax`, `RenameSubst`, `Context`, `CtxAlgebra`, `Typing`, `TypingD`, `Weakening`, `Substitution`, `Values`, `FreeVars`
+- `Sec3_2_Equational/`: `Equational` (the definitions), `EqAxiomTyping` (the axioms preserve typing)
+- `Sec3_4_HeapModel/`: `Heap`
+- `Sec3_5_Metatheory/`: `Metatheory` and the four `Counter*` files
+- `Sec4_Implementation/`: `Granule`
+- `Ext1_CallByName/` (beyond the paper): `CbnSemantics`, `CbnExamples`, `CbnNormalization`
+- `Ext2_MutableArrays/` (§3.3 and beyond): `RefShift`, `ArraySemantics`, `ArrayPreservation`, `ArrayProgress`, `ArrayExamples`
 
-**Definitions merged**
-- `Term.shiftRefs N` (array semantics) duplicated the heap model's `renameRefs`. `renameRefs` now lives in `Syntax.lean`, and `shiftRefs N` is defined as `renameRefs (N + ·)`.
-- The dereliction-free substitution lemmas (`HasTypeD.subst_lin`, `subst_nonlin`, `subst_none`) are now proved directly in `Substitution.lean`. Lemmas 1 and 2 (`HasType.subst_lin`/`subst_nonlin`) follow from them, which removes the wrapper lemmas that used to go back and forth in `Equational.lean`.
+**Files split:**
+- `Syntax` → `Syntax` + `RenameSubst` (renaming and substitution).
+- `Equational` → `Equational` + `FreeVars` + `EqAxiomTyping`.
+- `ArraySemantics` (740 lines) → `ArraySemantics` (definitions) + `ArrayPreservation` (subject reduction) + `ArrayProgress` (progress and type safety).
+- The four counterexample files used to import each other in a chain; each now imports only `Metatheory`.
 
-**Other compactions:** many proofs now treat structurally identical cases together. This applies to `hasType_iff_hasTypeD`, the term traversals (`PrimFree`, `freeIn_rename`), subject reduction, progress, determinism, and the store-based progress and preservation proofs.
+**Reading guide:** `READING_GUIDE.md` covers:
+- the de Bruijn and context conventions you need first;
+- a table mapping each directory to its paper section;
+- a table mapping every numbered item of the paper (Definitions 1–3, Figure 1, Lemmas 1–3, Theorems 4–7, the §2 examples, §4.1) to its Lean name and file;
+- two reading paths: statements only, or the full development in dependency order, with infrastructure files marked as skippable on a first read;
+- a dependency diagram and some tips for browsing.
 
-**Left as is**
-- The paper's typing judgment `HasType` and the dereliction-free `HasTypeD` still have two parallel lists of rules. Merging them into one parametrised definition would change how the registered `HasType` definition reads, so I didn't do it.
-- Several elimination-form cases (in `CbnStep.preserves` and `AStep.preserves`) still each have their own case. Merging them would rely on the order in which Lean names the inverted hypotheses, and that order differs between typing rules, so it would be fragile.
+The file table in `README.md` now follows the new layout and points to the guide.
 
-All changes are committed and pushed.
+**Comments added:**
+- Module docstrings now list main definitions and results, with implementation notes where useful. For example, `TypingD` explains why the dereliction-free system exists, `Substitution` explains why the lemma is generalised to any variable, and `Metatheory` has a table pointing each of Theorems 4–7 to its disproof.
+- Longer files are divided by section headers.
+- About 150 previously undocumented lemmas and definitions now have docstrings. These include each step and intermediate heap of the uniqueness counterexample, the context-algebra laws, and the inversion and progress helpers. The `HasType` docstring also explains how the paper's rules are encoded.
+
+The Properties table now points to the new file locations, and every entry keeps its earlier status. Everything is committed and pushed.

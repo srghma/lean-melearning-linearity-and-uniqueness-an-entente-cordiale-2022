@@ -38,27 +38,33 @@ heap entry but only assumes `Γ ⊢ v : A`, which does not imply it in general.
 
 ## Files
 
-| File | Contents |
-| --- | --- |
-| `Syntax.lean` | types `Ty`, primitives, terms `Term n`, the core grammars `CoreTy` and `CoreTerm n`, renaming and substitution |
-| `Context.lean`, `CtxAlgebra.lean` | contexts, context addition and its algebra |
-| `Typing.lean` | the typing judgment `HasType` (Figure 1 plus the array primitives of §3.3) |
-| `TypingD.lean` | an equivalent system with no separate dereliction rule (`hasType_iff_hasTypeD`) |
-| `Weakening.lean` | **Lemma 3** (weakening) `HasType.weaken`, plus renaming/shifting |
-| `Substitution.lean` | **Lemma 1** `HasType.subst_lin`, **Lemma 2** `HasType.subst_nonlin` |
-| `Values.lean` | the value grammar `Value n` and partially applied primitives `PrimFun n`, with an induction principle `IsValue.induction` |
-| `Equational.lean` | the equational theory `≡ₗ` (§3.2); every axiom preserves typing (`EqAxiom.preserves`) |
-| `Heap.lean` | the heap model (§3.4): heaps, single-step reduction `Step`, multi-step `Steps`, full β-reduction, compatibility `Compat` (**Definition 3**) |
-| `Metatheory.lean` | **Theorems 4–7** stated literally as propositions `Conservation`, `Uniqueness`, `Progress`, `EqSoundness` |
-| `Counter*.lean` | formal disproofs of these four statements (see below) |
-| `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
-| `CbnExamples.lean` | the progress and conservation counterexamples reduce to values under `CbnStep` |
-| `CbnNormalization.lean` | termination of `CbnStep` evaluation on well-typed closed terms (logical relation); `cbn_eval_core` for core terms |
-| `KeyIdeas.lean` | the examples of Section 2 (impossible/possible cake and coffee programs, `sip`, dereliction, borrowing, `uniqueReturn`/`uniqueBind`) |
-| `RefShift.lean` | renaming of array references (for `copy_β`) and weakening into larger non-linear contexts |
-| `ArraySemantics.lean` | a store-based semantics with mutable arrays, `AStep`, with subject reduction, progress and type safety |
-| `ArrayExamples.lean` | an example run: `readArray (writeArray (newArray 3) 0 x) 0` evaluates to `(x, *a)` |
-| `Granule.lean` | the `{0, 1, ω}` semiring of §4.1: a commutative semiring and partial order with monotone `+` and `*` |
+The files are grouped into directories by section of the paper; `READING_GUIDE.md`
+explains the layout, maps every numbered definition, lemma and theorem of the paper to
+its Lean name, and suggests reading orders. `RequestProject/LCU.lean` imports everything.
+
+| Directory (under `RequestProject/LCU/`) | Files | Contents |
+| --- | --- | --- |
+| `Sec2_KeyIdeas/` | `KeyIdeas.lean` | the examples of Section 2 (impossible/possible cake and coffee programs, `sip`, dereliction, borrowing, `uniqueReturn`/`uniqueBind`) |
+| `Sec3_1_Calculus/` | `Syntax.lean`, `RenameSubst.lean` | types `Ty`, primitives, terms `Term n`, the core grammars `CoreTy` and `CoreTerm n`; renaming and substitution |
+| | `Context.lean`, `CtxAlgebra.lean` | contexts, context addition and its algebra |
+| | `Typing.lean` | the typing judgment `HasType` (Figure 1 plus the array primitives of §3.3) |
+| | `TypingD.lean` | an equivalent system with no separate dereliction rule (`hasType_iff_hasTypeD`) |
+| | `Weakening.lean` | **Lemma 3** (weakening) `HasType.weaken`, plus renaming/shifting |
+| | `Substitution.lean` | **Lemma 1** `HasType.subst_lin`, **Lemma 2** `HasType.subst_nonlin` |
+| | `Values.lean` | the value grammar `Value n` and partially applied primitives `PrimFun n`, with an induction principle `IsValue.induction` |
+| | `FreeVars.lean` | free variables; linear variables must occur; strengthening |
+| `Sec3_2_Equational/` | `Equational.lean`, `EqAxiomTyping.lean` | the equational theory `≡ₗ` (§3.2); every axiom preserves typing (`EqAxiom.preserves`) |
+| `Sec3_4_HeapModel/` | `Heap.lean` | the heap model (§3.4): heaps, single-step reduction `Step`, multi-step `Steps`, full β-reduction, compatibility `Compat` (**Definition 3**) |
+| `Sec3_5_Metatheory/` | `Metatheory.lean` | **Theorems 4–7** stated literally as propositions `Conservation`, `Uniqueness`, `Progress`, `EqSoundness` |
+| | `Counter*.lean` | formal disproofs of these four statements (see below) |
+| `Sec4_Implementation/` | `Granule.lean` | the `{0, 1, ω}` semiring of §4.1: a commutative semiring and partial order with monotone `+` and `*` |
+| `Ext1_CallByName/` | `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
+| | `CbnExamples.lean` | the progress and conservation counterexamples reduce to values under `CbnStep` |
+| | `CbnNormalization.lean` | termination of `CbnStep` evaluation on well-typed closed terms (logical relation); `cbn_eval_core` for core terms |
+| `Ext2_MutableArrays/` | `RefShift.lean` | renaming of array references (for `copy_β`) and weakening into larger non-linear contexts |
+| | `ArraySemantics.lean` | a store-based semantics with mutable arrays: stores, `AStep`, well-typed configurations |
+| | `ArrayPreservation.lean`, `ArrayProgress.lean` | subject reduction, progress and type safety for `AStep` |
+| | `ArrayExamples.lean` | an example run: `readArray (writeArray (newArray 3) 0 x) 0` evaluates to `(x, *a)` |
 
 ## Reconstruction choices
 
@@ -136,7 +142,7 @@ types `Cake`, `Happy`, `Coffee` and `Awake` are arbitrary. The functions `eat`, 
 
 ## Mutable arrays: a store-based semantics with type safety
 
-`ArraySemantics.lean` extends the call-by-name semantics with a store of mutable float
+`Ext2_MutableArrays/` extends the call-by-name semantics with a store of mutable float
 arrays. The reduction `σ ⊢ t ⟶ σ' ⊢ t'` (`AStep`) uses these rules:
 
 * `newArray k` allocates a fresh array;
