@@ -1,0 +1,971 @@
+%%% -*-BibTeX-*-
+%%% Do NOT edit. File created by BibTeX with style
+%%% ACM-Reference-Format-Journals [18-Jan-2012].
+
+\begin{thebibliography}{65}
+
+%%% ====================================================================
+%%% NOTE TO THE USER: you can override these defaults by providing
+%%% customized versions of any of these macros before the \bibliography
+%%% command.  Each of them MUST provide its own final punctuation,
+%%% except for \shownote{}, \showDOI{}, and \showURL{}.  The latter two
+%%% do not use final punctuation, in order to avoid confusing it with
+%%% the Web address.
+%%%
+%%% To suppress output of a particular field, define its macro to expand
+%%% to an empty string, or better, \unskip, like this:
+%%%
+%%% \newcommand{\showDOI}[1]{\unskip}   % LaTeX syntax
+%%%
+%%% \def \showDOI #1{\unskip}           % plain TeX syntax
+%%%
+%%% ====================================================================
+
+\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi
+\ifx \showDOI      \undefined \def \showDOI       #1{#1}\fi
+\ifx \showISBNx    \undefined \def \showISBNx     #1{\unskip}     \fi
+\ifx \showISBNxiii \undefined \def \showISBNxiii  #1{\unskip}     \fi
+\ifx \showISSN     \undefined \def \showISSN      #1{\unskip}     \fi
+\ifx \showLCCN     \undefined \def \showLCCN      #1{\unskip}     \fi
+\ifx \shownote     \undefined \def \shownote      #1{#1}          \fi
+\ifx \showarticletitle \undefined \def \showarticletitle #1{#1}   \fi
+\ifx \showURL      \undefined \def \showURL       {\relax}        \fi
+% The following commands are used for tagged output and should be
+% invisible to TeX
+\providecommand\bibfield[2]{#2}
+\providecommand\bibinfo[2]{#2}
+\providecommand\natexlab[1]{#1}
+\providecommand\showeprint[2][]{arXiv:#2}
+
+\bibitem[Abel and Bernardy(2020)]%
+        {DBLP:journals/pacmpl/AbelB20}
+\bibfield{author}{\bibinfo{person}{Andreas Abel} {and}
+  \bibinfo{person}{Jean{-}Philippe Bernardy}.} \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{A Unified View of Modalities in Type Systems}.
+\newblock \bibinfo{journal}{\emph{Proc. {ACM} Program. Lang.}}
+  \bibinfo{volume}{4}, \bibinfo{number}{{ICFP}} (\bibinfo{year}{2020}),
+  \bibinfo{pages}{90:1--90:28}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3408972}
+\showDOI{\tempurl}
+
+
+\bibitem[Almeida(1997)]%
+        {almeida1997balloon}
+\bibfield{author}{\bibinfo{person}{Paulo~S{\'e}rgio Almeida}.}
+  \bibinfo{year}{1997}\natexlab{}.
+\newblock \showarticletitle{Balloon Types: Controlling Sharing of State in Data
+  Types}. In \bibinfo{booktitle}{\emph{ECOOP'97—Object-Oriented Programming:
+  11th European Conference Jyv{\"a}skyl{\"a}, Finland, June 9--13, 1997
+  Proceedings 11}}. Springer, \bibinfo{pages}{32--59}.
+\newblock
+
+
+\bibitem[Atkey(2018)]%
+        {atkey2018syntax}
+\bibfield{author}{\bibinfo{person}{Robert Atkey}.}
+  \bibinfo{year}{2018}\natexlab{}.
+\newblock \showarticletitle{Syntax and Semantics of Quantitative Type Theory}.
+  In \bibinfo{booktitle}{\emph{Proceedings of the 33rd Annual ACM/IEEE
+  Symposium on Logic in Computer Science}}. \bibinfo{pages}{56--65}.
+\newblock
+
+
+\bibitem[Balabonski et~al\mbox{.}(2016)]%
+        {mezzo}
+\bibfield{author}{\bibinfo{person}{Thibaut Balabonski},
+  \bibinfo{person}{Fran\c{c}ois Pottier}, {and} \bibinfo{person}{Jonathan
+  Protzenko}.} \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{The Design and Formalization of Mezzo, a
+  Permission-Based Programming Language}.
+\newblock \bibinfo{journal}{\emph{ACM Trans. Program. Lang. Syst.}}
+  \bibinfo{volume}{38}, \bibinfo{number}{4}, Article \bibinfo{articleno}{14}
+  (\bibinfo{date}{aug} \bibinfo{year}{2016}), \bibinfo{numpages}{94}~pages.
+\newblock
+\showISSN{0164-0925}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2837022}
+\showDOI{\tempurl}
+
+
+\bibitem[Bao et~al\mbox{.}(2021)]%
+        {10.1145/3485516}
+\bibfield{author}{\bibinfo{person}{Yuyan Bao}, \bibinfo{person}{Guannan Wei},
+  \bibinfo{person}{Oliver Bra\v{c}evac}, \bibinfo{person}{Yuxuan Jiang},
+  \bibinfo{person}{Qiyang He}, {and} \bibinfo{person}{Tiark Rompf}.}
+  \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{Reachability Types: Tracking Aliasing and
+  Separation in Higher-Order Functional Programs}.
+\newblock \bibinfo{journal}{\emph{Proc. ACM Program. Lang.}}
+  \bibinfo{volume}{5}, \bibinfo{number}{OOPSLA}, Article
+  \bibinfo{articleno}{139} (\bibinfo{date}{oct} \bibinfo{year}{2021}),
+  \bibinfo{numpages}{32}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3485516}
+\showDOI{\tempurl}
+
+
+\bibitem[Barendsen and Smetsers(1996)]%
+        {barendsen1996uniqueness}
+\bibfield{author}{\bibinfo{person}{Erik Barendsen} {and} \bibinfo{person}{Sjaak
+  Smetsers}.} \bibinfo{year}{1996}\natexlab{}.
+\newblock \showarticletitle{Uniqueness Typing for Functional Languages with
+  Graph Rewriting Semantics}.
+\newblock \bibinfo{journal}{\emph{Mathematical Structures in Computer Science}}
+  \bibinfo{volume}{6}, \bibinfo{number}{6} (\bibinfo{year}{1996}),
+  \bibinfo{pages}{579--612}.
+\newblock
+
+
+\bibitem[Benton(1995)]%
+        {benton1995mixed}
+\bibfield{author}{\bibinfo{person}{P~Nick Benton}.}
+  \bibinfo{year}{1995}\natexlab{}.
+\newblock \showarticletitle{A Mixed Linear and Non-Linear Logic: Proofs, Terms
+  and Models}. In \bibinfo{booktitle}{\emph{Computer Science Logic: 8th
+  Workshop, CSL'94 Kazimierz, Poland, September 25--30, 1994 Selected Papers
+  8}}. Springer, \bibinfo{pages}{121--135}.
+\newblock
+
+
+\bibitem[Bernardy et~al\mbox{.}(2017)]%
+        {bernardy2017linear}
+\bibfield{author}{\bibinfo{person}{Jean-Philippe Bernardy},
+  \bibinfo{person}{Mathieu Boespflug}, \bibinfo{person}{Ryan~R Newton},
+  \bibinfo{person}{Simon Peyton~Jones}, {and} \bibinfo{person}{Arnaud
+  Spiwack}.} \bibinfo{year}{2017}\natexlab{}.
+\newblock \showarticletitle{Linear Haskell: Practical Linearity in a
+  Higher-Order Polymorphic Language}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the ACM on Programming
+  Languages}} \bibinfo{volume}{2}, \bibinfo{number}{POPL}
+  (\bibinfo{year}{2017}), \bibinfo{pages}{1--29}.
+\newblock
+
+
+\bibitem[Bianchini et~al\mbox{.}(2023a)]%
+        {DBLP:conf/ecoop/BianchiniDGZ23}
+\bibfield{author}{\bibinfo{person}{Riccardo Bianchini},
+  \bibinfo{person}{Francesco Dagnino}, \bibinfo{person}{Paola Giannini}, {and}
+  \bibinfo{person}{Elena Zucca}.} \bibinfo{year}{2023}\natexlab{a}.
+\newblock \showarticletitle{Multi-Graded Featherweight Java}. In
+  \bibinfo{booktitle}{\emph{37th European Conference on Object-Oriented
+  Programming, {ECOOP} 2023, July 17-21, 2023, Seattle, Washington, United
+  States}} \emph{(\bibinfo{series}{LIPIcs}, Vol.~\bibinfo{volume}{263})},
+  \bibfield{editor}{\bibinfo{person}{Karim Ali} {and} \bibinfo{person}{Guido
+  Salvaneschi}} (Eds.). \bibinfo{publisher}{Schloss Dagstuhl - Leibniz-Zentrum
+  f{\"{u}}r Informatik}, \bibinfo{pages}{3:1--3:27}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.4230/LIPIcs.ECOOP.2023.3}
+\showDOI{\tempurl}
+
+
+\bibitem[Bianchini et~al\mbox{.}(2023b)]%
+        {10.1145/3622843}
+\bibfield{author}{\bibinfo{person}{Riccardo Bianchini},
+  \bibinfo{person}{Francesco Dagnino}, \bibinfo{person}{Paola Giannini}, {and}
+  \bibinfo{person}{Elena Zucca}.} \bibinfo{year}{2023}\natexlab{b}.
+\newblock \showarticletitle{Resource-Aware Soundness for Big-Step Semantics}.
+\newblock \bibinfo{journal}{\emph{Proc. ACM Program. Lang.}}
+  \bibinfo{volume}{7}, \bibinfo{number}{OOPSLA2}, Article
+  \bibinfo{articleno}{267} (\bibinfo{date}{oct} \bibinfo{year}{2023}),
+  \bibinfo{numpages}{29}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3622843}
+\showDOI{\tempurl}
+
+
+\bibitem[Bianchini et~al\mbox{.}(2022)]%
+        {10.1145/3563319}
+\bibfield{author}{\bibinfo{person}{Riccardo Bianchini},
+  \bibinfo{person}{Francesco Dagnino}, \bibinfo{person}{Paola Giannini},
+  \bibinfo{person}{Elena Zucca}, {and} \bibinfo{person}{Marco Servetto}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{Coeffects for Sharing and Mutation}.
+\newblock \bibinfo{journal}{\emph{Proc. ACM Program. Lang.}}
+  \bibinfo{volume}{6}, \bibinfo{number}{OOPSLA2}, Article
+  \bibinfo{articleno}{156} (\bibinfo{date}{oct} \bibinfo{year}{2022}),
+  \bibinfo{numpages}{29}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3563319}
+\showDOI{\tempurl}
+
+
+\bibitem[Bornat et~al\mbox{.}(2005)]%
+        {10.1145/1040305.1040327}
+\bibfield{author}{\bibinfo{person}{Richard Bornat}, \bibinfo{person}{Cristiano
+  Calcagno}, \bibinfo{person}{Peter O'Hearn}, {and} \bibinfo{person}{Matthew
+  Parkinson}.} \bibinfo{year}{2005}\natexlab{}.
+\newblock \showarticletitle{Permission Accounting in Separation Logic}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 32nd ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}} (Long Beach, California,
+  USA) \emph{(\bibinfo{series}{POPL '05})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{259–270}.
+\newblock
+\showISBNx{158113830X}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/1040305.1040327}
+\showDOI{\tempurl}
+
+
+\bibitem[Boyland(2003)]%
+        {boyland2003checking}
+\bibfield{author}{\bibinfo{person}{John Boyland}.}
+  \bibinfo{year}{2003}\natexlab{}.
+\newblock \showarticletitle{Checking Interference with Fractional Permissions}.
+  In \bibinfo{booktitle}{\emph{Static Analysis: 10th International Symposium,
+  SAS 2003 San Diego, CA, USA, June 11--13, 2003 Proceedings}}. Springer,
+  \bibinfo{pages}{55--72}.
+\newblock
+
+
+\bibitem[Brady(2021)]%
+        {idris2}
+\bibfield{author}{\bibinfo{person}{Edwin~C. Brady}.}
+  \bibinfo{year}{2021}\natexlab{}.
+\newblock \bibinfo{title}{Idris 2: Quantitative Type Theory in Practice}.
+\newblock , \bibinfo{numpages}{9:1--9:26}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.4230/LIPIcs.ECOOP.2021.9}
+\showDOI{\tempurl}
+
+
+\bibitem[Brunel et~al\mbox{.}(2014)]%
+        {brunel2014core}
+\bibfield{author}{\bibinfo{person}{Alo{\"\i}s Brunel}, \bibinfo{person}{Marco
+  Gaboardi}, \bibinfo{person}{Damiano Mazza}, {and} \bibinfo{person}{Steve
+  Zdancewic}.} \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{A Core Quantitative Coeffect Calculus}. In
+  \bibinfo{booktitle}{\emph{ESOP}}, Vol.~\bibinfo{volume}{8410}. Springer,
+  \bibinfo{pages}{351--370}.
+\newblock
+
+
+\bibitem[Choudhury et~al\mbox{.}(2021)]%
+        {choudhury2021graded}
+\bibfield{author}{\bibinfo{person}{Pritam Choudhury}, \bibinfo{person}{Harley
+  Eades~III}, \bibinfo{person}{Richard~A Eisenberg}, {and}
+  \bibinfo{person}{Stephanie Weirich}.} \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{A Graded Dependent Type System with a Usage-Aware
+  Semantics}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the ACM on Programming
+  Languages}} \bibinfo{volume}{5}, \bibinfo{number}{POPL}
+  (\bibinfo{year}{2021}), \bibinfo{pages}{1--32}.
+\newblock
+
+
+\bibitem[Clarke and Wrigstad(2003)]%
+        {clarke2003external}
+\bibfield{author}{\bibinfo{person}{Dave Clarke} {and} \bibinfo{person}{Tobias
+  Wrigstad}.} \bibinfo{year}{2003}\natexlab{}.
+\newblock \showarticletitle{External Uniqueness is Unique Enough}. In
+  \bibinfo{booktitle}{\emph{ECOOP 2003--Object-Oriented Programming: 17th
+  European Conference, Darmstadt, Germany, July 21-25, 2003. Proceedings 17}}.
+  Springer, \bibinfo{pages}{176--200}.
+\newblock
+
+
+\bibitem[Clarke et~al\mbox{.}(1998)]%
+        {10.1145/286936.286947}
+\bibfield{author}{\bibinfo{person}{David~G. Clarke}, \bibinfo{person}{John~M.
+  Potter}, {and} \bibinfo{person}{James Noble}.}
+  \bibinfo{year}{1998}\natexlab{}.
+\newblock \showarticletitle{Ownership Types for Flexible Alias Protection}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 13th ACM SIGPLAN Conference on
+  Object-Oriented Programming, Systems, Languages, and Applications}}
+  (Vancouver, British Columbia, Canada) \emph{(\bibinfo{series}{OOPSLA '98})}.
+  \bibinfo{publisher}{Association for Computing Machinery},
+  \bibinfo{address}{New York, NY, USA}, \bibinfo{pages}{48–64}.
+\newblock
+\showISBNx{1581130058}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/286936.286947}
+\showDOI{\tempurl}
+
+
+\bibitem[de~Vries(2013)]%
+        {uniquepoly}
+\bibfield{author}{\bibinfo{person}{Edsko de Vries}.}
+  \bibinfo{year}{2013}\natexlab{}.
+\newblock \showarticletitle{Modelling Unique and Affine Typing Using
+  Polymorphism}. In \bibinfo{booktitle}{\emph{Essays Dedicated to Rinus
+  Plasmeijer on the Occasion of His 61st Birthday on The Beauty of Functional
+  Code - Volume 8106}}. \bibinfo{publisher}{Springer-Verlag},
+  \bibinfo{address}{Berlin, Heidelberg}, \bibinfo{pages}{181–192}.
+\newblock
+\showISBNx{9783642403545}
+\urldef\tempurl%
+\url{https://doi.org/10.1007/978-3-642-40355-2{\_}13}
+\showDOI{\tempurl}
+
+
+\bibitem[de~Vries et~al\mbox{.}(2009)]%
+        {uniquemessage}
+\bibfield{author}{\bibinfo{person}{Edsko de Vries}, \bibinfo{person}{Adrian
+  Francalanza}, {and} \bibinfo{person}{Matthew Hennessy}.}
+  \bibinfo{year}{2009}\natexlab{}.
+\newblock \showarticletitle{Uniqueness Typing for Resource Management in
+  Message-Passing Concurrency}. In \bibinfo{booktitle}{\emph{Proceedings First
+  International Workshop on Linearity, {LINEARITY} 2009, Coimbra, Portugal,
+  12th September 2009}} \emph{(\bibinfo{series}{{EPTCS}},
+  Vol.~\bibinfo{volume}{22})}, \bibfield{editor}{\bibinfo{person}{M{\'{a}}rio
+  Florido} {and} \bibinfo{person}{Ian Mackie}} (Eds.). \bibinfo{pages}{26--37}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.4204/EPTCS.22.3}
+\showDOI{\tempurl}
+
+
+\bibitem[de~Vries et~al\mbox{.}(2008)]%
+        {simplified}
+\bibfield{author}{\bibinfo{person}{Edsko de Vries}, \bibinfo{person}{Rinus
+  Plasmeijer}, {and} \bibinfo{person}{David~M. Abrahamson}.}
+  \bibinfo{year}{2008}\natexlab{}.
+\newblock \showarticletitle{Uniqueness Typing Simplified}. In
+  \bibinfo{booktitle}{\emph{Implementation and Application of Functional
+  Languages}}, \bibfield{editor}{\bibinfo{person}{Olaf Chitil},
+  \bibinfo{person}{Zolt{\'a}n Horv{\'a}th}, {and} \bibinfo{person}{Vikt{\'o}ria
+  Zs{\'o}k}} (Eds.). \bibinfo{publisher}{Springer Berlin Heidelberg},
+  \bibinfo{address}{Berlin, Heidelberg}, \bibinfo{pages}{201--218}.
+\newblock
+\showISBNx{978-3-540-85373-2}
+
+
+\bibitem[Eades~III and Orchard(2020)]%
+        {eades2020grading}
+\bibfield{author}{\bibinfo{person}{Harley Eades~III} {and}
+  \bibinfo{person}{Dominic Orchard}.} \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Grading Adjoint Logic}.
+\newblock \bibinfo{journal}{\emph{arXiv preprint arXiv:2006.08854}}
+  (\bibinfo{year}{2020}).
+\newblock
+
+
+\bibitem[Fluet et~al\mbox{.}(2006)]%
+        {regions}
+\bibfield{author}{\bibinfo{person}{Matthew Fluet}, \bibinfo{person}{Greg
+  Morrisett}, {and} \bibinfo{person}{Amal Ahmed}.}
+  \bibinfo{year}{2006}\natexlab{}.
+\newblock \showarticletitle{Linear Regions Are All You Need}. In
+  \bibinfo{booktitle}{\emph{Programming Languages and Systems}},
+  \bibfield{editor}{\bibinfo{person}{Peter Sestoft}} (Ed.).
+  \bibinfo{publisher}{Springer Berlin Heidelberg}, \bibinfo{address}{Berlin,
+  Heidelberg}, \bibinfo{pages}{7--21}.
+\newblock
+\showISBNx{978-3-540-33096-7}
+
+
+\bibitem[Gaboardi et~al\mbox{.}(2016)]%
+        {gaboardi2016combining}
+\bibfield{author}{\bibinfo{person}{Marco Gaboardi}, \bibinfo{person}{Shin-ya
+  Katsumata}, \bibinfo{person}{Dominic Orchard}, \bibinfo{person}{Flavien
+  Breuvart}, {and} \bibinfo{person}{Tarmo Uustalu}.}
+  \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{Combining Effects and Coeffects via Grading}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 21st ACM SIGPLAN International
+  Conference on Functional Programming}} (Nara, Japan)
+  \emph{(\bibinfo{series}{ICFP 2016})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{476–489}.
+\newblock
+\showISBNx{9781450342193}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2951913.2951939}
+\showDOI{\tempurl}
+
+
+\bibitem[Ghica and Smith(2014)]%
+        {ghica2014coeffects}
+\bibfield{author}{\bibinfo{person}{Dan~R. Ghica} {and} \bibinfo{person}{Alex~I.
+  Smith}.} \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{Bounded Linear Types in a Resource Semiring}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 23rd European Symposium on
+  Programming Languages and Systems - Volume 8410}}.
+  \bibinfo{publisher}{Springer-Verlag}, \bibinfo{address}{Berlin, Heidelberg},
+  \bibinfo{pages}{331–350}.
+\newblock
+\showISBNx{9783642548321}
+\urldef\tempurl%
+\url{https://doi.org/10.1007/978-3-642-54833-8_18}
+\showDOI{\tempurl}
+
+
+\bibitem[Girard(1987)]%
+        {girard1987linear}
+\bibfield{author}{\bibinfo{person}{Jean-Yves Girard}.}
+  \bibinfo{year}{1987}\natexlab{}.
+\newblock \showarticletitle{Linear Logic}.
+\newblock \bibinfo{journal}{\emph{Theoretical Computer Science}}
+  \bibinfo{volume}{50}, \bibinfo{number}{1} (\bibinfo{year}{1987}),
+  \bibinfo{pages}{1--101}.
+\newblock
+
+
+\bibitem[Girard et~al\mbox{.}(1992)]%
+        {girard1992bounded}
+\bibfield{author}{\bibinfo{person}{Jean-Yves Girard}, \bibinfo{person}{Andre
+  Scedrov}, {and} \bibinfo{person}{Philip~J Scott}.}
+  \bibinfo{year}{1992}\natexlab{}.
+\newblock \showarticletitle{Bounded Linear Logic: A Modular Approach to
+  Polynomial-Time Computability}.
+\newblock \bibinfo{journal}{\emph{Theoretical Computer Science}}
+  \bibinfo{volume}{97}, \bibinfo{number}{1} (\bibinfo{year}{1992}),
+  \bibinfo{pages}{1--66}.
+\newblock
+
+
+\bibitem[Harrington(2006)]%
+        {harrington2006uniqueness}
+\bibfield{author}{\bibinfo{person}{Dana Harrington}.}
+  \bibinfo{year}{2006}\natexlab{}.
+\newblock \showarticletitle{Uniqueness Logic}.
+\newblock \bibinfo{journal}{\emph{Theoretical Computer Science}}
+  \bibinfo{volume}{354}, \bibinfo{number}{1} (\bibinfo{year}{2006}),
+  \bibinfo{pages}{24--41}.
+\newblock
+
+
+\bibitem[Hicks et~al\mbox{.}(2004)]%
+        {cyclone-memory}
+\bibfield{author}{\bibinfo{person}{Michael Hicks}, \bibinfo{person}{Greg
+  Morrisett}, \bibinfo{person}{Dan Grossman}, {and} \bibinfo{person}{Trevor
+  Jim}.} \bibinfo{year}{2004}\natexlab{}.
+\newblock \showarticletitle{Experience with Safe Manual Memory-Management in
+  {Cyclone}}. In \bibinfo{booktitle}{\emph{Proceedings of the 4th International
+  Symposium on Memory Management}} (Vancouver, BC, Canada)
+  \emph{(\bibinfo{series}{ISMM '04})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{73–84}.
+\newblock
+\showISBNx{1581139454}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/1029873.1029883}
+\showDOI{\tempurl}
+
+
+\bibitem[Hogg(1991)]%
+        {10.1145/118014.117975}
+\bibfield{author}{\bibinfo{person}{John Hogg}.}
+  \bibinfo{year}{1991}\natexlab{}.
+\newblock \showarticletitle{Islands: Aliasing Protection in Object-Oriented
+  Languages}.
+\newblock \bibinfo{journal}{\emph{SIGPLAN Not.}} \bibinfo{volume}{26},
+  \bibinfo{number}{11} (\bibinfo{date}{nov} \bibinfo{year}{1991}),
+  \bibinfo{pages}{271–285}.
+\newblock
+\showISSN{0362-1340}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/118014.117975}
+\showDOI{\tempurl}
+
+
+\bibitem[Hughes et~al\mbox{.}(2021a)]%
+        {hughes2021linear}
+\bibfield{author}{\bibinfo{person}{Jack Hughes}, \bibinfo{person}{Danielle
+  Marshall}, \bibinfo{person}{James Wood}, {and} \bibinfo{person}{Dominic
+  Orchard}.} \bibinfo{year}{2021}\natexlab{a}.
+\newblock \showarticletitle{Linear Exponentials as Graded Modal Types}. In
+  \bibinfo{booktitle}{\emph{5th International Workshop on Trends in Linear
+  Logic and Applications (TLLA 2021)}}.
+\newblock
+
+
+\bibitem[Hughes et~al\mbox{.}(2021b)]%
+        {hughes2021deriving}
+\bibfield{author}{\bibinfo{person}{Jack Hughes}, \bibinfo{person}{Michael
+  Vollmer}, {and} \bibinfo{person}{Dominic Orchard}.}
+  \bibinfo{year}{2021}\natexlab{b}.
+\newblock \showarticletitle{Deriving Distributive Laws for Graded Linear
+  Types}.
+\newblock \bibinfo{journal}{\emph{Electronic Proceedings in Theoretical
+  Computer Science}}  \bibinfo{volume}{353} (\bibinfo{date}{dec}
+  \bibinfo{year}{2021}), \bibinfo{pages}{109--131}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.4204/eptcs.353.6}
+\showDOI{\tempurl}
+
+
+\bibitem[Jouvelot and Gifford(1991)]%
+        {algebraic-reconstruction-effects}
+\bibfield{author}{\bibinfo{person}{Pierre Jouvelot} {and}
+  \bibinfo{person}{David Gifford}.} \bibinfo{year}{1991}\natexlab{}.
+\newblock \showarticletitle{Algebraic Reconstruction of Types and Effects}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 18th ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}} (Orlando, Florida, USA)
+  \emph{(\bibinfo{series}{POPL '91})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{303–310}.
+\newblock
+\showISBNx{0897914198}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/99583.99623}
+\showDOI{\tempurl}
+
+
+\bibitem[Jung et~al\mbox{.}(2019)]%
+        {jung2019stacked}
+\bibfield{author}{\bibinfo{person}{Ralf Jung}, \bibinfo{person}{Hoang-Hai
+  Dang}, \bibinfo{person}{Jeehoon Kang}, {and} \bibinfo{person}{Derek Dreyer}.}
+  \bibinfo{year}{2019}\natexlab{}.
+\newblock \showarticletitle{Stacked Borrows: An Aliasing Model for Rust}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the ACM on Programming
+  Languages}} \bibinfo{volume}{4}, \bibinfo{number}{POPL}
+  (\bibinfo{year}{2019}), \bibinfo{pages}{1--32}.
+\newblock
+
+
+\bibitem[Jung et~al\mbox{.}(2017)]%
+        {jung2017rustbelt}
+\bibfield{author}{\bibinfo{person}{Ralf Jung}, \bibinfo{person}{Jacques-Henri
+  Jourdan}, \bibinfo{person}{Robbert Krebbers}, {and} \bibinfo{person}{Derek
+  Dreyer}.} \bibinfo{year}{2017}\natexlab{}.
+\newblock \showarticletitle{RustBelt: Securing the Foundations of the Rust
+  Programming Language}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the ACM on Programming
+  Languages}} \bibinfo{volume}{2}, \bibinfo{number}{POPL}
+  (\bibinfo{year}{2017}), \bibinfo{pages}{1--34}.
+\newblock
+
+
+\bibitem[Lorenzen et~al\mbox{.}(2023)]%
+        {lorenzen2023fp}
+\bibfield{author}{\bibinfo{person}{Anton Lorenzen}, \bibinfo{person}{Daan
+  Leijen}, {and} \bibinfo{person}{Wouter Swierstra}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{FP$^2$: Fully in-Place Functional Programming}. In
+  \bibinfo{booktitle}{\emph{ICFP'23}}. ACM SIGPLAN.
+\newblock
+\urldef\tempurl%
+\url{https://www.microsoft.com/en-us/research/publication/fp2-fully-in-place-functional-programming-2/}
+\showURL{%
+\tempurl}
+\newblock
+\shownote{preprint}.
+
+
+\bibitem[Lucassen and Gifford(1988)]%
+        {polymorphic-effects}
+\bibfield{author}{\bibinfo{person}{J.~M. Lucassen} {and} \bibinfo{person}{D.~K.
+  Gifford}.} \bibinfo{year}{1988}\natexlab{}.
+\newblock \showarticletitle{Polymorphic Effect Systems}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 15th ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}} (San Diego, California,
+  USA) \emph{(\bibinfo{series}{POPL '88})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{47–57}.
+\newblock
+\showISBNx{0897912527}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/73560.73564}
+\showDOI{\tempurl}
+
+
+\bibitem[Makwana and Krishnaswami(2019)]%
+        {makwana2019numlin}
+\bibfield{author}{\bibinfo{person}{Dhruv~C Makwana} {and} \bibinfo{person}{Neel
+  Krishnaswami}.} \bibinfo{year}{2019}\natexlab{}.
+\newblock \showarticletitle{NumLin: Linear Types for Linear Algebra}.
+\newblock  (\bibinfo{year}{2019}).
+\newblock
+
+
+\bibitem[Marshall and Orchard(2022a)]%
+        {marshall2022integrity}
+\bibfield{author}{\bibinfo{person}{Daniellel Marshall} {and}
+  \bibinfo{person}{Dominic Orchard}.} \bibinfo{year}{2022}\natexlab{a}.
+\newblock \showarticletitle{Graded Modal Types for Integrity and
+  Confidentiality}. In \bibinfo{booktitle}{\emph{17th Workshop on Programming
+  Languages and Analysis for Security (PLAS 2022)}}.
+\newblock
+\showeprint[arxiv]{2309.04324}~[cs.PL]
+
+
+\bibitem[Marshall and Orchard(2022b)]%
+        {marshall2022take}
+\bibfield{author}{\bibinfo{person}{Danielle Marshall} {and}
+  \bibinfo{person}{Dominic Orchard}.} \bibinfo{year}{2022}\natexlab{b}.
+\newblock \showarticletitle{{How to Take the Inverse of a Type}}. In
+  \bibinfo{booktitle}{\emph{36th European Conference on Object-Oriented
+  Programming (ECOOP 2022)}} \emph{(\bibinfo{series}{Leibniz International
+  Proceedings in Informatics (LIPIcs)}, Vol.~\bibinfo{volume}{222})},
+  \bibfield{editor}{\bibinfo{person}{Karim Ali} {and} \bibinfo{person}{Jan
+  Vitek}} (Eds.). \bibinfo{publisher}{Schloss Dagstuhl -- Leibniz-Zentrum
+  f{\"u}r Informatik}, \bibinfo{address}{Dagstuhl, Germany},
+  \bibinfo{pages}{5:1--5:27}.
+\newblock
+\showISBNx{978-3-95977-225-9}
+\showISSN{1868-8969}
+\urldef\tempurl%
+\url{https://doi.org/10.4230/LIPIcs.ECOOP.2022.5}
+\showDOI{\tempurl}
+
+
+\bibitem[Marshall and Orchard(2022c)]%
+        {marshall2022replicate}
+\bibfield{author}{\bibinfo{person}{Danielle Marshall} {and}
+  \bibinfo{person}{Dominic Orchard}.} \bibinfo{year}{2022}\natexlab{c}.
+\newblock \showarticletitle{Replicate, Reuse, Repeat: Capturing Non-Linear
+  Communication via Session Types and Graded Modal Types}.
+\newblock \bibinfo{journal}{\emph{Electronic Proceedings in Theoretical
+  Computer Science}}  \bibinfo{volume}{356} (\bibinfo{date}{March}
+  \bibinfo{year}{2022}), \bibinfo{pages}{1–11}.
+\newblock
+\showISSN{2075-2180}
+\urldef\tempurl%
+\url{https://doi.org/10.4204/eptcs.356.1}
+\showDOI{\tempurl}
+
+
+\bibitem[Marshall et~al\mbox{.}(2022)]%
+        {marshall2022linearity}
+\bibfield{author}{\bibinfo{person}{Danielle Marshall}, \bibinfo{person}{Michael
+  Vollmer}, {and} \bibinfo{person}{Dominic Orchard}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{Linearity and Uniqueness: An Entente Cordiale}. In
+  \bibinfo{booktitle}{\emph{Programming Languages and Systems: 31st European
+  Symposium on Programming, ESOP 2022, Held as Part of the European Joint
+  Conferences on Theory and Practice of Software, ETAPS 2022, Munich, Germany,
+  April 2--7, 2022, Proceedings}}. Springer International Publishing Cham,
+  \bibinfo{pages}{346--375}.
+\newblock
+
+
+\bibitem[McBride(2001)]%
+        {mcbride2001derivative}
+\bibfield{author}{\bibinfo{person}{Conor McBride}.}
+  \bibinfo{year}{2001}\natexlab{}.
+\newblock \showarticletitle{The Derivative of a Regular Type is its Type of
+  One-Hole Contexts}.
+\newblock \bibinfo{journal}{\emph{Unpublished manuscript}}
+  (\bibinfo{year}{2001}), \bibinfo{pages}{74--88}.
+\newblock
+
+
+\bibitem[McBride(2016)]%
+        {mcbride2016got}
+\bibfield{author}{\bibinfo{person}{Conor McBride}.}
+  \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{I Got Plenty o' Nuttin'}.
+\newblock \bibinfo{journal}{\emph{A List of Successes That Can Change the
+  World: Essays Dedicated to Philip Wadler on the Occasion of His 60th
+  Birthday}} (\bibinfo{year}{2016}), \bibinfo{pages}{207--233}.
+\newblock
+
+
+\bibitem[Moon et~al\mbox{.}(2021)]%
+        {moon2021graded}
+\bibfield{author}{\bibinfo{person}{Benjamin Moon}, \bibinfo{person}{Harley
+  Eades~III}, {and} \bibinfo{person}{Dominic Orchard}.}
+  \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{Graded Modal Dependent Type Theory}.
+\newblock \bibinfo{journal}{\emph{Programming Languages and Systems}}
+  \bibinfo{volume}{12648} (\bibinfo{year}{2021}), \bibinfo{pages}{462}.
+\newblock
+
+
+\bibitem[Mycroft and Voigt(2013)]%
+        {mycroft}
+\bibfield{author}{\bibinfo{person}{Alan Mycroft} {and} \bibinfo{person}{Janina
+  Voigt}.} \bibinfo{year}{2013}\natexlab{}.
+\newblock \showarticletitle{Notions of Aliasing and Ownership}.
+\newblock In \bibinfo{booktitle}{\emph{Aliasing in Object-Oriented Programming.
+  Types, Analysis and Verification}}, \bibfield{editor}{\bibinfo{person}{Dave
+  Clarke}, \bibinfo{person}{James Noble}, {and} \bibinfo{person}{Tobias
+  Wrigstad}} (Eds.). \bibinfo{series}{Lecture Notes in Computer Science},
+  Vol.~\bibinfo{volume}{7850}. \bibinfo{publisher}{Springer},
+  \bibinfo{pages}{59--83}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/978-3-642-36946-9\_4}
+\showDOI{\tempurl}
+
+
+\bibitem[O'Connor et~al\mbox{.}(2021)]%
+        {cogent}
+\bibfield{author}{\bibinfo{person}{Liam O'Connor}, \bibinfo{person}{Zilin
+  Chen}, \bibinfo{person}{Christine Rizkallah}, \bibinfo{person}{Vincent
+  Jackson}, \bibinfo{person}{Sidney Amani}, \bibinfo{person}{Gerwin Klein},
+  \bibinfo{person}{Toby Murray}, \bibinfo{person}{Thomas Sewell}, {and}
+  \bibinfo{person}{Gabriele Keller}.} \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{Cogent: Uniqueness Types and Certified
+  Compilation}.
+\newblock \bibinfo{journal}{\emph{J. Funct. Program.}} (\bibinfo{year}{2021}).
+\newblock
+
+
+\bibitem[Orchard et~al\mbox{.}(2019)]%
+        {orchard2019quantitative}
+\bibfield{author}{\bibinfo{person}{Dominic Orchard},
+  \bibinfo{person}{Vilem-Benjamin Liepelt}, {and} \bibinfo{person}{Harley
+  Eades~III}.} \bibinfo{year}{2019}\natexlab{}.
+\newblock \showarticletitle{Quantitative Program Reasoning with Graded Modal
+  Types}.
+\newblock \bibinfo{journal}{\emph{Proceedings of the ACM on Programming
+  Languages}} \bibinfo{volume}{3}, \bibinfo{number}{ICFP}
+  (\bibinfo{year}{2019}), \bibinfo{pages}{1--30}.
+\newblock
+
+
+\bibitem[Pearce(2021)]%
+        {pearce2021lightweight}
+\bibfield{author}{\bibinfo{person}{David~J Pearce}.}
+  \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{A Lightweight Formalism for Reference Lifetimes and
+  Borrowing in Rust}.
+\newblock \bibinfo{journal}{\emph{ACM Transactions on Programming Languages and
+  Systems (TOPLAS)}} \bibinfo{volume}{43}, \bibinfo{number}{1}
+  (\bibinfo{year}{2021}), \bibinfo{pages}{1--73}.
+\newblock
+
+
+\bibitem[Petricek et~al\mbox{.}(2014)]%
+        {petricek2014coeffects}
+\bibfield{author}{\bibinfo{person}{Tomas Petricek}, \bibinfo{person}{Dominic
+  Orchard}, {and} \bibinfo{person}{Alan Mycroft}.}
+  \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{Coeffects: A Calculus of Context-Dependent
+  Computation}. In \bibinfo{booktitle}{\emph{Proceedings of the 19th ACM
+  SIGPLAN International Conference on Functional Programming}} (Gothenburg,
+  Sweden) \emph{(\bibinfo{series}{ICFP '14})}. \bibinfo{publisher}{Association
+  for Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{123–135}.
+\newblock
+\showISBNx{9781450328739}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2628136.2628160}
+\showDOI{\tempurl}
+
+
+\bibitem[Radanne et~al\mbox{.}(2020)]%
+        {affe}
+\bibfield{author}{\bibinfo{person}{Gabriel Radanne}, \bibinfo{person}{Hannes
+  Saffrich}, {and} \bibinfo{person}{Peter Thiemann}.}
+  \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Kindly Bent to Free Us}.
+\newblock \bibinfo{journal}{\emph{Proc. ACM Program. Lang.}}
+  \bibinfo{volume}{4}, \bibinfo{number}{ICFP}, Article \bibinfo{articleno}{103}
+  (\bibinfo{date}{Aug.} \bibinfo{year}{2020}), \bibinfo{numpages}{29}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3408985}
+\showDOI{\tempurl}
+
+
+\bibitem[Sammler et~al\mbox{.}(2021)]%
+        {sammler2021refinedc}
+\bibfield{author}{\bibinfo{person}{Michael Sammler}, \bibinfo{person}{Rodolphe
+  Lepigre}, \bibinfo{person}{Robbert Krebbers}, \bibinfo{person}{Kayvan
+  Memarian}, \bibinfo{person}{Derek Dreyer}, {and} \bibinfo{person}{Deepak
+  Garg}.} \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{RefinedC: Automating the Foundational Verification
+  of C Code with Refined Ownership Types}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 42nd ACM SIGPLAN International
+  Conference on Programming Language Design and Implementation}}.
+  \bibinfo{pages}{158--174}.
+\newblock
+
+
+\bibitem[Smetsers et~al\mbox{.}(1994)]%
+        {clean}
+\bibfield{author}{\bibinfo{person}{Sjaak Smetsers}, \bibinfo{person}{Erik
+  Barendsen}, \bibinfo{person}{Marko van Eekelen}, {and} \bibinfo{person}{Rinus
+  Plasmeijer}.} \bibinfo{year}{1994}\natexlab{}.
+\newblock \showarticletitle{Guaranteeing Safe Destructive Updates Through a
+  Type System with Uniqueness Information for Graphs}. In
+  \bibinfo{booktitle}{\emph{Graph Transformations in Computer Science}},
+  \bibfield{editor}{\bibinfo{person}{Hans~J{\"u}rgen Schneider} {and}
+  \bibinfo{person}{Hartmut Ehrig}} (Eds.). \bibinfo{publisher}{Springer Berlin
+  Heidelberg}, \bibinfo{address}{Berlin, Heidelberg},
+  \bibinfo{pages}{358--379}.
+\newblock
+\showISBNx{978-3-540-48333-5}
+\urldef\tempurl%
+\url{https://doi.org/10.1007/3-540-57787-4\_23}
+\showDOI{\tempurl}
+
+
+\bibitem[Somogyi et~al\mbox{.}(1996)]%
+        {mercury}
+\bibfield{author}{\bibinfo{person}{Zoltan Somogyi}, \bibinfo{person}{Fergus
+  Henderson}, {and} \bibinfo{person}{Thomas Conway}.}
+  \bibinfo{year}{1996}\natexlab{}.
+\newblock \showarticletitle{The Execution Algorithm of {Mercury}, an Efficient
+  Purely Declarative Logic Programming Language}.
+\newblock \bibinfo{journal}{\emph{The Journal of Logic Programming}}
+  \bibinfo{volume}{29}, \bibinfo{number}{1} (\bibinfo{year}{1996}),
+  \bibinfo{pages}{17--64}.
+\newblock
+\showISSN{0743-1066}
+\urldef\tempurl%
+\url{https://doi.org/10.1016/S0743-1066(96)00068-4}
+\showDOI{\tempurl}
+\newblock
+\shownote{High-Performance Implementations of Logic Programming Systems}.
+
+
+\bibitem[Spiwack et~al\mbox{.}(2022)]%
+        {10.1145/3547626}
+\bibfield{author}{\bibinfo{person}{Arnaud Spiwack}, \bibinfo{person}{Csongor
+  Kiss}, \bibinfo{person}{Jean-Philippe Bernardy}, \bibinfo{person}{Nicolas
+  Wu}, {and} \bibinfo{person}{Richard~A. Eisenberg}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{Linearly Qualified Types: Generic Inference for
+  Capabilities and Uniqueness}.
+\newblock \bibinfo{journal}{\emph{Proc. ACM Program. Lang.}}
+  \bibinfo{volume}{6}, \bibinfo{number}{ICFP}, Article \bibinfo{articleno}{95}
+  (\bibinfo{date}{aug} \bibinfo{year}{2022}), \bibinfo{numpages}{28}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3547626}
+\showDOI{\tempurl}
+
+
+\bibitem[Tofte et~al\mbox{.}(2004)]%
+        {region-retrospective}
+\bibfield{author}{\bibinfo{person}{Mads Tofte}, \bibinfo{person}{Lars
+  Birkedal}, \bibinfo{person}{Martin Elsman}, {and} \bibinfo{person}{Niels
+  Hallenberg}.} \bibinfo{year}{2004}\natexlab{}.
+\newblock \showarticletitle{A {Retrospective} on {Region}-{Based} {Memory}
+  {Management}}.
+\newblock \bibinfo{journal}{\emph{Higher-Order and Symbolic Computation}}
+  \bibinfo{volume}{17}, \bibinfo{number}{3} (\bibinfo{date}{Sept.}
+  \bibinfo{year}{2004}), \bibinfo{pages}{245--265}.
+\newblock
+\showISSN{1573-0557}
+\urldef\tempurl%
+\url{https://doi.org/10.1023/B:LISP.0000029446.78563.a4}
+\showDOI{\tempurl}
+
+
+\bibitem[Tov and Pucella(2011)]%
+        {10.1145/1925844.1926436}
+\bibfield{author}{\bibinfo{person}{Jesse~A. Tov} {and}
+  \bibinfo{person}{Riccardo Pucella}.} \bibinfo{year}{2011}\natexlab{}.
+\newblock \showarticletitle{Practical Affine Types}.
+\newblock \bibinfo{journal}{\emph{SIGPLAN Not.}} \bibinfo{volume}{46},
+  \bibinfo{number}{1} (\bibinfo{date}{Jan.} \bibinfo{year}{2011}),
+  \bibinfo{pages}{447–458}.
+\newblock
+\showISSN{0362-1340}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/1925844.1926436}
+\showDOI{\tempurl}
+
+
+\bibitem[Vollmer et~al\mbox{.}(2024)]%
+        {vollmer2024mixed}
+\bibfield{author}{\bibinfo{person}{Victoria Vollmer}, \bibinfo{person}{Danielle
+  Marshall}, \bibinfo{person}{Harley~Eades III}, {and} \bibinfo{person}{Dominic
+  Orchard}.} \bibinfo{year}{2024}\natexlab{}.
+\newblock \bibinfo{title}{A Mixed Linear and Graded Logic: Proofs, Terms, and
+  Models}.
+\newblock
+\newblock
+\showeprint[arxiv]{2401.17199}~[cs.LO]
+
+
+\bibitem[Wadler(1990)]%
+        {wadler1990linear}
+\bibfield{author}{\bibinfo{person}{Philip Wadler}.}
+  \bibinfo{year}{1990}\natexlab{}.
+\newblock \showarticletitle{Linear Types can Change the World!}. In
+  \bibinfo{booktitle}{\emph{Programming Concepts and Methods}},
+  Vol.~\bibinfo{volume}{3}. Citeseer, \bibinfo{pages}{5}.
+\newblock
+
+
+\bibitem[Wadler(1993)]%
+        {DBLP:conf/mfps/Wadler93}
+\bibfield{author}{\bibinfo{person}{Philip Wadler}.}
+  \bibinfo{year}{1993}\natexlab{}.
+\newblock \showarticletitle{A Syntax for Linear Logic}. In
+  \bibinfo{booktitle}{\emph{Mathematical Foundations of Programming Semantics,
+  9th International Conference, New Orleans, LA, USA, April 7-10, 1993,
+  Proceedings}}. \bibinfo{pages}{513--529}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/3-540-58027-1\_24}
+\showDOI{\tempurl}
+
+
+\bibitem[Walker et~al\mbox{.}(2000)]%
+        {static-capabilities}
+\bibfield{author}{\bibinfo{person}{David Walker}, \bibinfo{person}{Karl Crary},
+  {and} \bibinfo{person}{Greg Morrisett}.} \bibinfo{year}{2000}\natexlab{}.
+\newblock \showarticletitle{Typed Memory Management via Static Capabilities}.
+\newblock \bibinfo{journal}{\emph{ACM Trans. Program. Lang. Syst.}}
+  \bibinfo{volume}{22}, \bibinfo{number}{4} (\bibinfo{date}{jul}
+  \bibinfo{year}{2000}), \bibinfo{pages}{701–771}.
+\newblock
+\showISSN{0164-0925}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/363911.363923}
+\showDOI{\tempurl}
+
+
+\bibitem[Wei et~al\mbox{.}(2024)]%
+        {10.1145/3632856}
+\bibfield{author}{\bibinfo{person}{Guannan Wei}, \bibinfo{person}{Oliver
+  Bra\v{c}evac}, \bibinfo{person}{Songlin Jia}, \bibinfo{person}{Yuyan Bao},
+  {and} \bibinfo{person}{Tiark Rompf}.} \bibinfo{year}{2024}\natexlab{}.
+\newblock \showarticletitle{Polymorphic Reachability Types: Tracking Freshness,
+  Aliasing, and Separation in Higher-Order Generic Programs}.
+\newblock \bibinfo{journal}{\emph{Proc. ACM Program. Lang.}}
+  \bibinfo{volume}{8}, \bibinfo{number}{POPL}, Article \bibinfo{articleno}{14}
+  (\bibinfo{date}{jan} \bibinfo{year}{2024}), \bibinfo{numpages}{32}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3632856}
+\showDOI{\tempurl}
+
+
+\bibitem[Weiss et~al\mbox{.}(2019)]%
+        {weiss2019oxide}
+\bibfield{author}{\bibinfo{person}{Aaron Weiss}, \bibinfo{person}{Olek
+  Gierczak}, \bibinfo{person}{Daniel Patterson}, {and} \bibinfo{person}{Amal
+  Ahmed}.} \bibinfo{year}{2019}\natexlab{}.
+\newblock \showarticletitle{Oxide: The Essence of Rust}.
+\newblock \bibinfo{journal}{\emph{arXiv preprint arXiv:1903.00982}}
+  (\bibinfo{year}{2019}).
+\newblock
+
+
+\bibitem[Wood and Atkey(2022)]%
+        {DBLP:conf/esop/WoodA22}
+\bibfield{author}{\bibinfo{person}{James Wood} {and} \bibinfo{person}{Robert
+  Atkey}.} \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{A Framework for Substructural Type Systems}. In
+  \bibinfo{booktitle}{\emph{Programming Languages and Systems - 31st European
+  Symposium on Programming, {ESOP} 2022, Held as Part of the European Joint
+  Conferences on Theory and Practice of Software, {ETAPS} 2022, Munich,
+  Germany, April 2-7, 2022, Proceedings}} \emph{(\bibinfo{series}{Lecture Notes
+  in Computer Science}, Vol.~\bibinfo{volume}{13240})},
+  \bibfield{editor}{\bibinfo{person}{Ilya Sergey}} (Ed.).
+  \bibinfo{publisher}{Springer}, \bibinfo{pages}{376--402}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/978-3-030-99336-8\_14}
+\showDOI{\tempurl}
+
+
+\bibitem[Zhu and Xi(2005)]%
+        {ats}
+\bibfield{author}{\bibinfo{person}{Dengping Zhu} {and} \bibinfo{person}{Hongwei
+  Xi}.} \bibinfo{year}{2005}\natexlab{}.
+\newblock \showarticletitle{Safe Programming with Pointers Through Stateful
+  Views}. In \bibinfo{booktitle}{\emph{Practical Aspects of Declarative
+  Languages}}, \bibfield{editor}{\bibinfo{person}{Manuel~V. Hermenegildo} {and}
+  \bibinfo{person}{Daniel Cabeza}} (Eds.). \bibinfo{publisher}{Springer Berlin
+  Heidelberg}, \bibinfo{address}{Berlin, Heidelberg}, \bibinfo{pages}{83--97}.
+\newblock
+\showISBNx{978-3-540-30557-6}
+
+
+\end{thebibliography}
