@@ -182,10 +182,15 @@ main ones are:
   use `ℕ`.
 * Functions that the paper only declares (`observe`, `alter`) are linear variables of
   the context.
-* `exampleGraded` is not formalised. It reads a `Float [4]` out of a reference that
-  holds a `Float [6]`, and afterwards uses the reference at type `Ref id (Float [2])`.
-  The printed interface of `readRef` keeps the type of the reference unchanged, so the
-  example does not type-check against it.
+* `exampleGraded` reads a `Float [4]` out of a reference that holds a `Float [6]`, and
+  afterwards uses the reference at type `Ref id (Float [2])`. The printed interface of
+  `readRef` returns the unboxed contents and keeps the type of the reference unchanged,
+  so the example does not type-check against it (`not_primTy_readRef_graded`). It is
+  formalised in `Sec5_Fractional/ExampleGraded.lean` (`exampleGraded_typing`) with an
+  added primitive that is **not in the paper**,
+  `readRefSplit : *(Ref_id (□_(q+r) A)) ⊸ □_q A ⊗ *(Ref_id (□_r A))`, with reduction
+  `Step.readRefSplit` (the stored `[v]_(q+r)` becomes `[v]_r` and `[v]_q` is returned).
+  The printed `readRef` is kept unchanged.
 * `exampleConcurrent`, `exampleDeriving` and the parallel-sum example use Granule
   features (`par`, `Maybe`/`Either`, length-indexed vectors) that are outside the
   calculus, so they are not formalised.

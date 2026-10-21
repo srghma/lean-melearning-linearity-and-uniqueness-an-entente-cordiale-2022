@@ -145,6 +145,12 @@ inductive Step : {n m : ℕ} → Heap R n → Term R n → R → Heap R m → Te
   | readRef {n : ℕ} {H : Heap R n} {a id : ℕ} {q : ℚ} {r : R} {v : Term R n} {s : R} :
       H.refs a = some (q, id) → H.ress id = some (.ref (box r v)) →
       Step H (app (prim .readRef) (star (ref a))) s H (pair v (star (ref a)))
+  /-- **Amendment (not in the paper).** `readRefSplit` splits the grade of a stored box
+  `[v]_(q+r)`: it returns `[v]_q` and leaves `[v]_r` in the reference. -/
+  | readRefSplit {n : ℕ} {H : Heap R n} {a id : ℕ} {f : ℚ} {q r : R} {v : Term R n} {s : R} :
+      H.refs a = some (f, id) → H.ress id = some (.ref (box (q + r) v)) →
+      Step H (app (prim .readRefSplit) (star (ref a))) s
+        (H.addRes id (.ref (box r v))) (pair (box q v) (star (ref a)))
   /-- `swapRef` exchanges the stored value (reconstructed) -/
   | swapRef {n : ℕ} {H : Heap R n} {a id : ℕ} {q : ℚ} {v₀ v : Term R n} {s : R} :
       H.refs a = some (q, id) → H.ress id = some (.ref v₀) → IsValue v →

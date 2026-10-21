@@ -92,6 +92,7 @@ lemma PrimTy.subst {p : Prim} {A : Ty R k} (h : PrimTy p A) (σ : Fin k → Iden
     have := PrimTy.newRef (R := R) (A.subst σ)
     simpa [Ty.subst, Ty.shift_subst_up] using this
   | readRef p ι r A => exact .readRef p _ r _
+  | readRefSplit ι q r A => exact .readRefSplit _ q r _
   | swapRef p ι A hp => exact .swapRef p _ _ hp
   | freezeRef ι A => exact .freezeRef _ _
 

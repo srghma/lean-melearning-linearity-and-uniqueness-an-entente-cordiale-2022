@@ -12,6 +12,7 @@ public import RequestProject.FOFU.Sec4_Uniqueness.Examples
 public import RequestProject.FOFU.Sec5_1_Equational.Equational
 public import RequestProject.FOFU.Sec5_2_Distributive.Examples
 public import RequestProject.FOFU.Sec5_Fractional.Examples
+public import RequestProject.FOFU.Sec5_Fractional.ExampleGraded
 public import RequestProject.FOFU.Sec5_Fractional.Permission
 public import RequestProject.FOFU.Sec5_Fractional.Resources
 public import RequestProject.FOFU.Sec6_1_Preliminaries.Heap

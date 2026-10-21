@@ -76,6 +76,7 @@ theorem Step.new_ident {n m : ℕ} {H : Heap R n} {t : Term R n} {s : R} {H' : H
   | writeArray _ hres => rw [hH] at hres; cases hres
   | deleteArray _ hres => rw [hH] at hres; cases hres
   | readRef _ hres => rw [hH] at hres; cases hres
+  | readRefSplit _ hres => rw [hH] at hres; cases hres
   | swapRef _ hres => rw [hH] at hres; cases hres
   | freezeRef _ hres => rw [hH] at hres; cases hres
   | share => intro id' h; exact absurd (hH id') h

@@ -40,6 +40,13 @@ lists the formalisation choices.
   `exampleShare`, `exampleBorrow`, `exampleReborrow`, `exampleArray`, `exampleClone`,
   `exampleReference`, `examplePartial` (all with `ℕ` grades), and Example 6.5
   (`example_6_5`).
+* **`exampleGraded`** does not type-check with the printed `readRef` interface
+  (`not_primTy_readRef_graded`). It is typed (`exampleGraded_typing`,
+  `Sec5_Fractional/ExampleGraded.lean`) using an added primitive that is not in the paper,
+  `readRefSplit : *(Ref_id (□_(q+r) A)) ⊸ □_q A ⊗ *(Ref_id (□_r A))`, with reduction rule
+  `Step.readRefSplit`. The printed `readRef` is unchanged. Because the primitive is part of
+  the calculus, the §6.3 statements below range over terms that may use it too. None of
+  the counterexamples uses it, and the two positive results still hold.
 * **Lemmas 6.2 and 6.3 (substitution) are proved**: `HasType.subst_lin` and
   `HasType.subst_grd`. The proof uses a dereliction-free version of the typing judgment
   (`hasType_iff_hasTypeD`), the algebra of contexts, identifier substitution, renaming,

@@ -111,6 +111,8 @@ inductive Prim where
   | deleteArray
   | newRef
   | readRef
+  /-- amended, grade-splitting `readRef` (not in the paper; needed for `exampleGraded`) -/
+  | readRefSplit
   | swapRef
   | freezeRef
   deriving DecidableEq
@@ -123,6 +125,7 @@ def Prim.arity : Prim → ℕ
   | .deleteArray => 1
   | .newRef => 1
   | .readRef => 1
+  | .readRefSplit => 1
   | .swapRef => 2
   | .freezeRef => 1
 

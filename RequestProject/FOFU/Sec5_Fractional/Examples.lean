@@ -13,11 +13,12 @@ linearly at the permission `1/2` at which the example applies it.  The trailing
 
 Contexts are written with `Ctx.ofList` (variable `#0` first).
 
-`exampleGraded` is not formalized: it reads a `Float [4]` out of a reference created with
-contents of type `Float [6]` and afterwards uses the reference at type `Ref id (Float [2])`,
-i.e. `readRef` splits the grade `6 = 4 + 2`.  The interface printed in §5,
+`exampleGraded` reads a `Float [4]` out of a reference created with contents of type
+`Float [6]` and afterwards uses the reference at type `Ref id (Float [2])`, i.e. `readRef`
+splits the grade `6 = 4 + 2`.  The interface printed in §5,
 `readRef : &_p (Ref_id (□_r A)) ⊸ A ⊗ &_p (Ref_id (□_r A))`, keeps the type of the reference
-unchanged, so the example does not type-check against the stated interface.
+unchanged, so the example does not type-check against it.  It is formalised in
+`ExampleGraded.lean` with an amended, grade-splitting read primitive `readRefSplit`.
 -/
 
 @[expose] public section

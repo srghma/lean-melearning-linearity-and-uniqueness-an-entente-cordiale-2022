@@ -46,6 +46,16 @@ inductive PrimTy : Prim → Ty R k → Prop where
   | readRef (p : Perm) (ι : Ident k) (r : R) (A : Ty R k) :
       PrimTy .readRef
         (lolli (borrow p (ref ι (box r A))) (tensor A (borrow p (ref ι (box r A)))))
+  /-- **Amendment (not in the paper).** The grade-splitting read
+  `readRefSplit : *(Ref_id (□_(q+r) A)) ⊸ □_q A ⊗ *(Ref_id (□_r A))`, i.e. Granule's
+  `readRef : *(Ref id (a [q+r])) → (a [q], *(Ref id (a [r])))`.  It is the interface that
+  the paper's `exampleGraded` uses.  It changes the type of the reference, so it is only
+  offered for the unique permission `*` (a borrow `&_p` with `p ≢ *` cannot change type:
+  other borrows of the same reference, or the owner waiting in `withBorrow`, still expect
+  the old type). -/
+  | readRefSplit [Add R] (ι : Ident k) (q r : R) (A : Ty R k) :
+      PrimTy .readRefSplit
+        (lolli (star (ref ι (box (q + r) A))) (tensor (box q A) (star (ref ι (box r A)))))
   /-- `swapRef : &_p (Ref_id A) ⊸ A ⊸ A ⊗ &_p (Ref_id A)` for `p ≡ 1 ∨ p ≡ *` -/
   | swapRef (p : Perm) (ι : Ident k) (A : Ty R k) (hp : p = Perm.one ∨ p = Perm.star) :
       PrimTy .swapRef (lolli (borrow p (ref ι A)) (lolli A (tensor A (borrow p (ref ι A)))))
