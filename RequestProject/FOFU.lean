@@ -19,7 +19,9 @@ public import RequestProject.FOFU.Sec6_1_Preliminaries.TypingRefs
 public import RequestProject.FOFU.Sec6_1_Preliminaries.Values
 public import RequestProject.FOFU.Sec6_2_Reduction.Step
 public import RequestProject.FOFU.Sec6_3_Theorems.Compat
+public import RequestProject.FOFU.Sec6_3_Theorems.BorrowSafetyLiteral
 public import RequestProject.FOFU.Sec6_3_Theorems.CounterBorrowSafety
+public import RequestProject.FOFU.Sec6_3_Theorems.CounterMultiBorrowLiteral
 public import RequestProject.FOFU.Sec6_3_Theorems.CounterEqSoundness
 public import RequestProject.FOFU.Sec6_3_Theorems.CounterPreservation
 public import RequestProject.FOFU.Sec6_3_Theorems.CounterProgress

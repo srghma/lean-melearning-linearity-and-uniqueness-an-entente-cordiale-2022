@@ -51,8 +51,9 @@ lists the formalisation choices.
   soundness with respect to `≡` (`not_eqSoundness`) are false for both variants. Borrow
   safety, multi-reduction borrow safety and uniqueness are false for the repaired
   variant (`not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_uniqueness_gc`).
-  For the printed variant, uniqueness holds vacuously (`uniqueness_literal`), and the
-  two borrow-safety statements remain open. These results concern the rules as printed
+  For the printed variant, borrow safety holds (`borrowSafety_literal`), multi-reduction
+  borrow safety is false (`not_multiBorrowSafety_literal`), and uniqueness holds
+  vacuously (`uniqueness_literal`). These results concern the rules as printed
   in the provided text, not necessarily the full rule set in the paper's appendices.
 
 ## *Linearity and Uniqueness: An Entente Cordiale*

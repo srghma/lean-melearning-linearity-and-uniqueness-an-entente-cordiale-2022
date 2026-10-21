@@ -19,8 +19,8 @@ compatibility (`Compat gc`).  The flag `gc` selects Definition 6.4 as printed
 | Lemma 6.3 (Graded substitution) | `HasType.subst_grd` | proved (`Substitution.lean`) |
 | Theorem 6.6 (Progress) | `Progress gc` | false for both `gc` (`CounterProgress.lean`) |
 | Theorem 6.7 (Type preservation) | `Preservation gc` | false for both `gc` (`CounterPreservation.lean`) |
-| Lemma 6.8 (Borrow safety) | `BorrowSafety gc` | false for `gc = true` (`CounterBorrowSafety.lean`) |
-| Theorem 6.9 (Multi-reduction borrow safety) | `MultiBorrowSafety gc` | false for `gc = true` (`CounterBorrowSafety.lean`) |
+| Lemma 6.8 (Borrow safety) | `BorrowSafety gc` | true for `gc = false` (`BorrowSafetyLiteral.lean`), false for `gc = true` (`CounterBorrowSafety.lean`) |
+| Theorem 6.9 (Multi-reduction borrow safety) | `MultiBorrowSafety gc` | false for both `gc` (`CounterMultiBorrowLiteral.lean`, `CounterBorrowSafety.lean`) |
 | Corollary 6.10 (Uniqueness) | `Uniqueness gc` | vacuously true for `gc = false`, false for `gc = true` |
 | Theorem 6.11 (Soundness w.r.t. `≡`) | `EqSoundness gc heapEq` | false for both `gc` and every `heapEq` (`CounterEqSoundness.lean`) |
 

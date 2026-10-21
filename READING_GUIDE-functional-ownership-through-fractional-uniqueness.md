@@ -93,7 +93,8 @@ because the single type of types contains the borrowing modality.
 | **Lemma 6.2** (linear substitution) | `HasType.subst_lin` | `Sec6_3_Theorems/Substitution.lean` |
 | **Lemma 6.3** (graded substitution) | `HasType.subst_grd` | `Sec6_3_Theorems/Substitution.lean` |
 | Theorems 6.6–6.11 as stated | `Progress`, `Preservation`, `BorrowSafety`, `MultiBorrowSafety`, `Uniqueness`, `EqSoundness` | `Sec6_3_Theorems/Statements.lean` |
-| Counterexamples | `not_progress`, `not_preservation_literal`, `not_preservation_gc`, `not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_uniqueness_gc`, `not_eqSoundness` | `Sec6_3_Theorems/Counter*.lean` |
+| Counterexamples | `not_progress`, `not_preservation_literal`, `not_preservation_gc`, `not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_multiBorrowSafety_literal`, `not_uniqueness_gc`, `not_eqSoundness` | `Sec6_3_Theorems/Counter*.lean` |
+| Lemma 6.8 for the printed Definition 6.4 | `borrowSafety_literal`, `Step.new_ident` | `Sec6_3_Theorems/BorrowSafetyLiteral.lean` |
 
 ## Results on the theorems of §6.3
 
@@ -122,8 +123,8 @@ resource entry `id ↦ v_r` is compatible with any context (`Compat.ress_eq_none
 | --- | --- | --- |
 | Theorem 6.6 (Progress) | false: `not_progress` | false: `not_progress` |
 | Theorem 6.7 (Preservation) | false: `not_preservation_literal` | false: `not_preservation_gc` |
-| Lemma 6.8 (Borrow safety) | open | false: `not_borrowSafety_gc` |
-| Theorem 6.9 (Multi-reduction borrow safety) | open | false: `not_multiBorrowSafety_gc` |
+| Lemma 6.8 (Borrow safety) | true: `borrowSafety_literal` | false: `not_borrowSafety_gc` |
+| Theorem 6.9 (Multi-reduction borrow safety) | false: `not_multiBorrowSafety_literal` | false: `not_multiBorrowSafety_gc` |
 | Corollary 6.10 (Uniqueness) | true, vacuously: `uniqueness_literal` | false: `not_uniqueness_gc` |
 | Theorem 6.11 (Soundness w.r.t. `≡`) | false: `not_eqSoundness` | false: `not_eqSoundness` |
 
@@ -138,8 +139,20 @@ The counterexamples (details in the docstrings of the `Counter*.lean` files):
   `ref₀` from the heap, but the function still mentions it.
 * **Borrow safety:** `clone [ref₀]₁ as x in x` creates a new identifier whose
   reference only occurs in the heap, so its permissions in the term sum to `0`.
-* **Multi-reduction borrow safety:** `split (*ref₀)` ends with two references of
-  permission `1/2` and none of permission `1`.
+* **Multi-reduction borrow safety (repaired):** `split (*ref₀)` ends with two references
+  of permission `1/2` and none of permission `1`.
+* **Multi-reduction borrow safety (printed):** starting from the empty heap,
+  `(unpack ⟨id, x⟩ = newArray 3 in withBorrow (λb. unpack ⟨id', c⟩ = newRef (split b) in
+  let [d] = share₀ c in *()) x, newArray 3)` creates an array, splits the borrow into two
+  halves, stores them in a new reference cell and discards the cell with `share₀`. The
+  value is `(*(), pack ⟨id₂, *ref₄⟩)`, and the first array's identifier has two
+  references of permission `1/2` and none of permission `1`.
+
+**Lemma 6.8 with the printed rules** holds (`borrowSafety_literal`). The part about
+identifiers of the initial heap is vacuous. For the part about new identifiers,
+`Step.new_ident` shows that if the heap has no resource entries, every identifier
+created by a step has exactly one reference, with permission `1`, and that reference
+occurs in the reduced term. The proof does not use typing.
 * **Uniqueness:** after `split` and `join` the original reference `ref₀` has been
   replaced by a new one.
 

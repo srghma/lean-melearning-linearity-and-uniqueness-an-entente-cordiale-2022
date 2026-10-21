@@ -8,8 +8,9 @@ All three statements quantify over identifiers `id ∈ dom(H)` of the initial he
 Definition 6.4 as printed, compatible heaps have no identifiers
 (`Compat.ress_eq_none`), so these parts are vacuous; in particular Corollary 6.10 holds
 vacuously (`uniqueness_literal`).  For Lemma 6.8 and Theorem 6.9 with the printed
-definition, the second conjunct (about new identifiers) is not vacuous and we leave it
-open.
+definition, the second conjunct (about new identifiers) is not vacuous: Lemma 6.8 holds
+(`borrowSafety_literal`, in `BorrowSafetyLiteral.lean`) and Theorem 6.9 is false
+(`not_multiBorrowSafety_literal`, in `CounterMultiBorrowLiteral.lean`).
 
 With the repaired heap compatibility (`gc = true`) all three statements are false; each
 counterexample starts from the heap `ref₀ ↦_1 id₀, id₀ ↦ init` and the context
