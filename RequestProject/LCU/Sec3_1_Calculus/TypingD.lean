@@ -21,7 +21,8 @@ steps.  In `HasTypeD`, every derivation is syntax-directed.  Almost all metatheo
 
 ## Main results
 
-* `HasTypeD.der`: dereliction is admissible in `HasTypeD`.
+* `HasTypeD.derVar`, `HasTypeD.derRef`: dereliction (for variables and for array
+  references) is admissible in `HasTypeD`.
 * `hasType_iff_hasTypeD`: `HasType Γ t A ↔ HasTypeD Γ t A`.
 -/
 
@@ -32,106 +33,80 @@ namespace LCU
 open Term
 
 /-- Typing without dereliction (an auxiliary, equivalent presentation of `HasType`). -/
-inductive HasTypeD : {n : ℕ} → Ctx n → Term n → Ty → Prop where
-  | var {n : ℕ} {Γ : Ctx n} {i : Fin n} {h : Hyp} :
-      Γ (.inl i) = some h → (Γ.set (.inl i) none).AllNonLin →
-      HasTypeD Γ (var i) h.ty
-  | abs {n : ℕ} {Γ : Ctx n} {t : Term (n + 1)} {A B : Ty} :
+inductive HasTypeD : {n ρ : ℕ} → TCtx n ρ → Term n ρ → Ty → Prop where
+  | var {n ρ : ℕ} {Γ : TCtx n ρ} {i : Var n} {h : Hyp Ty} :
+      Γ.vars.Pick NonLin i (some h) → Γ.refs.All NonLin → HasTypeD Γ (var i) h.ty
+  | abs {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term (n + 1) ρ} {A B : Ty} :
       HasTypeD (Γ.cons (some (.lin A))) t B → HasTypeD Γ (lam t) (A ⊸ B)
-  | app {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ t₂ : Term n} {A B : Ty} :
+  | app {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {t₁ t₂ : Term n ρ} {A B : Ty} :
       HasTypeD Γ₁ t₁ (A ⊸ B) → HasTypeD Γ₂ t₂ A → Γ₁.Add Γ₂ Γ → HasTypeD Γ (app t₁ t₂) B
-  | tensorI {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ t₂ : Term n} {A B : Ty} :
+  | tensorI {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {t₁ t₂ : Term n ρ} {A B : Ty} :
       HasTypeD Γ₁ t₁ A → HasTypeD Γ₂ t₂ B → Γ₁.Add Γ₂ Γ → HasTypeD Γ (pair t₁ t₂) (A ⊗ B)
-  | tensorE {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ : Term n} {t₂ : Term (n + 2)} {A B C : Ty} :
+  | tensorE {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {t₁ : Term n ρ} {t₂ : Term (n + 2) ρ} {A B C : Ty} :
       HasTypeD Γ₁ t₁ (A ⊗ B) →
       HasTypeD ((Γ₂.cons (some (.lin A))).cons (some (.lin B))) t₂ C →
       Γ₁.Add Γ₂ Γ → HasTypeD Γ (letPair t₁ t₂) C
-  | unitI {n : ℕ} {Γ : Ctx n} : Γ.AllNonLin → HasTypeD Γ unit .unit
-  | unitE {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ t₂ : Term n} {B : Ty} :
+  | unitI {n ρ : ℕ} {Γ : TCtx n ρ} : Γ.AllNonLin → HasTypeD Γ unit .unit
+  | unitE {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {t₁ t₂ : Term n ρ} {B : Ty} :
       HasTypeD Γ₁ t₁ .unit → HasTypeD Γ₂ t₂ B → Γ₁.Add Γ₂ Γ → HasTypeD Γ (letUnit t₁ t₂) B
-  | bangI {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+  | bangI {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {A : Ty} :
       Γ.AllNonLin → HasTypeD Γ t A → HasTypeD Γ (bang t) (.bang A)
-  | bangE {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ : Term n} {t₂ : Term (n + 1)} {A B : Ty} :
+  | bangE {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {t₁ : Term n ρ} {t₂ : Term (n + 1) ρ} {A B : Ty} :
       HasTypeD Γ₁ t₁ (.bang A) → HasTypeD (Γ₂.cons (some (.nonlin A))) t₂ B →
       Γ₁.Add Γ₂ Γ → HasTypeD Γ (letBang t₁ t₂) B
-  | borrow {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+  | borrow {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {A : Ty} :
       HasTypeD Γ t (.star A) → HasTypeD Γ (borrow t) (.bang A)
-  | copy {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {t₁ : Term n} {t₂ : Term (n + 1)} {A B : Ty} :
+  | copy {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {t₁ : Term n ρ} {t₂ : Term (n + 1) ρ} {A B : Ty} :
       HasTypeD Γ₁ t₁ (.bang A) → HasTypeD (Γ₂.cons (some (.lin (.star A)))) t₂ (.bang B) →
       Γ₁.Add Γ₂ Γ → HasTypeD Γ (copy t₁ t₂) (.bang B)
-  | nec {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+  | nec {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {A : Ty} :
       HasTypeD Γ.refsOnly t A → Γ.VarsNonLin → HasTypeD Γ (star t) (.star A)
-  | natI {n : ℕ} {Γ : Ctx n} {k : ℕ} : Γ.AllNonLin → HasTypeD Γ (nat k) .nat
-  | floatI {n : ℕ} {Γ : Ctx n} {x : Float} : Γ.AllNonLin → HasTypeD Γ (float x) .float
-  | prim {n : ℕ} {Γ : Ctx n} {p : Prim} : Γ.AllNonLin → HasTypeD Γ (prim p) p.ty
-  | ref {n : ℕ} {Γ : Ctx n} {a : ℕ} {h : Hyp} :
-      Γ (.inr a) = some h → (Γ.set (.inr a) none).AllNonLin →
-      HasTypeD Γ (ref a) (.array h.ty)
+  | natI {n ρ : ℕ} {Γ : TCtx n ρ} {k : ℕ} : Γ.AllNonLin → HasTypeD Γ (nat k) .nat
+  | floatI {n ρ : ℕ} {Γ : TCtx n ρ} {x : FloatLit} : Γ.AllNonLin → HasTypeD Γ (float x) .float
+  | prim {n ρ : ℕ} {Γ : TCtx n ρ} {p : Prim} : Γ.AllNonLin → HasTypeD Γ (prim p) p.ty
+  | ref {n ρ : ℕ} {Γ : TCtx n ρ} {a : Var ρ} {h : Hyp ArrTy} :
+      Γ.refs.Pick NonLin a (some h) → Γ.vars.All NonLin → HasTypeD Γ (ref a) h.ty.toTy
 
 /-! ## Auxiliary context lemmas -/
 
-namespace Ctx
+namespace TCtx
 
-variable {n : ℕ}
-
-/-- Lifting a name under a variable binder. -/
-def liftName : Fin n ⊕ ℕ → Fin (n + 1) ⊕ ℕ := Sum.map Fin.succ id
-
-@[simp] lemma liftName_inl (i : Fin n) : liftName (.inl i) = .inl i.succ := rfl
-@[simp] lemma liftName_inr (a : ℕ) : liftName (n := n) (.inr a) = .inr a := rfl
-
-/-- Looking up a lifted name in an extended context. -/
-lemma cons_liftName (Γ : Ctx n) (h : Option Hyp) (x : Fin n ⊕ ℕ) :
-    Γ.cons h (liftName x) = Γ x := by
-  rcases x with i | a <;> rfl
-
-/-- Updating a name commutes with extending the context. -/
-lemma cons_set (Γ : Ctx n) (h : Option Hyp) (x : Fin n ⊕ ℕ) (h' : Option Hyp) :
-    (Γ.set x h').cons h = (Γ.cons h).set (liftName x) h' := by
-  rcases x with i | a
-  · exact cons_set_succ Γ h i h'
-  · funext y; rcases y with j | b
-    · cases j using Fin.cases <;> rfl
-    · by_cases hb : b = a
-      · subst hb; simp
-      · rw [cons_inr, set_ne _ _ (by simpa using hb), set_ne _ _ (by simpa using hb)]; rfl
-
-lemma refsOnly_set_inr (Γ : Ctx n) (a : ℕ) (h : Option Hyp) :
-    (Γ.set (.inr a) h).refsOnly = Γ.refsOnly.set (.inr a) h := by
-  funext y; rcases y with j | b
-  · simp [set]
-  · by_cases hb : b = a
-    · subst hb; simp
-    · rw [refsOnly_inr, set_ne _ _ (by simpa using hb), set_ne _ _ (by simpa using hb)]; rfl
-
-lemma VarsNonLin.set_inr {Γ : Ctx n} (hΓ : Γ.VarsNonLin) (a : ℕ) (h : Option Hyp) :
-    (Γ.set (.inr a) h).VarsNonLin := by
-  intro i; rw [set_ne _ _ (by simp)]; exact hΓ i
-
-/-- A non-linear context contains no linear assumption. -/
-lemma AllNonLin.not_lin {Γ : Ctx n} (hΓ : Γ.AllNonLin) {x : Fin n ⊕ ℕ} {A : Ty}
-    (hx : Γ x = some (.lin A)) : False := by
-  have := hΓ x; rw [hx] at this; exact this
-
-lemma AllNonLin.set_not_lin {Γ : Ctx n} {x y : Fin n ⊕ ℕ} {h : Option Hyp}
-    (hΓ : (Γ.set x h).AllNonLin) {A : Ty} (hy : Γ y = some (.lin A)) : y = x := by
-  by_contra hne
-  have := hΓ y; rw [set_ne _ _ hne, hy] at this; exact this
+variable {n ρ : ℕ}
 
 /-- Dereliction distributes over a sum: turning the linear assumption `x : A` of
 `Γ₁ + Γ₂` into `x : [A]` can be done in whichever summand contains `x : A`. -/
-lemma Add.der {Γ₁ Γ₂ Γ : Ctx n} (hadd : Γ₁.Add Γ₂ Γ) {x : Fin n ⊕ ℕ} {A : Ty}
-    (hx : Γ x = some (.lin A)) :
-    (Γ₁ x = some (.lin A) ∧ (Γ₁.set x (some (.nonlin A))).Add Γ₂ (Γ.set x (some (.nonlin A)))) ∨
-    (Γ₂ x = some (.lin A) ∧ Γ₁.Add (Γ₂.set x (some (.nonlin A))) (Γ.set x (some (.nonlin A)))) := by
-  have := hadd x; rw [hx] at this
+lemma Add.derVar {Γ₁ Γ₂ Γ : TCtx n ρ} (hadd : Γ₁.Add Γ₂ Γ) {i : Var n} {A : Ty}
+    (hx : Γ.vars.get i = some (.lin A)) :
+    (Γ₁.vars.get i = some (.lin A) ∧
+      (Γ₁.setVar i (some (.nonlin A))).Add Γ₂ (Γ.setVar i (some (.nonlin A)))) ∨
+    (Γ₂.vars.get i = some (.lin A) ∧
+      Γ₁.Add (Γ₂.setVar i (some (.nonlin A))) (Γ.setVar i (some (.nonlin A)))) := by
+  have := hadd.vars.get i; rw [hx] at this
   rcases this.der with ⟨hd, hl⟩ | ⟨hd, hl⟩
   · left; refine ⟨hl, ?_⟩
-    have := hadd.set (x := x) hd; rwa [Ctx.set_eq_self rfl] at this
+    have := hadd.setVar (i := i) hd
+    rwa [setVar_get] at this
   · right; refine ⟨hl, ?_⟩
-    have := hadd.set (x := x) hd; rwa [Ctx.set_eq_self rfl] at this
+    have := hadd.setVar (i := i) hd
+    rwa [setVar_get] at this
 
-end Ctx
+/-- Dereliction of an array reference distributes over a sum. -/
+lemma Add.derRef {Γ₁ Γ₂ Γ : TCtx n ρ} (hadd : Γ₁.Add Γ₂ Γ) {a : Var ρ} {A : ArrTy}
+    (hx : Γ.refs.get a = some (.lin A)) :
+    (Γ₁.refs.get a = some (.lin A) ∧
+      (Γ₁.setRef a (some (.nonlin A))).Add Γ₂ (Γ.setRef a (some (.nonlin A)))) ∨
+    (Γ₂.refs.get a = some (.lin A) ∧
+      Γ₁.Add (Γ₂.setRef a (some (.nonlin A))) (Γ.setRef a (some (.nonlin A)))) := by
+  have := hadd.refs.get a; rw [hx] at this
+  rcases this.der with ⟨hd, hl⟩ | ⟨hd, hl⟩
+  · left; refine ⟨hl, ?_⟩
+    have := hadd.setRef (a := a) hd
+    rwa [setRef_get] at this
+  · right; refine ⟨hl, ?_⟩
+    have := hadd.setRef (a := a) hd
+    rwa [setRef_get] at this
+
+end TCtx
 
 /-! ## Admissibility of dereliction and equivalence with `HasType` -/
 
@@ -144,64 +119,89 @@ macro "split_rule " h₁:term:max h₂:term:max hadd:term:max : tactic => `(tact
 
 namespace HasTypeD
 
-/-- Dereliction is admissible in the dereliction-free system, for variables and
-array references alike. -/
-theorem der {n : ℕ} {Γ : Ctx n} {t : Term n} {B : Ty} (ht : HasTypeD Γ t B) :
-    ∀ {x : Fin n ⊕ ℕ} {A : Ty}, Γ x = some (.lin A) →
-      HasTypeD (Γ.set x (some (.nonlin A))) t B := by
+/-- Dereliction of a variable is admissible in the dereliction-free system. -/
+theorem derVar {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {B : Ty} (ht : HasTypeD Γ t B) :
+    ∀ {i : Var n} {A : Ty}, Γ.vars.get i = some (.lin A) →
+      HasTypeD (Γ.setVar i (some (.nonlin A))) t B := by
   induction ht with
-  | var hi hrest | ref hi hrest =>
+  | var hi hr =>
     intro x A hx
-    obtain rfl := Ctx.AllNonLin.set_not_lin hrest hx
-    rw [hi] at hx; cases hx
-    first
-    | exact HasTypeD.var (h := .nonlin A) (by simp) (by rw [Ctx.set_set]; exact hrest)
-    | exact HasTypeD.ref (h := .nonlin A) (by simp) (by rw [Ctx.set_set]; exact hrest)
+    obtain rfl := hi.eq_of_not (by rw [hx]; exact not_nonLin_lin A)
+    rw [hi.get] at hx; cases hx
+    exact HasTypeD.var (h := .nonlin A) (hi.set _) hr
+  | ref hi hv =>
+    intro x A hx; exact (not_lin_of_all hv hx).elim
   | abs _ ih =>
     intro x A hx
-    refine HasTypeD.abs ?_
-    rw [Ctx.cons_set]
-    exact ih (by rw [Ctx.cons_liftName]; exact hx)
+    exact HasTypeD.abs (ih (i := .succ x) hx)
   | app h₁ h₂ hadd ih₁ ih₂ | tensorI h₁ h₂ hadd ih₁ ih₂ | tensorE h₁ h₂ hadd ih₁ ih₂
   | unitE h₁ h₂ hadd ih₁ ih₂ | bangE h₁ h₂ hadd ih₁ ih₂ | copy h₁ h₂ hadd ih₁ ih₂ =>
     intro x A hx
-    rcases hadd.der hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
+    rcases hadd.derVar hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
     · split_rule (ih₁ hl) h₂ hd
-    · split_rule h₁
-        (by (try simp only [Ctx.cons_set]); exact ih₂ (by simpa only [Ctx.cons_liftName])) hd
+    · first
+      | have h2 := ih₂ (i := x) hl; split_rule h₁ h2 hd
+      | have h2 := ih₂ (i := .succ x) hl
+        simp only [← TCtx.cons_setVar_succ] at h2; split_rule h₁ h2 hd
+      | have h2 := ih₂ (i := .succ (.succ x)) hl
+        simp only [← TCtx.cons_setVar_succ] at h2; split_rule h₁ h2 hd
   | unitI hΓ | bangI hΓ _ _ | natI hΓ | floatI hΓ | prim hΓ =>
-    intro x A hx; exact (hΓ.not_lin hx).elim
+    intro x A hx; exact (not_lin_of_all hΓ.vars hx).elim
   | borrow _ ih => intro x A hx; exact HasTypeD.borrow (ih hx)
-  | @nec n Γ t A' _ hΓ ih =>
+  | nec _ hΓ _ => intro x A hx; exact (not_lin_of_all hΓ hx).elim
+
+/-- Dereliction of an array reference is admissible in the dereliction-free system. -/
+theorem derRef {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {B : Ty} (ht : HasTypeD Γ t B) :
+    ∀ {a : Var ρ} {A : ArrTy}, Γ.refs.get a = some (.lin A) →
+      HasTypeD (Γ.setRef a (some (.nonlin A))) t B := by
+  induction ht with
+  | var hi hr =>
+    intro x A hx; exact (not_lin_of_all hr hx).elim
+  | ref hi hv =>
     intro x A hx
-    rcases x with i | a
-    · have := hΓ i; rw [hx] at this; exact this.elim
-    · refine HasTypeD.nec ?_ (hΓ.set_inr a _)
-      rw [Ctx.refsOnly_set_inr]
-      exact ih (by simpa using hx)
+    obtain rfl := hi.eq_of_not (by rw [hx]; exact not_nonLin_lin A)
+    rw [hi.get] at hx; cases hx
+    exact HasTypeD.ref (h := .nonlin A) (hi.set _) hv
+  | abs _ ih =>
+    intro x A hx
+    have h := ih hx
+    simp only [← TCtx.cons_setRef] at h
+    exact HasTypeD.abs h
+  | app h₁ h₂ hadd ih₁ ih₂ | tensorI h₁ h₂ hadd ih₁ ih₂ | tensorE h₁ h₂ hadd ih₁ ih₂
+  | unitE h₁ h₂ hadd ih₁ ih₂ | bangE h₁ h₂ hadd ih₁ ih₂ | copy h₁ h₂ hadd ih₁ ih₂ =>
+    intro x A hx
+    rcases hadd.derRef hx with ⟨hl, hd⟩ | ⟨hl, hd⟩
+    · split_rule (ih₁ hl) h₂ hd
+    · have h2 := ih₂ hl
+      simp only [← TCtx.cons_setRef] at h2; split_rule h₁ h2 hd
+  | unitI hΓ | bangI hΓ _ _ | natI hΓ | floatI hΓ | prim hΓ =>
+    intro x A hx; exact (not_lin_of_all hΓ.refs hx).elim
+  | borrow _ ih => intro x A hx; exact HasTypeD.borrow (ih hx)
+  | nec _ hΓ ih =>
+    intro x A hx
+    exact HasTypeD.nec (ih hx) hΓ
 
 end HasTypeD
 
 /-- The paper's typing judgment and the dereliction-free one coincide. -/
-theorem hasType_iff_hasTypeD {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} :
+theorem hasType_iff_hasTypeD {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {A : Ty} :
     HasType Γ t A ↔ HasTypeD Γ t A := by
   constructor
   · intro h
     induction h with
     | var hi hrest => exact HasTypeD.var (h := .lin _) hi hrest
-    | der _ hi ih => exact ih.der hi
+    | der _ hi ih => exact ih.derVar hi.eq
     | _ => constructor <;> assumption
   · intro h
     induction h with
-    | @var n Γ i h hi hrest =>
+    | @var n ρ Γ i h hi hrest =>
       cases h with
       | lin A => exact HasType.var hi hrest
       | nonlin A =>
-        have e : Γ = (Γ.set (.inl i) (some (.lin A))).set (.inl i) (some (.nonlin A)) := by
-          rw [Ctx.set_set, Ctx.set_eq_self hi]
+        have e : Γ = (Γ.setVar i (some (.lin A))).setVar i (some (.nonlin A)) := by
+          rw [TCtx.setVar_setVar, ← hi.get, TCtx.setVar_get]
         rw [e]
-        show HasType _ _ A
-        exact HasType.der (HasType.var (by simp) (by rw [Ctx.set_set]; exact hrest)) (by simp)
+        exact HasType.der (HasType.var (hi.set _) hrest) (by simp [TCtx.setVar])
     | _ => constructor <;> assumption
 
 end LCU

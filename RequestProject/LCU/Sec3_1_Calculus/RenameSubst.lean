@@ -1,197 +1,172 @@
 module
 public import RequestProject.LCU.Sec3_1_Calculus.Syntax
-public import RequestProject.Common.DeBruijn
 
 /-!
-# Renaming and substitution of de Bruijn terms
+# Renaming and substitution of LCU terms
 
-Parallel renaming `Term.rename ρ` (with `ρ : Fin n → Fin m`) and parallel substitution
-`Term.subst σ` (with `σ : Fin n → Term m`) for the intrinsically scoped terms
-`Term n`.  Going under a binder shifts the map with `Ren.up` / `Subst.up`, which keep
-index `0` fixed and shift all other indices by one.
+Renaming and substitution are the generic operations of the binding layer
+(`RequestProject/Common/Syntax.lean`), instantiated at the LCU signature; their laws are
+the generic laws.  This file only gives them their LCU names and records how they compute
+on each constructor (all these equations hold by `rfl`).
 
-* `Term.subst1 s t` is the single substitution `[s/x]t` for the variable bound by a
-  one-variable binder (index `0` of `t : Term (n + 1)`).
-* `Term.subst2 s₁ s₂ t` is the double substitution `[s₁/x, s₂/y]t` used by
-  `let (x, y) = …`, where `y` is index `0` and `x` is index `1`.
-* `renameRefs θ t` renames the runtime array references (not variables) of `t`; it is
-  the renaming `θ` of the heap rule `copy_β`.
-
-The usual laws (`rename_rename`, `subst_rename`, `rename_subst`, `subst_subst`,
-`subst_var`, ...) are proved by induction on terms after proving the corresponding
-law for the lifted maps.
+* `Term.rename ρ t` (with `ρ : Var n → Var m`) and `Term.subst σ t` (with
+  `σ : Var n → Term m ρ`);
+* `Term.subst1 t s` is the single substitution `[s/x]t` for the variable bound by a
+  one-variable binder, `Term.subst2 t s₁ s₂` the double substitution `[s₁/x, s₂/y]t` used by
+  `let (x, y) = …` (`y` is `Var.zero`, `x` is `Var.succ Var.zero`);
+* `Term.renameRefs θ t` renames the runtime array references of `t` along
+  `θ : Var ρ → Var ρ'` (it is the generic operator map); it is the renaming `θ` of the heap
+  rule `copy_β`.
 -/
 
 @[expose] public section
 
 namespace LCU
 
+open Binding
+
 namespace Term
 
-/-! ## Renaming -/
-
-/- Lifting a renaming under a binder (`Ren.up`) and its basic laws are shared with the
-FOFU formalisation: they live in `RequestProject/Common/DeBruijn.lean` (namespace
-`DeBruijn`) and are re-exported here so that `Ren.up`, `Term.Ren.up`, `Ren.up_zero`,
-`Ren.up_succ`, `Ren.up_id` and `Ren.up_comp` keep working unchanged in this
-development. -/
-export DeBruijn (Ren.up Ren.up_zero Ren.up_succ Ren.up_id Ren.up_comp)
+variable {n m k ρ : ℕ}
 
 /-- Simultaneous renaming of free variables. -/
-def rename : {n m : ℕ} → (Fin n → Fin m) → Term n → Term m
-  | _, _, ρ, var i => var (ρ i)
-  | _, _, ρ, lam t => lam (rename (Ren.up ρ) t)
-  | _, _, ρ, app t₁ t₂ => app (rename ρ t₁) (rename ρ t₂)
-  | _, _, ρ, pair t₁ t₂ => pair (rename ρ t₁) (rename ρ t₂)
-  | _, _, ρ, letPair t₁ t₂ => letPair (rename ρ t₁) (rename (Ren.up (Ren.up ρ)) t₂)
-  | _, _, _, unit => unit
-  | _, _, ρ, letUnit t₁ t₂ => letUnit (rename ρ t₁) (rename ρ t₂)
-  | _, _, ρ, bang t => bang (rename ρ t)
-  | _, _, ρ, letBang t₁ t₂ => letBang (rename ρ t₁) (rename (Ren.up ρ) t₂)
-  | _, _, ρ, borrow t => borrow (rename ρ t)
-  | _, _, ρ, copy t₁ t₂ => copy (rename ρ t₁) (rename (Ren.up ρ) t₂)
-  | _, _, ρ, star t => star (rename ρ t)
-  | _, _, _, nat k => nat k
-  | _, _, _, float x => float x
-  | _, _, _, prim p => prim p
-  | _, _, _, ref a => ref a
-
-/-! ## Substitution -/
-
-/-- Lifting a substitution under a binder. -/
-def Subst.up {n m : ℕ} (σ : Fin n → Term m) : Fin (n + 1) → Term (m + 1) :=
-  Fin.cases (var 0) (fun i => rename Fin.succ (σ i))
-
-@[simp] lemma Subst.up_zero {n m : ℕ} (σ : Fin n → Term m) : Subst.up σ 0 = var 0 := rfl
-@[simp] lemma Subst.up_succ {n m : ℕ} (σ : Fin n → Term m) (i : Fin n) :
-    Subst.up σ i.succ = rename Fin.succ (σ i) := rfl
+abbrev rename (r : Var n → Var m) (t : Term n ρ) : Term m ρ := Tm.ren r t
 
 /-- Simultaneous (capture-avoiding) substitution of free variables. -/
-def subst : {n m : ℕ} → (Fin n → Term m) → Term n → Term m
-  | _, _, σ, var i => σ i
-  | _, _, σ, lam t => lam (subst (Subst.up σ) t)
-  | _, _, σ, app t₁ t₂ => app (subst σ t₁) (subst σ t₂)
-  | _, _, σ, pair t₁ t₂ => pair (subst σ t₁) (subst σ t₂)
-  | _, _, σ, letPair t₁ t₂ => letPair (subst σ t₁) (subst (Subst.up (Subst.up σ)) t₂)
-  | _, _, _, unit => unit
-  | _, _, σ, letUnit t₁ t₂ => letUnit (subst σ t₁) (subst σ t₂)
-  | _, _, σ, bang t => bang (subst σ t)
-  | _, _, σ, letBang t₁ t₂ => letBang (subst σ t₁) (subst (Subst.up σ) t₂)
-  | _, _, σ, borrow t => borrow (subst σ t)
-  | _, _, σ, copy t₁ t₂ => copy (subst σ t₁) (subst (Subst.up σ) t₂)
-  | _, _, σ, star t => star (subst σ t)
-  | _, _, _, nat k => nat k
-  | _, _, _, float x => float x
-  | _, _, _, prim p => prim p
-  | _, _, _, ref a => ref a
+abbrev subst (σ : Var n → Term m ρ) (t : Term n ρ) : Term m ρ := Tm.subst σ t
 
-/-- Single substitution `[s/x]t` of `s` for the variable `x = 0` bound in `t`. -/
-def subst1 {n : ℕ} (s : Term n) (t : Term (n + 1)) : Term n :=
-  subst (Fin.cons s var) t
+/-- Single substitution `[s/x]t` of `s` for the variable `x = Var.zero` bound in `t`. -/
+abbrev subst1 (t : Term (n + 1) ρ) (s : Term n ρ) : Term n ρ := Tm.inst1 t s
 
-/-- Double substitution `[s₁/x, s₂/y]t` for `t` the body of a `let (x, y) = _ in t`
-(so `y` is index `0` and `x` is index `1`). -/
-def subst2 {n : ℕ} (s₁ s₂ : Term n) (t : Term (n + 2)) : Term n :=
-  subst (Fin.cons s₂ (Fin.cons s₁ var)) t
+/-- Double substitution `[s₁/x, s₂/y]t` for `t` the body of a `let (x, y) = _ in t`. -/
+abbrev subst2 (t : Term (n + 2) ρ) (s₁ s₂ : Term n ρ) : Term n ρ := Tm.inst2 t s₁ s₂
 
-/-! ## Basic lemmas about renaming and substitution -/
+/-- Lifting a substitution under a binder. -/
+abbrev Subst.up (σ : Var n → Term m ρ) : Var (n + 1) → Term (m + 1) ρ := Binding.Subst.up σ
 
-/-- Renaming along the identity does nothing. -/
-lemma rename_id {n : ℕ} (t : Term n) : rename id t = t := by
-  induction t <;> simp only [rename, Ren.up_id, id_eq, *]
+/-! ## Renaming and substitution on each constructor -/
 
-/-- Renamings compose. -/
-lemma rename_rename {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) (t : Term n) :
-    rename ρ' (rename ρ t) = rename (ρ' ∘ ρ) t := by
-  induction t generalizing m k <;> simp only [rename, Ren.up_comp, Function.comp_apply, *]
+section Compute
 
-lemma Subst.up_var {n : ℕ} : Subst.up (var : Fin n → Term n) = var := by
-  funext i; cases i using Fin.cases <;> rfl
+variable (r : Var n → Var m) (σ : Var n → Term m ρ)
 
-/-- Substituting every variable by itself does nothing. -/
-lemma subst_var {n : ℕ} (t : Term n) : subst var t = t := by
-  induction t <;> simp only [subst, Subst.up_var, *]
+@[simp] lemma rename_var (i : Var n) : (var i : Term n ρ).rename r = var (r i) := rfl
+@[simp] lemma rename_lam (t : Term (n + 1) ρ) : (lam t).rename r = lam (t.rename (Ren.up r)) := rfl
+@[simp] lemma rename_app (t₁ t₂ : Term n ρ) : (app t₁ t₂).rename r = app (t₁.rename r) (t₂.rename r) := rfl
+@[simp] lemma rename_pair (t₁ t₂ : Term n ρ) :
+    (pair t₁ t₂).rename r = pair (t₁.rename r) (t₂.rename r) := rfl
+@[simp] lemma rename_letPair (t₁ : Term n ρ) (t₂ : Term (n + 2) ρ) :
+    (letPair t₁ t₂).rename r = letPair (t₁.rename r) (t₂.rename (Ren.up (Ren.up r))) := rfl
+@[simp] lemma rename_unit : (unit : Term n ρ).rename r = unit := rfl
+@[simp] lemma rename_letUnit (t₁ t₂ : Term n ρ) :
+    (letUnit t₁ t₂).rename r = letUnit (t₁.rename r) (t₂.rename r) := rfl
+@[simp] lemma rename_bang (t : Term n ρ) : (bang t).rename r = bang (t.rename r) := rfl
+@[simp] lemma rename_letBang (t₁ : Term n ρ) (t₂ : Term (n + 1) ρ) :
+    (letBang t₁ t₂).rename r = letBang (t₁.rename r) (t₂.rename (Ren.up r)) := rfl
+@[simp] lemma rename_borrow (t : Term n ρ) : (borrow t).rename r = borrow (t.rename r) := rfl
+@[simp] lemma rename_copy (t₁ : Term n ρ) (t₂ : Term (n + 1) ρ) :
+    (copy t₁ t₂).rename r = copy (t₁.rename r) (t₂.rename (Ren.up r)) := rfl
+@[simp] lemma rename_star (t : Term n ρ) : (star t).rename r = star (t.rename r) := rfl
+@[simp] lemma rename_nat (k : ℕ) : (nat k : Term n ρ).rename r = nat k := rfl
+@[simp] lemma rename_float (x : FloatLit) : (float x : Term n ρ).rename r = float x := rfl
+@[simp] lemma rename_prim (p : Prim) : (prim p : Term n ρ).rename r = prim p := rfl
+@[simp] lemma rename_ref (a : Var ρ) : (ref a : Term n ρ).rename r = ref a := rfl
 
-lemma Subst.up_ren {n m : ℕ} (ρ : Fin n → Fin m) :
-    Subst.up (var ∘ ρ) = var ∘ Ren.up ρ := by
-  funext i; cases i using Fin.cases <;> rfl
+@[simp] lemma subst_var (i : Var n) : (var i : Term n ρ).subst σ = σ i := rfl
+@[simp] lemma subst_lam (t : Term (n + 1) ρ) : (lam t).subst σ = lam (t.subst (Subst.up σ)) := rfl
+@[simp] lemma subst_app (t₁ t₂ : Term n ρ) : (app t₁ t₂).subst σ = app (t₁.subst σ) (t₂.subst σ) := rfl
+@[simp] lemma subst_pair (t₁ t₂ : Term n ρ) :
+    (pair t₁ t₂).subst σ = pair (t₁.subst σ) (t₂.subst σ) := rfl
+@[simp] lemma subst_letPair (t₁ : Term n ρ) (t₂ : Term (n + 2) ρ) :
+    (letPair t₁ t₂).subst σ = letPair (t₁.subst σ) (t₂.subst (Subst.up (Subst.up σ))) := rfl
+@[simp] lemma subst_unit : (unit : Term n ρ).subst σ = unit := rfl
+@[simp] lemma subst_letUnit (t₁ t₂ : Term n ρ) :
+    (letUnit t₁ t₂).subst σ = letUnit (t₁.subst σ) (t₂.subst σ) := rfl
+@[simp] lemma subst_bang (t : Term n ρ) : (bang t).subst σ = bang (t.subst σ) := rfl
+@[simp] lemma subst_letBang (t₁ : Term n ρ) (t₂ : Term (n + 1) ρ) :
+    (letBang t₁ t₂).subst σ = letBang (t₁.subst σ) (t₂.subst (Subst.up σ)) := rfl
+@[simp] lemma subst_borrow (t : Term n ρ) : (borrow t).subst σ = borrow (t.subst σ) := rfl
+@[simp] lemma subst_copy (t₁ : Term n ρ) (t₂ : Term (n + 1) ρ) :
+    (copy t₁ t₂).subst σ = copy (t₁.subst σ) (t₂.subst (Subst.up σ)) := rfl
+@[simp] lemma subst_star (t : Term n ρ) : (star t).subst σ = star (t.subst σ) := rfl
+@[simp] lemma subst_nat (k : ℕ) : (nat k : Term n ρ).subst σ = nat k := rfl
+@[simp] lemma subst_float (x : FloatLit) : (float x : Term n ρ).subst σ = float x := rfl
+@[simp] lemma subst_prim (p : Prim) : (prim p : Term n ρ).subst σ = prim p := rfl
+@[simp] lemma subst_ref (a : Var ρ) : (ref a : Term n ρ).subst σ = ref a := rfl
 
-/-- A renaming is a special substitution (by variables). -/
-lemma subst_ren {n m : ℕ} (ρ : Fin n → Fin m) (t : Term n) :
-    subst (var ∘ ρ) t = rename ρ t := by
-  induction t generalizing m <;> simp only [subst, rename, Subst.up_ren, Function.comp_apply, *]
+end Compute
 
-lemma Subst.up_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Fin m → Term k) :
-    Subst.up (σ ∘ ρ) = Subst.up σ ∘ Ren.up ρ := by
-  funext i; cases i using Fin.cases <;> rfl
+/-! ## The laws (instances of the generic laws) -/
 
-/-- Substitution after renaming is substitution along the composite. -/
-lemma subst_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Fin m → Term k) (t : Term n) :
-    subst σ (rename ρ t) = subst (σ ∘ ρ) t := by
-  induction t generalizing m k <;> simp only [subst, rename, Subst.up_rename, Function.comp_apply, *]
+lemma rename_id (t : Term n ρ) : t.rename id = t := Tm.ren_id t
 
-lemma Subst.up_rename' {n m k : ℕ} (σ : Fin n → Term m) (ρ : Fin m → Fin k) :
-    Subst.up (rename ρ ∘ σ) = rename (Ren.up ρ) ∘ Subst.up σ := by
-  funext i; cases i using Fin.cases
-  · rfl
-  · simp [Subst.up, rename_rename]; rfl
+lemma rename_rename (r : Var n → Var m) (r' : Var m → Var k) (t : Term n ρ) :
+    (t.rename r).rename r' = t.rename (r' ∘ r) := Tm.ren_ren r r' t
 
-/-- Renaming after substitution is substitution along the renamed map. -/
-lemma rename_subst {n m k : ℕ} (σ : Fin n → Term m) (ρ : Fin m → Fin k) (t : Term n) :
-    rename ρ (subst σ t) = subst (rename ρ ∘ σ) t := by
-  induction t generalizing m k <;> simp only [subst, rename, Subst.up_rename', Function.comp_apply, *]
+lemma subst_var' (t : Term n ρ) : t.subst var = t := Tm.subst_var t
 
-lemma Subst.up_comp {n m k : ℕ} (σ : Fin n → Term m) (τ : Fin m → Term k) :
-    Subst.up (subst τ ∘ σ) = subst (Subst.up τ) ∘ Subst.up σ := by
-  funext i; cases i using Fin.cases
-  · rfl
-  · simp only [Function.comp, Subst.up_succ, rename_subst, subst_rename]
-    rfl
+lemma rename_eq_subst (r : Var n → Var m) (t : Term n ρ) : t.rename r = t.subst (var ∘ r) :=
+  Tm.ren_eq_subst r t
 
-/-- Substitutions compose. -/
-lemma subst_subst {n m k : ℕ} (σ : Fin n → Term m) (τ : Fin m → Term k) (t : Term n) :
-    subst τ (subst σ t) = subst (subst τ ∘ σ) t := by
-  induction t generalizing m k <;> simp only [subst, Subst.up_comp, Function.comp_apply, *]
+lemma subst_rename (r : Var n → Var m) (σ : Var m → Term k ρ) (t : Term n ρ) :
+    (t.rename r).subst σ = t.subst (σ ∘ r) := Tm.subst_ren r σ t
 
-/-- Substituting into a weakened term has no effect. -/
-@[simp] lemma subst1_rename_succ {n : ℕ} (s t : Term n) :
-    subst1 s (rename Fin.succ t) = t := by
-  simp [subst1, subst_rename]
-  conv_rhs => rw [← subst_var t]
-  rfl
+lemma rename_subst (σ : Var n → Term m ρ) (r : Var m → Var k) (t : Term n ρ) :
+    (t.subst σ).rename r = t.subst (rename r ∘ σ) := Tm.ren_subst σ r t
 
-/-- The double substitution is the composition of two single substitutions. -/
-lemma subst2_eq {n : ℕ} (s₁ s₂ : Term n) (t : Term (n + 2)) :
-    subst2 s₁ s₂ t = subst1 s₁ (subst1 (rename Fin.succ s₂) t) := by
-  simp only [subst2, subst1, subst_subst]
-  congr 1
-  funext i
-  cases i using Fin.cases with
-  | zero => exact (subst1_rename_succ s₁ s₂).symm
-  | succ i =>
-    cases i using Fin.cases <;> simp [subst]
+lemma subst_subst (σ : Var n → Term m ρ) (τ : Var m → Term k ρ) (t : Term n ρ) :
+    (t.subst σ).subst τ = t.subst (subst τ ∘ σ) := Tm.subst_subst σ τ t
+
+@[simp] lemma subst1_rename_succ (s t : Term n ρ) : (t.rename .succ).subst1 s = t :=
+  Tm.inst1_ren_succ s t
+
+lemma subst2_eq (t : Term (n + 2) ρ) (s₁ s₂ : Term n ρ) :
+    t.subst2 s₁ s₂ = (t.subst1 (s₂.rename .succ)).subst1 s₁ := Tm.inst2_eq s₁ s₂ t
+
+@[simp] lemma Subst.up_zero (σ : Var n → Term m ρ) : Subst.up σ .zero = var .zero := rfl
+@[simp] lemma Subst.up_succ (σ : Var n → Term m ρ) (i : Var n) :
+    Subst.up σ (.succ i) = (σ i).rename .succ := rfl
 
 end Term
 
 /-! ## Renaming array references -/
 
+/-- The operator map renaming runtime array references along `θ`. -/
+def Op.renameRef {ρ ρ' : ℕ} (θ : Var ρ → Var ρ') : Op ρ → Op ρ'
+  | .lam => .lam
+  | .app => .app
+  | .pair => .pair
+  | .letPair => .letPair
+  | .unit => .unit
+  | .letUnit => .letUnit
+  | .bang => .bang
+  | .letBang => .letBang
+  | .borrow => .borrow
+  | .copy => .copy
+  | .star => .star
+  | .nat k => .nat k
+  | .float x => .float x
+  | .prim p => .prim p
+  | .ref a => .ref (θ a)
+
+/-- Renaming runtime references is an arity-preserving operator map. -/
+def refHom {ρ ρ' : ℕ} (θ : Var ρ → Var ρ') : SigHom (sig ρ) (sig ρ') where
+  map := Op.renameRef θ
+  arity_map o := by cases o <;> rfl
+
 /-- Renaming of array references `θ(t)`. -/
-def renameRefs (θ : ℕ → ℕ) : {n : ℕ} → Term n → Term n
-  | _, .var i => .var i
-  | _, .lam t => .lam (renameRefs θ t)
-  | _, .app t₁ t₂ => .app (renameRefs θ t₁) (renameRefs θ t₂)
-  | _, .pair t₁ t₂ => .pair (renameRefs θ t₁) (renameRefs θ t₂)
-  | _, .letPair t₁ t₂ => .letPair (renameRefs θ t₁) (renameRefs θ t₂)
-  | _, .unit => .unit
-  | _, .letUnit t₁ t₂ => .letUnit (renameRefs θ t₁) (renameRefs θ t₂)
-  | _, .bang t => .bang (renameRefs θ t)
-  | _, .letBang t₁ t₂ => .letBang (renameRefs θ t₁) (renameRefs θ t₂)
-  | _, .borrow t => .borrow (renameRefs θ t)
-  | _, .copy t₁ t₂ => .copy (renameRefs θ t₁) (renameRefs θ t₂)
-  | _, .star t => .star (renameRefs θ t)
-  | _, .nat k => .nat k
-  | _, .float x => .float x
-  | _, .prim p => .prim p
-  | _, .ref a => .ref (θ a)
+def renameRefs {n ρ ρ' : ℕ} (θ : Var ρ → Var ρ') (t : Term n ρ) : Term n ρ' := Tm.mapOp (refHom θ) t
+
+namespace Term
+
+variable {n m ρ ρ' : ℕ}
+
+lemma renameRefs_rename (θ : Var ρ → Var ρ') (r : Var n → Var m) (t : Term n ρ) :
+    renameRefs θ (t.rename r) = (renameRefs θ t).rename r := Tm.mapOp_ren _ r t
+
+lemma renameRefs_subst (θ : Var ρ → Var ρ') (σ : Var n → Term m ρ) (t : Term n ρ) :
+    renameRefs θ (t.subst σ) = (renameRefs θ t).subst (renameRefs θ ∘ σ) := Tm.mapOp_subst _ σ t
+
+end Term
 
 end LCU

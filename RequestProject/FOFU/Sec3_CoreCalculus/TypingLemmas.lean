@@ -1,20 +1,17 @@
 module
 public import RequestProject.FOFU.Sec3_CoreCalculus.Typing
-public import Mathlib.Tactic.FinCases
-public import Mathlib.Data.Fintype.Basic
 
 /-!
 # Small derived typing rules and tactics for typing examples
 
 * `HasType.var'`: the derived rule `(var')` of §3, i.e. `var` followed by dereliction:
   `0 · Γ, x : [A]_1 ⊢ x : A`.
-* `CtxAdd.empty`, `CtxAdd.cons`, `Ctx.IsZero.empty`, `Ctx.IsZero.cons`, `zeroRest_cons_zero`,
-  `zeroRest_cons_succ`: structural lemmas for building context side conditions of
-  concrete derivations, with contexts built by `Ctx.cons` from `Ctx.empty`.
-* `Ctx.ofList`: a context given by the list of its assumptions (variable `#0` first).
-* tactics `ctx_add` (proves `CtxAdd Γ₁ Γ₂ Γ`) and `zero_rest` (proves the side condition
-  `∀ j, j ≠ i → ZeroAssm (Γ.vars j)` of `var`, or `Γ.IsZero`) for concrete contexts built
-  with `Ctx.ofList`, by checking every variable.
+* `TCtx.ofList`: a source context (no references) given by the list of its assumptions
+  (variable `Var.zero` first).
+* tactics for the side conditions of concrete derivations, which are all structural
+  judgments on length-indexed contexts and are proved by applying their constructors:
+  `ctx_add` (proves `CtxAdd Γ₁ Γ₂ Γ`), `zero_ctx` (proves `Γ.IsZero`) and `pick_var`
+  (proves the premise `Γ.vars.Pick ZeroAssm i a` of the rule `var`).
 -/
 
 @[expose] public section
@@ -24,74 +21,52 @@ namespace FOFU
 variable {R : Type} [Grades.PreorderedSemiring R]
 
 /-- The derived rule `(var')`: `0 · Γ, x : [A]_1 ⊢ x : A` (`var` followed by `der`). -/
-theorem HasType.var' {k n : ℕ} {Γ : Ctx R k n} {i : Fin n} {A : Ty R k}
-    (hi : Γ.vars i = some (.grd A 1)) (hz : ∀ j, j ≠ i → ZeroAssm (Γ.vars j)) :
-    HasType Γ (.var i) A := by
-  have hv : HasType (Γ.update i (some (.lin A))) (.var i) A :=
-    HasType.var (by simp [Ctx.update]) (fun j hj => by
-      simp only [Ctx.update, Function.update_of_ne hj]; exact hz j hj)
-  have h := HasType.der (i := i) (A := A) (by simp [Ctx.update]) hv
-  have e : (Γ.update i (some (.lin A))).update i (some (.grd A 1)) = Γ := by
-    ext j
-    · by_cases hj : j = i
-      · subst hj; simp [Ctx.update, hi]
-      · simp [Ctx.update, Function.update_of_ne hj]
-    · rfl
+theorem HasType.var' {k n ρ : ℕ} {Γ : TCtx R k n ρ} {i : Var n} {A : Ty R k}
+    (hi : Γ.vars.Pick ZeroAssm i (some (.grd A 1))) : HasType Γ (.var i) A := by
+  have hv : HasType (Γ.setVar i (some (.lin A))) (.var i) A := HasType.var (hi.set _)
+  have h := HasType.der (i := i) (A := A) (Ctx.Lookup.of_eq (by simp)) hv
+  have e : (Γ.setVar i (some (.lin A))).setVar i (some (.grd A 1)) = Γ := by
+    refine TCtx.ext rfl ?_
+    simp only [TCtx.setVar_vars, Ctx.set_set]
+    rw [← hi.get, Ctx.set_get]
   rwa [e] at h
 
-/-- `∅ + ∅ = ∅`. -/
-theorem CtxAdd.empty {k : ℕ} : CtxAdd (Ctx.empty : Ctx R k 0) Ctx.empty Ctx.empty :=
-  ⟨fun i => i.elim0, fun _ => RefAdd.noneLeft _⟩
-
-/-- `(Γ₁, x : a) + (Γ₂, x : b) = (Γ, x : c)` when `a + b = c` and `Γ₁ + Γ₂ = Γ`. -/
-theorem CtxAdd.cons {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {a b c : Option (Assm R k)}
-    (habc : AssmAdd a b c) (h : CtxAdd Γ₁ Γ₂ Γ) :
-    CtxAdd (Γ₁.cons a) (Γ₂.cons b) (Γ.cons c) :=
-  ⟨fun i => Fin.cases habc (fun j => h.vars j) i, h.refs⟩
-
-theorem Ctx.IsZero.empty {k : ℕ} : (Ctx.empty : Ctx R k 0).IsZero := fun i => i.elim0
-
-theorem Ctx.IsZero.cons {k n : ℕ} {Γ : Ctx R k n} {a : Option (Assm R k)}
-    (ha : ZeroAssm a) (h : Γ.IsZero) : (Γ.cons a).IsZero :=
-  fun i => Fin.cases ha (fun j => h j) i
-
-/-- Side condition of `var` for the variable `0` of `Γ, x : a`. -/
-theorem zeroRest_cons_zero {k n : ℕ} {Γ : Ctx R k n} {a : Option (Assm R k)}
-    (h : Γ.IsZero) : ∀ j, j ≠ 0 → ZeroAssm ((Γ.cons a).vars j) := by
-  intro j hj
-  cases j using Fin.cases with
-  | zero => exact absurd rfl hj
-  | succ j => exact h j
-
-/-- Side condition of `var` for the variable `i + 1` of `Γ, x : a`. -/
-theorem zeroRest_cons_succ {k n : ℕ} {Γ : Ctx R k n} {a : Option (Assm R k)} {i : Fin n}
-    (ha : ZeroAssm a) (h : ∀ j, j ≠ i → ZeroAssm (Γ.vars j)) :
-    ∀ j, j ≠ i.succ → ZeroAssm ((Γ.cons a).vars j) := by
-  intro j hj
-  cases j using Fin.cases with
-  | zero => exact ha
-  | succ j => exact h j (fun e => hj (e ▸ rfl))
-
-/-- The context whose variable `#i` has the `i`-th assumption of the list (no references). -/
-abbrev Ctx.ofList {k : ℕ} : (l : List (Option (Assm R k))) → Ctx R k l.length
-  | [] => Ctx.empty
-  | a :: l => (Ctx.ofList l).cons a
-
-/-- A context built from a list of absent / zero-graded assumptions is zero. -/
-theorem Ctx.IsZero.ofList_nil {k : ℕ} : (Ctx.ofList [] : Ctx R k 0).IsZero := Ctx.IsZero.empty
+/-- The source context whose variable `Var.zero` has the first assumption of the list,
+`Var.succ Var.zero` the second, and so on (no references). -/
+abbrev TCtx.ofList {k : ℕ} : (l : List (Option (Assm R k))) → TCtx R k l.length 0
+  | [] => TCtx.empty
+  | a :: l => (TCtx.ofList l).cons a
 
 end FOFU
 
-/-- Proves `CtxAdd Γ₁ Γ₂ Γ` for concrete contexts by checking every variable. -/
+/-- Proves `CtxAdd Γ₁ Γ₂ Γ` for concrete contexts by applying the constructors of the
+pointwise relations. -/
 macro "ctx_add" : tactic => `(tactic| (
-  refine ⟨fun i => ?_, fun _ => FOFU.RefAdd.noneLeft _⟩
-  fin_cases i <;>
-    first
+  refine ⟨?_, ?_⟩ <;>
+    repeat' (first
+      | exact Ctx.Forall₃.nil
+      | refine Ctx.Forall₃.snoc ?_ ?_
       | exact FOFU.AssmAdd.noneLeft _
       | exact FOFU.AssmAdd.noneRight _
-      | exact FOFU.AssmAdd.grd _ _ _))
+      | exact FOFU.AssmAdd.grd _ _ _
+      | exact FOFU.RefAdd.noneLeft _
+      | exact FOFU.RefAdd.noneRight _
+      | exact FOFU.RefAdd.both _)))
 
-/-- Proves `∀ j, j ≠ i → ZeroAssm (Γ.vars j)` (or `Γ.IsZero`) for concrete contexts. -/
-macro "zero_rest" : tactic => `(tactic| (
-  intro j
-  fin_cases j <;> first | (intro hj; exact absurd rfl hj) | (intros; trivial) | (intros; rfl)))
+/-- Proves `Γ.IsZero` for concrete contexts. -/
+macro "zero_ctx" : tactic => `(tactic| (
+  repeat' (first
+    | exact Ctx.All.nil
+    | refine Ctx.All.snoc ?_ ?_
+    | exact FOFU.ZeroAssm.none
+    | exact FOFU.ZeroAssm.grd _)))
+
+/-- Proves the premise `Γ.vars.Pick ZeroAssm i a` of the rule `var` for concrete contexts. -/
+macro "pick_var" : tactic => `(tactic| (
+  repeat' (first
+    | refine Ctx.Pick.here ?_
+    | refine Ctx.Pick.there ?_ ?_
+    | exact Ctx.All.nil
+    | refine Ctx.All.snoc ?_ ?_
+    | exact FOFU.ZeroAssm.none
+    | exact FOFU.ZeroAssm.grd _)))

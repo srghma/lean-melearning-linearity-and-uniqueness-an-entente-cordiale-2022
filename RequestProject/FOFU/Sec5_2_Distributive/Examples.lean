@@ -22,27 +22,27 @@ open Ty
 
 /-- `λindigo. let (r, p) = push indigo in pull (withBorrow alter r, p)`, in the scope of
 `alter = #0`. -/
-def examplePartial : Term ℕ 1 :=
+def examplePartial : Term ℕ 1 0 :=
   .lam (.letPair (.push (.var 0)) (.pull (.pair (.withBorrow (.var 3) (.var 1)) (.var 0))))
 
 /-- `alter : &₁ A ⊸ &₁ A ⊢ examplePartial : *(A ⊗ B) ⊸ *(A ⊗ B)`. -/
 theorem examplePartial_typing {k : ℕ} (A B : Ty ℕ k) :
-    HasType (Ctx.ofList [some (.lin (lolli (borrow Perm.one A) (borrow Perm.one A)))])
+    HasType (TCtx.ofList [some (.lin (lolli (borrow Perm.one A) (borrow Perm.one A)))])
       examplePartial (lolli (star (tensor A B)) (star (tensor A B))) := by
   set Alt : Ty ℕ k := lolli (borrow Perm.one A) (borrow Perm.one A)
   refine HasType.abs (HasType.tensorE
-    (Γ₁ := Ctx.ofList [some (.lin (star (tensor A B))), none])
-    (Γ₂ := Ctx.ofList [none, some (.lin Alt)])
-    (by ctx_add) (HasType.push (HasType.var rfl (by zero_rest))) ?_)
+    (Γ₁ := TCtx.ofList [some (.lin (star (tensor A B))), none])
+    (Γ₂ := TCtx.ofList [none, some (.lin Alt)])
+    (by ctx_add) (HasType.push (HasType.var (by pick_var))) ?_)
   -- `p : *B, r : *A, indigo : −, alter : Alt ⊢ pull (withBorrow alter r, p) : *(A ⊗ B)`
   exact HasType.pull (HasType.tensorI
-    (Γ₁ := Ctx.ofList [none, some (.lin (star A)), none, some (.lin Alt)])
-    (Γ₂ := Ctx.ofList [some (.lin (star B)), none, none, none])
+    (Γ₁ := TCtx.ofList [none, some (.lin (star A)), none, some (.lin Alt)])
+    (Γ₂ := TCtx.ofList [some (.lin (star B)), none, none, none])
     (by ctx_add)
     (HasType.withBorrow
-      (Γ₁ := Ctx.ofList [none, none, none, some (.lin Alt)])
-      (Γ₂ := Ctx.ofList [none, some (.lin (star A)), none, none])
-      (by ctx_add) (HasType.var rfl (by zero_rest)) (HasType.var rfl (by zero_rest)))
-    (HasType.var rfl (by zero_rest)))
+      (Γ₁ := TCtx.ofList [none, none, none, some (.lin Alt)])
+      (Γ₂ := TCtx.ofList [none, some (.lin (star A)), none, none])
+      (by ctx_add) (HasType.var (by pick_var)) (HasType.var (by pick_var)))
+    (HasType.var (by pick_var)))
 
 end FOFU

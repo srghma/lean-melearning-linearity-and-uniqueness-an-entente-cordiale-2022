@@ -1,8 +1,7 @@
 module
 public import RequestProject.FOFU.Sec3_CoreCalculus.TypeSubst
 public import RequestProject.Common.Grades.PreorderedSemiring
-public import Mathlib.Logic.Function.Basic
-public import Mathlib.Data.Fin.Tuple.Basic
+public import RequestProject.Common.Ctx
 
 /-!
 # Typing contexts, context addition and scalar multiplication (Section 3, §6.1)
@@ -14,17 +13,18 @@ Contexts of the paper,
 
 are represented as follows.
 
-* The identifiers `id` of `Γ` are the `k` bound identifiers of the scope: a context is a
-  `Ctx R k n`, and the types it contains are `Ty R k`.  Extending `Γ` with an
-  identifier is `Ctx.shiftNames` (all types are weakened).
-* The term variables are de Bruijn indices `Fin n`; `Γ.vars i` is the assumption on
-  variable `i`, or `none` if `i` is not in the context.  Assumptions are linear
-  (`Assm.lin A`, `x : A`) or graded (`Assm.grd A r`, `x : [A]_r`).
-* Runtime references are named by natural numbers; `Γ.refs a` is the assumption
-  `a : Res_id A` (a `RefTy`), if any.
+* The identifiers `id` of `Γ` are the `k` bound identifiers of the scope: the types of a
+  context `TCtx R k n ρ` are `Ty R k`.  Extending `Γ` with an identifier is
+  `TCtx.shiftNames` (all types are weakened).
+* The `n` term variables and the `ρ` runtime references each get an optional assumption;
+  both are length-indexed lists (`Ctx` from `RequestProject/Common/Ctx.lean`), so
+  `Γ.vars.get i` is the assumption on the variable `i` (`none` if `i` is not in the
+  paper's context).  Assumptions on variables are linear (`Assm.lin A`, `x : A`) or graded
+  (`Assm.grd A r`, `x : [A]_r`); assumptions on references are `ref : Res_id A`
+  (`RefTy`).
 
 Context addition `Γ₁ + Γ₂` (§3, extended in §6.1) is partial, so it is the relation
-`CtxAdd Γ₁ Γ₂ Γ`, defined pointwise:
+`CtxAdd Γ₁ Γ₂ Γ`, the pointwise lifting (`Ctx.Forall₃`) of
 
 * `none + a = a + none = a`;
 * `(x : [A]_r) + (x : [A]_s) = (x : [A]_(r + s))`;
@@ -34,7 +34,7 @@ Context addition `Γ₁ + Γ₂` (§3, extended in §6.1) is partial, so it is t
 Scalar multiplication `r · Γ` (§3) is the partial relation `CtxScale r Γ Γ'`: it scales
 graded assumptions, keeps references, and is undefined on linear assumptions.
 
-`Ctx.IsZero Γ` says that `Γ` has the form `0 · Γ'`: every variable is absent or graded
+`TCtx.IsZero Γ` says that `Γ` has the form `0 · Γ'`: every variable is absent or graded
 by `0` (references are arbitrary).
 
 Grades are elements of a `Grades.PreorderedSemiring`, a class shared with the
@@ -59,38 +59,54 @@ structure RefTy (R : Type) (k : ℕ) where
   /-- the kind of resource (`Array` or `Ref`) -/
   kind : ResKind
   /-- the identifier `id` of the resource -/
-  id : Ident k
+  id : Var k
   /-- the type `A` of the contents -/
   ty : Ty R k
 
 /-- The type `Res_id A` denoted by a reference assumption. -/
 def RefTy.toTy {k : ℕ} (T : RefTy R k) : Ty R k := Ty.res T.kind T.id T.ty
 
-/-- Typing contexts with `k` identifiers in scope and `n` term variables. -/
-@[ext] structure Ctx (R : Type) (k n : ℕ) where
-  /-- assumptions on term variables (`none` if the variable is not in the context) -/
-  vars : Fin n → Option (Assm R k)
-  /-- assumptions `ref : Res_id A` on runtime references -/
-  refs : ℕ → Option (RefTy R k)
+/-- Renaming the identifiers of an assumption. -/
+def Assm.ren {k k' : ℕ} (r : Var k → Var k') : Assm R k → Assm R k'
+  | lin A => lin (A.ren r)
+  | grd A s => grd (A.ren r) s
 
-namespace Assm
+/-- Renaming the identifiers of a reference assumption. -/
+def RefTy.ren {k k' : ℕ} (r : Var k → Var k') (T : RefTy R k) : RefTy R k' :=
+  ⟨T.kind, r T.id, T.ty.ren r⟩
 
-variable {k k' : ℕ}
+@[simp] lemma Assm.ren_lin {k k' : ℕ} (r : Var k → Var k') (A : Ty R k) :
+    (Assm.lin A).ren r = .lin (A.ren r) := rfl
+@[simp] lemma Assm.ren_grd {k k' : ℕ} (r : Var k → Var k') (A : Ty R k) (s : R) :
+    (Assm.grd A s).ren r = .grd (A.ren r) s := rfl
+@[simp] lemma RefTy.toTy_ren {k k' : ℕ} (r : Var k → Var k') (T : RefTy R k) :
+    (T.ren r).toTy = T.toTy.ren r := rfl
 
-/-- Applying an identifier substitution to an assumption. -/
-def subst (σ : Fin k → Ident k') : Assm R k → Assm R k'
-  | lin A => lin (A.subst σ)
-  | grd A r => grd (A.subst σ) r
+lemma Assm.ren_ren {k k' k'' : ℕ} (r : Var k → Var k') (r' : Var k' → Var k'') (a : Assm R k) :
+    (a.ren r).ren r' = a.ren (r' ∘ r) := by
+  cases a <;> simp [Assm.ren, Ty.ren_ren]
 
-end Assm
+lemma RefTy.ren_ren {k k' k'' : ℕ} (r : Var k → Var k') (r' : Var k' → Var k'')
+    (T : RefTy R k) : (T.ren r).ren r' = T.ren (r' ∘ r) := by
+  simp [RefTy.ren, Ty.ren_ren]
 
-/-- Applying an identifier substitution to a reference assumption. -/
-def RefTy.subst {k k' : ℕ} (σ : Fin k → Ident k') (T : RefTy R k) : RefTy R k' :=
-  ⟨T.kind, T.id.subst σ, T.ty.subst σ⟩
+@[simp] lemma Assm.ren_id {k : ℕ} (a : Assm R k) : a.ren id = a := by
+  cases a <;> simp [Assm.ren]
+
+@[simp] lemma RefTy.ren_id {k : ℕ} (T : RefTy R k) : T.ren _root_.id = T := by
+  simp [RefTy.ren]
+
+/-- Typing contexts with `k` identifiers, `n` term variables and `ρ` runtime references
+in scope. -/
+structure TCtx (R : Type) (k n ρ : ℕ) where
+  /-- assumptions `ref : Res_id A` on the runtime references -/
+  refs : Ctx (Option (RefTy R k)) ρ
+  /-- assumptions on the term variables (`none` if the variable is not in the context) -/
+  vars : Ctx (Option (Assm R k)) n
 
 section Algebra
 
-variable [Grades.PreorderedSemiring R] {k n : ℕ}
+variable [Grades.PreorderedSemiring R] {k n ρ : ℕ}
 
 /-- Pointwise context addition on variable assumptions. -/
 inductive AssmAdd : Option (Assm R k) → Option (Assm R k) → Option (Assm R k) → Prop where
@@ -106,9 +122,9 @@ inductive RefAdd : Option (RefTy R k) → Option (RefTy R k) → Option (RefTy R
   | both (T : RefTy R k) : RefAdd (some T) (some T) (some T)
 
 /-- Context addition `Γ₁ + Γ₂ = Γ` (a partial operation, hence a relation). -/
-structure CtxAdd (Γ₁ Γ₂ Γ : Ctx R k n) : Prop where
-  vars : ∀ i, AssmAdd (Γ₁.vars i) (Γ₂.vars i) (Γ.vars i)
-  refs : ∀ a, RefAdd (Γ₁.refs a) (Γ₂.refs a) (Γ.refs a)
+structure CtxAdd (Γ₁ Γ₂ Γ : TCtx R k n ρ) : Prop where
+  refs : Ctx.Forall₃ RefAdd Γ₁.refs Γ₂.refs Γ.refs
+  vars : Ctx.Forall₃ AssmAdd Γ₁.vars Γ₂.vars Γ.vars
 
 /-- Pointwise scalar multiplication on variable assumptions (undefined on linear
 assumptions). -/
@@ -118,82 +134,76 @@ inductive AssmScale (r : R) : Option (Assm R k) → Option (Assm R k) → Prop w
 
 /-- Scalar multiplication `r · Γ = Γ'` (partial: undefined if `Γ` contains a linear
 assumption); references are preserved. -/
-structure CtxScale (r : R) (Γ Γ' : Ctx R k n) : Prop where
-  vars : ∀ i, AssmScale r (Γ.vars i) (Γ'.vars i)
+structure CtxScale (r : R) (Γ Γ' : TCtx R k n ρ) : Prop where
   refs : Γ'.refs = Γ.refs
+  vars : Ctx.Forall₂ (AssmScale r) Γ.vars Γ'.vars
 
 /-- An assumption that is absent or graded by `0`. -/
-def ZeroAssm : Option (Assm R k) → Prop
-  | none => True
-  | some (.lin _) => False
-  | some (.grd _ r) => r = 0
+inductive ZeroAssm : Option (Assm R k) → Prop where
+  /-- no assumption -/
+  | none : ZeroAssm none
+  /-- a graded assumption `x : [A]_0` -/
+  | grd (A : Ty R k) : ZeroAssm (some (.grd A 0))
+
+@[simp] lemma zeroAssm_none : ZeroAssm (none : Option (Assm R k)) := .none
+@[simp] lemma not_zeroAssm_lin (A : Ty R k) : ¬ ZeroAssm (some (.lin A)) := nofun
+lemma ZeroAssm.elim {A : Ty R k} {P : Prop} (h : ZeroAssm (some (.lin A))) : P := nomatch h
+@[simp] lemma zeroAssm_grd_iff {A : Ty R k} {r : R} : ZeroAssm (some (.grd A r)) ↔ r = 0 :=
+  ⟨fun | .grd _ => rfl, fun h => h ▸ .grd A⟩
 
 /-- `Γ` has the form `0 · Γ'`: every variable is absent or graded by `0`. -/
-def Ctx.IsZero (Γ : Ctx R k n) : Prop := ∀ i, ZeroAssm (Γ.vars i)
+def TCtx.IsZero (Γ : TCtx R k n ρ) : Prop := Γ.vars.All ZeroAssm
 
 end Algebra
 
-/-- If the left summand has a reference assumption, so does the sum. -/
-lemma RefAdd.ne_none_left {k : ℕ} {x y z : Option (RefTy R k)} (h : RefAdd x y z)
-    (hx : x ≠ none) : z ≠ none := by
-  cases h <;> simp_all
+namespace TCtx
 
-/-- If the right summand has a reference assumption, so does the sum. -/
-lemma RefAdd.ne_none_right {k : ℕ} {x y z : Option (RefTy R k)} (h : RefAdd x y z)
-    (hy : y ≠ none) : z ≠ none := by
-  cases h <;> simp_all
+variable {k k' n ρ : ℕ}
 
+/-- The empty context `∅` in a scope of `n` variables and `ρ` references: no variable and
+no reference has an assumption. -/
+def empty : TCtx R k n ρ := ⟨.replicate ρ none, .replicate n none⟩
 
-namespace Ctx
-
-variable {k k' n : ℕ}
-
-/-- The empty context `∅` (no variables, no references). -/
-def empty : Ctx R k 0 := ⟨Fin.elim0, fun _ => none⟩
-
-/-- The context with `n` variables, none of which has an assumption, and no references
-(the empty context in a scope of `n` variables). -/
-def none (n : ℕ) : Ctx R k n := ⟨fun _ => Option.none, fun _ => Option.none⟩
-
-/-- Extending a context by a new variable `0` (going under a binder). -/
-def cons (a : Option (Assm R k)) (Γ : Ctx R k n) : Ctx R k (n + 1) :=
-  ⟨Fin.cons a Γ.vars, Γ.refs⟩
-
-/-- Extending a context by a new last variable (as a heap grows). -/
-def snoc (Γ : Ctx R k n) (a : Option (Assm R k)) : Ctx R k (n + 1) :=
-  ⟨Fin.snoc Γ.vars a, Γ.refs⟩
+/-- Extending a context by a new variable `Var.zero` (going under a binder). -/
+def cons (Γ : TCtx R k n ρ) (a : Option (Assm R k)) : TCtx R k (n + 1) ρ := ⟨Γ.refs, Γ.vars ,, a⟩
 
 /-- Replacing the assumption on variable `i`. -/
-def update (Γ : Ctx R k n) (i : Fin n) (a : Option (Assm R k)) : Ctx R k n :=
-  ⟨Function.update Γ.vars i a, Γ.refs⟩
-
-/-- Adding the reference assumption `ref : T`. -/
-def addRef (Γ : Ctx R k n) (a : ℕ) (T : RefTy R k) : Ctx R k n :=
-  ⟨Γ.vars, Function.update Γ.refs a (some T)⟩
+def setVar (Γ : TCtx R k n ρ) (i : Var n) (a : Option (Assm R k)) : TCtx R k n ρ :=
+  ⟨Γ.refs, Γ.vars.set i a⟩
 
 /-- The runtime part `γ` of a context: only its references. -/
-def refsOnly (Γ : Ctx R k n) : Ctx R k n := ⟨fun _ => Option.none, Γ.refs⟩
+def refsOnly (Γ : TCtx R k n ρ) : TCtx R k n ρ := ⟨Γ.refs, .replicate n none⟩
 
-/-- Applying an identifier substitution to all the types of a context. -/
-def substNames (σ : Fin k → Ident k') (Γ : Ctx R k n) : Ctx R k' n :=
-  ⟨fun i => (Γ.vars i).map (Assm.subst σ), fun a => (Γ.refs a).map (RefTy.subst σ)⟩
+/-- Renaming the identifiers in all the types of a context. -/
+def renNames (r : Var k → Var k') (Γ : TCtx R k n ρ) : TCtx R k' n ρ :=
+  ⟨Γ.refs.map (Option.map (RefTy.ren r)), Γ.vars.map (Option.map (Assm.ren r))⟩
 
 /-- Extending the context with a new identifier `Γ, id` (all types are shifted). -/
-def shiftNames (Γ : Ctx R k n) : Ctx R (k + 1) n := Γ.substNames (fun i => Ident.bound i.succ)
+def shiftNames (Γ : TCtx R k n ρ) : TCtx R (k + 1) n ρ := Γ.renNames Var.succ
 
-@[simp] lemma cons_vars_zero (a : Option (Assm R k)) (Γ : Ctx R k n) :
-    (Γ.cons a).vars 0 = a := rfl
-@[simp] lemma cons_vars_succ (a : Option (Assm R k)) (Γ : Ctx R k n) (i : Fin n) :
-    (Γ.cons a).vars i.succ = Γ.vars i := rfl
-@[simp] lemma cons_refs (a : Option (Assm R k)) (Γ : Ctx R k n) : (Γ.cons a).refs = Γ.refs := rfl
-@[simp] lemma snoc_refs (a : Option (Assm R k)) (Γ : Ctx R k n) : (Γ.snoc a).refs = Γ.refs := rfl
-@[simp] lemma update_refs (Γ : Ctx R k n) (i : Fin n) (a : Option (Assm R k)) :
-    (Γ.update i a).refs = Γ.refs := rfl
-@[simp] lemma refsOnly_refs (Γ : Ctx R k n) : Γ.refsOnly.refs = Γ.refs := rfl
-@[simp] lemma refsOnly_vars (Γ : Ctx R k n) (i : Fin n) : Γ.refsOnly.vars i = Option.none := rfl
-@[simp] lemma none_vars (i : Fin n) : (Ctx.none n : Ctx R k n).vars i = Option.none := rfl
-@[simp] lemma none_refs (a : ℕ) : (Ctx.none n : Ctx R k n).refs a = Option.none := rfl
+@[simp] lemma empty_refs : (empty : TCtx R k n ρ).refs = .replicate ρ none := rfl
+@[simp] lemma empty_vars : (empty : TCtx R k n ρ).vars = .replicate n none := rfl
+@[simp] lemma cons_refs (Γ : TCtx R k n ρ) (a : Option (Assm R k)) : (Γ.cons a).refs = Γ.refs :=
+  rfl
+@[simp] lemma cons_vars (Γ : TCtx R k n ρ) (a : Option (Assm R k)) :
+    (Γ.cons a).vars = Γ.vars ,, a := rfl
+@[simp] lemma setVar_refs (Γ : TCtx R k n ρ) (i : Var n) (a : Option (Assm R k)) :
+    (Γ.setVar i a).refs = Γ.refs := rfl
+@[simp] lemma setVar_vars (Γ : TCtx R k n ρ) (i : Var n) (a : Option (Assm R k)) :
+    (Γ.setVar i a).vars = Γ.vars.set i a := rfl
+@[simp] lemma refsOnly_refs (Γ : TCtx R k n ρ) : Γ.refsOnly.refs = Γ.refs := rfl
+@[simp] lemma refsOnly_vars (Γ : TCtx R k n ρ) : Γ.refsOnly.vars = .replicate n none := rfl
+@[simp] lemma renNames_refs (r : Var k → Var k') (Γ : TCtx R k n ρ) :
+    (Γ.renNames r).refs = Γ.refs.map (Option.map (RefTy.ren r)) := rfl
+@[simp] lemma renNames_vars (r : Var k → Var k') (Γ : TCtx R k n ρ) :
+    (Γ.renNames r).vars = Γ.vars.map (Option.map (Assm.ren r)) := rfl
 
-end Ctx
+lemma ext {Γ Δ : TCtx R k n ρ} (hr : Γ.refs = Δ.refs) (hv : Γ.vars = Δ.vars) : Γ = Δ := by
+  cases Γ; cases Δ; cases hr; cases hv; rfl
+
+lemma ext_iff' {Γ Δ : TCtx R k n ρ} : Γ = Δ ↔ Γ.refs = Δ.refs ∧ Γ.vars = Δ.vars :=
+  ⟨fun h => h ▸ ⟨rfl, rfl⟩, fun ⟨h₁, h₂⟩ => ext h₁ h₂⟩
+
+end TCtx
 
 end FOFU

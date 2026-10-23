@@ -3,243 +3,175 @@ public import RequestProject.FOFU.Sec6_3_Theorems.NameSubst
 public import RequestProject.FOFU.Sec3_CoreCalculus.RenameSubst
 
 /-!
-# Renaming (and weakening by absent variables) in typing derivations
+# Renaming (and weakening by zero-graded variables) in typing derivations
 
-`HasTypeD.rename`: if `Γ ⊢ t : A` and `ρ` is an injective renaming of variables, then
-`ρ(Γ) ⊢ ρ(t) : A`, where `ρ(Γ)` (`Ctx.ren ρ Γ`) gives `ρ j` the assumption of `j` and
-no assumption to variables outside the image of `ρ`.  In particular a derivation can be
-moved under a binder (`HasTypeD.shift`: `Γ, x : − ⊢ t↑ : A`).
-
-The renaming `DeBruijn.Ren.up` on variables is shared with *Linearity and Uniqueness*
-(`RequestProject/Common/DeBruijn.lean`).
+`HasTypeD.rename`: if `Γ ⊢ t : A` and `Γ.RenCtx r Γ'`, i.e. `Γ'` is `Γ` renamed along an
+injective renaming `r` of variables with absent or `0`-graded assumptions on the variables
+outside the image of `r`, then `Γ' ⊢ r(t) : A`.  It is the generic context renaming
+`Ctx.Ren ZeroAssm r` of `RequestProject/Common/Ctx.lean` on the variables; the references
+are unchanged.  In particular a derivation can be moved under a binder
+(`HasTypeD.shift`: `Γ, x : − ⊢ t↑ : A`).
 -/
 
 @[expose] public section
 
 namespace FOFU
 
-open DeBruijn Ty
+open Ty
 
 variable {R : Type} [Grades.PreorderedSemiring R]
 
-namespace Ctx
+/-- A zero assumption is its own sum. -/
+lemma ZeroAssm.add_self {k : ℕ} {a : Option (Assm R k)} (h : ZeroAssm a) : AssmAdd a a a := by
+  cases h with
+  | none => exact .noneLeft _
+  | grd A => have := AssmAdd.grd A (0 : R) 0; rwa [add_zero] at this
 
-section
-omit [Grades.PreorderedSemiring R]
+namespace TCtx
 
-variable {k n m : ℕ}
+variable {k n m ρ : ℕ}
 
-/-- Renaming a context along `ρ : Fin n → Fin m`. -/
-noncomputable def ren (ρ : Fin n → Fin m) (Γ : Ctx R k n) : Ctx R k m :=
-  ⟨Function.extend ρ Γ.vars (fun _ => Option.none), Γ.refs⟩
+/-- `RenCtx r Γ Γ'`: `Γ'` is `Γ` renamed along the injective `r`, with absent or
+`0`-graded assumptions on the variables outside the image of `r`; the references are
+unchanged. -/
+structure RenCtx (r : Var n → Var m) (Γ : TCtx R k n ρ) (Γ' : TCtx R k m ρ) : Prop where
+  refs : Γ'.refs = Γ.refs
+  vars : Ctx.Ren ZeroAssm r Γ.vars Γ'.vars
 
-@[simp] lemma ren_refs (ρ : Fin n → Fin m) (Γ : Ctx R k n) : (Γ.ren ρ).refs = Γ.refs := rfl
+namespace RenCtx
 
-lemma ren_vars_apply {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) (Γ : Ctx R k n)
-    (j : Fin n) : (Γ.ren ρ).vars (ρ j) = Γ.vars j :=
-  hρ.extend_apply Γ.vars (fun _ => Option.none) j
+variable {r : Var n → Var m} {Γ : TCtx R k n ρ} {Γ' : TCtx R k m ρ}
 
-lemma ren_vars_of_notMem {ρ : Fin n → Fin m} (Γ : Ctx R k n) {l : Fin m}
-    (hl : ∀ j, ρ j ≠ l) : (Γ.ren ρ).vars l = Option.none :=
-  Function.extend_apply' Γ.vars (fun _ => Option.none) l (fun ⟨j, hj⟩ => hl j hj)
+lemma cons (hr : RenCtx r Γ Γ') (a : Option (Assm R k)) :
+    RenCtx (Ren.up r) (Γ.cons a) (Γ'.cons a) := ⟨hr.refs, hr.vars.up a⟩
 
-/-- Every variable of the target is either the image of a variable, or outside the image
-(and then has no assumption in any renamed context). -/
-lemma ren_cases {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) (l : Fin m) :
-    (∃ j, ρ j = l ∧ ∀ Δ : Ctx R k n, (Δ.ren ρ).vars l = Δ.vars j) ∨
-    (∀ Δ : Ctx R k n, (Δ.ren ρ).vars l = Option.none) := by
-  by_cases h : ∃ j, ρ j = l
-  · obtain ⟨j, rfl⟩ := h
-    exact Or.inl ⟨j, rfl, fun Δ => ren_vars_apply hρ Δ j⟩
-  · exact Or.inr fun Δ => ren_vars_of_notMem Δ (fun j hj => h ⟨j, hj⟩)
+lemma isZero (hr : RenCtx r Γ Γ') (hΓ : Γ.IsZero) : Γ'.IsZero := hr.vars.all hΓ
 
-lemma cons_ren_up {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) (Γ : Ctx R k n)
-    (a : Option (Assm R k)) : (Γ.cons a).ren (Ren.up ρ) = (Γ.ren ρ).cons a := by
-  ext1
-  · funext l
-    cases l using Fin.cases with
-    | zero => exact ren_vars_apply (Ren.up_injective hρ) _ 0
-    | succ l =>
-      rcases ren_cases hρ (k := k) l with ⟨j, rfl, -⟩ | h
-      · rw [cons_vars_succ, ren_vars_apply hρ]
-        exact ren_vars_apply (Ren.up_injective hρ) (Γ.cons a) j.succ
-      · rw [cons_vars_succ, h]
-        apply ren_vars_of_notMem
-        intro j hj
-        obtain ⟨i, hi⟩ := Ren.exists_of_up ⟨j, hj⟩
-        have := h ((Ctx.none n : Ctx R k n).update i (some (.lin .unit)))
-        rw [← hi, ren_vars_apply hρ] at this
-        simp [Ctx.update] at this
-  · rfl
+lemma refsOnly (hr : RenCtx r Γ Γ') : RenCtx r Γ.refsOnly Γ'.refsOnly :=
+  ⟨hr.refs, Ctx.Ren.replicate .none hr.vars.inj⟩
 
-lemma update_ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) (Γ : Ctx R k n) (i : Fin n)
-    (a : Option (Assm R k)) : (Γ.update i a).ren ρ = (Γ.ren ρ).update (ρ i) a := by
-  ext1
-  · funext l
-    rcases ren_cases hρ (k := k) l with ⟨j, rfl, h⟩ | h
-    · rw [h]
-      by_cases hj : j = i
-      · subst hj; simp [Ctx.update]
-      · rw [update_vars_ne _ hj, update_vars_ne _ (hρ.ne hj), ren_vars_apply hρ]
-    · rw [h, update_vars_ne, h]
-      intro e; subst e
-      have := h ((Ctx.none n : Ctx R k n).update i (some (.lin .unit)))
-      rw [ren_vars_apply hρ] at this
-      simp [Ctx.update] at this
-  · rfl
+lemma setVar (hr : RenCtx r Γ Γ') (i : Var n) (a : Option (Assm R k)) :
+    RenCtx r (Γ.setVar i a) (Γ'.setVar (r i) a) := ⟨hr.refs, hr.vars.set i a⟩
 
-lemma refsOnly_ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) (Γ : Ctx R k n) :
-    Γ.refsOnly.ren ρ = (Γ.ren ρ).refsOnly := by
-  ext1
-  · funext l
-    rcases ren_cases hρ (k := k) l with ⟨j, rfl, h⟩ | h
-    · rw [h]; rfl
-    · rw [h]; rfl
-  · rfl
+lemma shiftNames (hr : RenCtx r Γ Γ') : RenCtx r Γ.shiftNames Γ'.shiftNames :=
+  ⟨by simp [TCtx.shiftNames, hr.refs],
+    hr.vars.mapCtx _ fun _ ha => ha.renNames _⟩
 
-lemma substNames_ren {k' : ℕ} {ρ : Fin n → Fin m} (hρ : Function.Injective ρ)
-    (σ : Fin k → Ident k') (Γ : Ctx R k n) :
-    (Γ.ren ρ).substNames σ = (Γ.substNames σ).ren ρ := by
-  ext1
-  · funext l
-    rcases ren_cases hρ (k := k) l with ⟨j, rfl, h⟩ | h
-    · simp only [substNames]; rw [h, ren_vars_apply hρ]
-    · simp only [substNames]; rw [h, ren_vars_of_notMem]
-      · rfl
-      intro j hj; subst hj
-      have := h ((Ctx.none n : Ctx R k n).update j (some (.lin .unit)))
-      rw [ren_vars_apply hρ] at this
-      simp [Ctx.update] at this
-  · rfl
+lemma lookup (hr : RenCtx r Γ Γ') {i : Var n} {a : Option (Assm R k)}
+    (h : Γ.vars.Lookup i a) : Γ'.vars.Lookup (r i) a :=
+  Ctx.Lookup.of_eq (by rw [hr.vars.map, h.eq])
 
-lemma shiftNames_ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) (Γ : Ctx R k n) :
-    (Γ.ren ρ).shiftNames = Γ.shiftNames.ren ρ := substNames_ren hρ _ Γ
+/-- A splitting `Γ₁ + Γ₂ = Γ` of the source context can be transported to a splitting of
+the renamed context; the extra (zero) assumptions are given to both parts. -/
+lemma split (hr : RenCtx r Γ Γ') {Γ₁ Γ₂ : TCtx R k n ρ} (hadd : CtxAdd Γ₁ Γ₂ Γ) :
+    ∃ Γ₁' Γ₂', RenCtx r Γ₁ Γ₁' ∧ RenCtx r Γ₂ Γ₂' ∧ CtxAdd Γ₁' Γ₂' Γ' := by
+  obtain ⟨Δ₁, Δ₂, h₁, h₂, h⟩ := hr.vars.split ZeroAssm.add_self hadd.vars
+  exact ⟨⟨Γ₁.refs, Δ₁⟩, ⟨Γ₂.refs, Δ₂⟩, ⟨rfl, h₁⟩, ⟨rfl, h₂⟩, ⟨hr.refs ▸ hadd.refs, h⟩⟩
 
-/-- Renaming along `Fin.succ` adds an absent variable `0`. -/
-lemma ren_succ (Γ : Ctx R k n) : Γ.ren Fin.succ = Γ.cons Option.none := by
-  ext1
-  · funext l
-    cases l using Fin.cases with
-    | zero => exact ren_vars_of_notMem Γ (fun j => Fin.succ_ne_zero j)
-    | succ l => exact ren_vars_apply (Fin.succ_injective _) Γ l
-  · rfl
+/-- Scaling can be transported along renamings. -/
+lemma scale (hr : RenCtx r Γ Γ') {q : R} {Γ₀ : TCtx R k n ρ} (hs : CtxScale q Γ₀ Γ) :
+    ∃ Γ₀', RenCtx r Γ₀ Γ₀' ∧ CtxScale q Γ₀' Γ' := by
+  classical
+  let f : Var m → Option (Assm R k) := fun j =>
+    if hj : ∃ i, r i = j then Γ₀.vars.get hj.choose else Γ'.vars.get j
+  have hf : ∀ i, f (r i) = Γ₀.vars.get i := fun i => by
+    have hex : ∃ i', r i' = r i := ⟨i, rfl⟩
+    simp only [f, dif_pos hex]; rw [hr.vars.inj hex.choose_spec]
+  have hf' : ∀ j, (∀ i, r i ≠ j) → f j = Γ'.vars.get j := fun j hj => by
+    simp only [f, dif_neg (show ¬ ∃ i, r i = j from fun ⟨i, e⟩ => hj i e)]
+  refine ⟨⟨Γ₀.refs, Ctx.ofFn f⟩, ⟨rfl, ⟨hr.vars.inj, fun i => by simp [hf], fun j hj => ?_⟩⟩,
+    ⟨by rw [hr.refs, hs.refs], Ctx.forall₂_iff.2 fun j => ?_⟩⟩
+  · rw [Ctx.get_ofFn, hf' j hj]; exact hr.vars.off j hj
+  · rw [Ctx.get_ofFn]
+    by_cases hj : ∃ i, r i = j
+    · obtain ⟨i, rfl⟩ := hj
+      rw [hf, hr.vars.map]; exact hs.vars.get i
+    · have hj' : ∀ i, r i ≠ j := fun i e => hj ⟨i, e⟩
+      rw [hf' j hj']; exact AssmScale.zero (hr.vars.off j hj') q
 
-end
+end RenCtx
 
-end Ctx
+/-- Renaming along `Var.succ`, adding a new variable with a zero assumption. -/
+lemma renCtx_succ (Γ : TCtx R k n ρ) {a : Option (Assm R k)} (ha : ZeroAssm a) :
+    RenCtx Var.succ Γ (Γ.cons a) := ⟨rfl, Ctx.Ren.succ Γ.vars ha⟩
 
-variable {k n m : ℕ}
-
-lemma CtxAdd.ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) {Γ₁ Γ₂ Γ : Ctx R k n}
-    (h : CtxAdd Γ₁ Γ₂ Γ) : CtxAdd (Γ₁.ren ρ) (Γ₂.ren ρ) (Γ.ren ρ) := by
-  refine ⟨fun l => ?_, h.refs⟩
-  rcases Ctx.ren_cases hρ (k := k) l with ⟨j, rfl, e⟩ | e
-  · rw [e, e, e]; exact h.vars j
-  · rw [e, e, e]; exact .noneLeft _
-
-lemma CtxScale.ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) {r : R} {Γ Γ' : Ctx R k n}
-    (h : CtxScale r Γ Γ') : CtxScale r (Γ.ren ρ) (Γ'.ren ρ) := by
-  refine ⟨fun l => ?_, h.refs⟩
-  rcases Ctx.ren_cases hρ (k := k) l with ⟨j, rfl, e⟩ | e
-  · rw [e, e]; exact h.vars j
-  · rw [e, e]; exact .none
-
-lemma Ctx.IsZero.ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) {Γ : Ctx R k n}
-    (h : Γ.IsZero) : (Γ.ren ρ).IsZero := by
-  intro l
-  rcases Ctx.ren_cases hρ (k := k) l with ⟨j, rfl, e⟩ | e
-  · rw [e]; exact h j
-  · rw [e]; trivial
-
-lemma zeroRest_ren {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) {Γ : Ctx R k n} {i : Fin n}
-    (h : ∀ j, j ≠ i → ZeroAssm (Γ.vars j)) :
-    ∀ l, l ≠ ρ i → ZeroAssm ((Γ.ren ρ).vars l) := by
-  intro l hl
-  rcases Ctx.ren_cases hρ (k := k) l with ⟨j, rfl, e⟩ | e
-  · rw [e]; exact h j (fun hj => hl (hj ▸ rfl))
-  · rw [e]; trivial
-
-omit [Grades.PreorderedSemiring R] in
-/-- Renaming does not change whether a term allocates resources. -/
-lemma Term.allocates_rename {n m : ℕ} {ρ : Fin n → Fin m} {t : Term R n} :
-    (t.rename ρ).Allocates ↔ t.Allocates := by
-  induction t generalizing m with
-  | var => simp [Term.rename, Term.Allocates]
-  | _ => simp_all [Term.rename, Term.Allocates]
+end TCtx
 
 /-! ## The renaming lemma -/
 
-theorem HasTypeD.rename {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (h : HasTypeD Γ t A) :
-    ∀ {m : ℕ} {ρ : Fin n → Fin m}, Function.Injective ρ →
-      HasTypeD (Γ.ren ρ) (t.rename ρ) A := by
+theorem HasTypeD.rename {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k}
+    (h : HasTypeD Γ t A) :
+    ∀ {m : ℕ} {r : Var n → Var m} {Γ' : TCtx R k m ρ}, Γ.RenCtx r Γ' →
+      HasTypeD Γ' (t.rename r) A := by
   induction h with
-  | var hi hz =>
-    intro m ρ hρ
-    exact .var (by rw [Ctx.ren_vars_apply hρ]; exact hi) (zeroRest_ren hρ hz)
-  | varG hi hz =>
-    intro m ρ hρ
-    exact .varG (by rw [Ctx.ren_vars_apply hρ]; exact hi) (zeroRest_ren hρ hz)
-  | abs _ ih =>
-    intro m ρ hρ
-    have := ih (Ren.up_injective hρ)
-    rw [Ctx.cons_ren_up hρ] at this
-    exact .abs this
-  | app hadd _ _ ih₁ ih₂ => intro m ρ hρ; exact .app (hadd.ren hρ) (ih₁ hρ) (ih₂ hρ)
-  | pr hs _ hna ih =>
-    intro m ρ hρ
-    refine .pr (hs.ren hρ) (ih hρ) ?_
-    intro h'; exact hna (Term.allocates_rename.mp h')
-  | elim hadd _ _ ih₁ ih₂ =>
-    intro m ρ hρ
-    have := ih₂ (Ren.up_injective hρ)
-    rw [Ctx.cons_ren_up hρ] at this
-    exact .elim (hadd.ren hρ) (ih₁ hρ) this
-  | approx hi hrs _ ih =>
-    intro m ρ hρ
-    have := HasTypeD.approx (by rw [Ctx.ren_vars_apply hρ]; exact hi) hrs (ih hρ)
-    rw [Ctx.update_ren hρ]
-    exact this
-  | tensorI hadd _ _ ih₁ ih₂ => intro m ρ hρ; exact .tensorI (hadd.ren hρ) (ih₁ hρ) (ih₂ hρ)
-  | tensorE hadd _ _ ih₁ ih₂ =>
-    intro m ρ hρ
-    have := ih₂ (Ren.up_injective (Ren.up_injective hρ))
-    rw [Ctx.cons_ren_up (Ren.up_injective hρ), Ctx.cons_ren_up hρ] at this
-    exact .tensorE (hadd.ren hρ) (ih₁ hρ) this
-  | unitI hz => intro m ρ hρ; exact .unitI (hz.ren hρ)
-  | unitE hadd _ _ ih₁ ih₂ => intro m ρ hρ; exact .unitE (hadd.ren hρ) (ih₁ hρ) (ih₂ hρ)
-  | pack ι _ ih => intro m ρ hρ; exact .pack ι (ih hρ)
-  | unpack hadd _ _ ih₁ ih₂ =>
-    intro m ρ hρ
-    have := ih₂ (Ren.up_injective hρ)
-    rw [Ctx.cons_ren_up hρ, ← Ctx.shiftNames_ren hρ] at this
-    exact .unpack (hadd.ren hρ) (ih₁ hρ) this
-  | share r _ ih => intro m ρ hρ; exact .share r (ih hρ)
-  | clone ι hadd _ hr hc hA _ ih₁ ih₂ =>
-    intro m ρ hρ
-    have := ih₂ (Ren.up_injective hρ)
-    rw [Ctx.cons_ren_up hρ] at this
-    exact .clone ι (hadd.ren hρ) (ih₁ hρ) hr hc hA this
+  | var hi => intro m r Γ' hr; exact .var (hr.vars.pick hi)
+  | varG hi => intro m r Γ' hr; exact .varG (hr.vars.pick hi)
+  | abs _ ih => intro m r Γ' hr; exact .abs (ih (hr.cons _))
+  | app hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .app hadd' (ih₁ h₁) (ih₂ h₂)
+  | tensorI hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .tensorI hadd' (ih₁ h₁) (ih₂ h₂)
+  | unitE hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .unitE hadd' (ih₁ h₁) (ih₂ h₂)
   | withBorrow hadd _ _ ih₁ ih₂ =>
-    intro m ρ hρ; exact .withBorrow (hadd.ren hρ) (ih₁ hρ) (ih₂ hρ)
-  | split _ ih => intro m ρ hρ; exact .split (ih hρ)
-  | join hfg hadd _ _ ih₁ ih₂ => intro m ρ hρ; exact .join hfg (hadd.ren hρ) (ih₁ hρ) (ih₂ hρ)
-  | push _ ih => intro m ρ hρ; exact .push (ih hρ)
-  | pull _ ih => intro m ρ hρ; exact .pull (ih hρ)
-  | nat x hz => intro m ρ hρ; exact .nat x (hz.ren hρ)
-  | float x hz => intro m ρ hρ; exact .float x (hz.ren hρ)
-  | prim hz hp => intro m ρ hρ; exact .prim (hz.ren hρ) hp
-  | nec p hz _ ih =>
-    intro m ρ hρ
-    have := ih hρ
-    rw [Ctx.refsOnly_ren hρ] at this
-    exact .nec p (hz.ren hρ) this
-  | unborrow _ ih => intro m ρ hρ; exact .unborrow (ih hρ)
-  | ref hz ha => intro m ρ hρ; exact .ref (hz.ren hρ) ha
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .withBorrow hadd' (ih₁ h₁) (ih₂ h₂)
+  | join hfg hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .join hfg hadd' (ih₁ h₁) (ih₂ h₂)
+  | elim hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .elim hadd' (ih₁ h₁) (ih₂ (h₂.cons _))
+  | tensorE hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .tensorE hadd' (ih₁ h₁) (ih₂ ((h₂.cons _).cons _))
+  | unpack hadd _ _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .unpack hadd' (ih₁ h₁) (ih₂ (h₂.shiftNames.cons _))
+  | clone ι hadd _ hq hc hA _ ih₁ ih₂ =>
+    intro m r Γ' hr
+    obtain ⟨Γ₁', Γ₂', h₁, h₂, hadd'⟩ := hr.split hadd
+    exact .clone ι hadd' (ih₁ h₁) hq hc hA (ih₂ (h₂.cons _))
+  | pr hs _ hna ih =>
+    intro m r Γ' hr
+    obtain ⟨Γ₀', h₀, hs'⟩ := hr.scale hs
+    exact .pr hs' (ih h₀) (by rwa [Term.allocates_ren])
+  | @approx k n ρ Γ t B i C q s hi hrs _ ih =>
+    intro m r Γ' hr
+    have h₀ := hr.setVar i (Γ.vars.get i)
+    rw [TCtx.setVar_setVar, TCtx.setVar_get] at h₀
+    have hq : (Γ'.setVar (r i) (Γ.vars.get i)).vars.Lookup (r i) (some (.grd C q)) :=
+      Ctx.Lookup.of_eq (by simp [hi.eq])
+    have := HasTypeD.approx hq hrs (ih h₀)
+    have hs : Γ'.vars.get (r i) = some (.grd C s) := by rw [hr.vars.map]; simp
+    rwa [TCtx.setVar_setVar, ← hs, TCtx.setVar_get] at this
+  | pack ι _ ih => intro m r Γ' hr; exact .pack ι (ih hr)
+  | share q _ ih => intro m r Γ' hr; exact .share q (ih hr)
+  | split _ ih => intro m r Γ' hr; exact .split (ih hr)
+  | push _ ih => intro m r Γ' hr; exact .push (ih hr)
+  | pull _ ih => intro m r Γ' hr; exact .pull (ih hr)
+  | unborrow _ ih => intro m r Γ' hr; exact .unborrow (ih hr)
+  | unitI hz => intro m r Γ' hr; exact .unitI (hr.isZero hz)
+  | nat x hz => intro m r Γ' hr; exact .nat x (hr.isZero hz)
+  | float x hz => intro m r Γ' hr; exact .float x (hr.isZero hz)
+  | prim hz hp => intro m r Γ' hr; exact .prim (hr.isZero hz) hp
+  | nec p hz _ ih => intro m r Γ' hr; exact .nec p (hr.isZero hz) (ih hr.refsOnly)
+  | ref hz ha => intro m r Γ' hr; exact .ref (hr.isZero hz) (hr.refs ▸ ha)
 
 /-- Moving a derivation under a binder: `Γ ⊢ t : A` implies `Γ, x : − ⊢ t↑ : A`. -/
-theorem HasTypeD.shift {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (h : HasTypeD Γ t A) :
-    HasTypeD (Γ.cons none) (t.rename Fin.succ) A := by
-  have := h.rename (Fin.succ_injective n)
-  rwa [Ctx.ren_succ] at this
+theorem HasTypeD.shift {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k}
+    (h : HasTypeD Γ t A) : HasTypeD (Γ.cons none) (t.rename Var.succ) A :=
+  h.rename (TCtx.renCtx_succ Γ .none)
 
 end FOFU

@@ -20,7 +20,7 @@ substitution:
 
 plus congruence rules reducing the eliminated term of every elimination form.
 
-We prove for terms without free variables (in particular for closed terms `Term 0`)
+We prove for terms without free variables (in particular for closed terms `Term 0 ρ`)
 in contexts whose runtime array references are non-linear:
 
 * **subject reduction** (`CbnStep.preserves`, `CbnSteps.preserves`);
@@ -43,130 +43,164 @@ open Term
 
 /-! ## Primitive-free terms -/
 
+/-- The operators that are array primitives. -/
+def Op.IsPrim {ρ : ℕ} (o : Op ρ) : Prop := ∃ p, o = Op.prim p
+
 /-- A term is primitive-free if it contains no array primitive `newArray`,
 `readArray`, `writeArray`, `deleteArray`. -/
-def Term.PrimFree : {n : ℕ} → Term n → Prop
-  | _, var _ => True
-  | _, lam t => t.PrimFree
-  | _, app t₁ t₂ => t₁.PrimFree ∧ t₂.PrimFree
-  | _, pair t₁ t₂ => t₁.PrimFree ∧ t₂.PrimFree
-  | _, letPair t₁ t₂ => t₁.PrimFree ∧ t₂.PrimFree
-  | _, unit => True
-  | _, letUnit t₁ t₂ => t₁.PrimFree ∧ t₂.PrimFree
-  | _, bang t => t.PrimFree
-  | _, letBang t₁ t₂ => t₁.PrimFree ∧ t₂.PrimFree
-  | _, borrow t => t.PrimFree
-  | _, copy t₁ t₂ => t₁.PrimFree ∧ t₂.PrimFree
-  | _, star t => t.PrimFree
-  | _, nat _ => True
-  | _, float _ => True
-  | _, prim _ => False
-  | _, ref _ => True
+def Term.PrimFree {n ρ : ℕ} (t : Term n ρ) : Prop := ¬ Binding.Tm.HasOp Op.IsPrim t
+
+section PrimFree
+
+variable {n ρ : ℕ}
+
+open Binding in
+/-- Unfolding `PrimFree` on an operator application. -/
+lemma Term.primFree_op {o : Op ρ} {as : Args (sig ρ) n (Op.arity o)} :
+    Term.PrimFree (Tm.op o as : Term n ρ) ↔ ¬ o.IsPrim ∧ ¬ Args.HasOp Op.IsPrim as := by
+  simp [Term.PrimFree, Tm.hasOp_op_iff]
+
+open Binding in
+lemma Term.primFree_args {k : ℕ} {ks : List ℕ} {t : Tm (sig ρ) (n + k)}
+    {as : Args (sig ρ) n ks} :
+    ¬ Args.HasOp Op.IsPrim (.cons t as) ↔ Term.PrimFree t ∧ ¬ Args.HasOp Op.IsPrim as := by
+  simp [Term.PrimFree, Args.hasOp_cons_iff]
+
+@[simp] lemma Term.primFree_var (i : Var n) : (var i : Term n ρ).PrimFree := nofun
+
+@[simp] lemma Term.primFree_lam (t : Term (n + 1) ρ) : (lam t).PrimFree ↔ t.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_app (t₁ t₂ : Term n ρ) :
+    (app t₁ t₂).PrimFree ↔ t₁.PrimFree ∧ t₂.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_pair (t₁ t₂ : Term n ρ) :
+    (pair t₁ t₂).PrimFree ↔ t₁.PrimFree ∧ t₂.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_letPair (t₁ : Term n ρ) (t₂ : Term (n + 2) ρ) :
+    (letPair t₁ t₂).PrimFree ↔ t₁.PrimFree ∧ t₂.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_unit : (unit : Term n ρ).PrimFree := by
+  simp [Term.primFree_op, Op.IsPrim]
+@[simp] lemma Term.primFree_letUnit (t₁ t₂ : Term n ρ) :
+    (letUnit t₁ t₂).PrimFree ↔ t₁.PrimFree ∧ t₂.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_bang (t : Term n ρ) : (bang t).PrimFree ↔ t.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_letBang (t₁ : Term n ρ) (t₂ : Term (n + 1) ρ) :
+    (letBang t₁ t₂).PrimFree ↔ t₁.PrimFree ∧ t₂.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_borrow (t : Term n ρ) : (borrow t).PrimFree ↔ t.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_copy (t₁ : Term n ρ) (t₂ : Term (n + 1) ρ) :
+    (copy t₁ t₂).PrimFree ↔ t₁.PrimFree ∧ t₂.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_star (t : Term n ρ) : (star t).PrimFree ↔ t.PrimFree := by
+  simp [Term.primFree_op, Term.primFree_args, Op.IsPrim]
+@[simp] lemma Term.primFree_nat (k : ℕ) : (nat k : Term n ρ).PrimFree := by
+  simp [Term.primFree_op, Op.IsPrim]
+@[simp] lemma Term.primFree_float (x : FloatLit) : (float x : Term n ρ).PrimFree := by
+  simp [Term.primFree_op, Op.IsPrim]
+@[simp] lemma Term.primFree_ref (a : Var ρ) : (ref a : Term n ρ).PrimFree := by
+  simp [Term.primFree_op, Op.IsPrim]
+@[simp] lemma Term.not_primFree_prim (p : Prim) : ¬ (prim p : Term n ρ).PrimFree := by
+  simp [Term.primFree_op, Op.IsPrim]
+
+end PrimFree
 
 /-- Renaming preserves being primitive-free. -/
-lemma Term.PrimFree.rename {n m : ℕ} {t : Term n} (ht : t.PrimFree) (ρ : Fin n → Fin m) :
-    (t.rename ρ).PrimFree := by
-  induction t generalizing m with
-  | prim => exact ht.elim
-  | lam _ ih | bang _ ih | borrow _ ih | star _ ih => exact ih ht _
-  | app _ _ ih₁ ih₂ | pair _ _ ih₁ ih₂ | letPair _ _ ih₁ ih₂ | letUnit _ _ ih₁ ih₂
-  | letBang _ _ ih₁ ih₂ | copy _ _ ih₁ ih₂ => exact ⟨ih₁ ht.1 _, ih₂ ht.2 _⟩
-  | _ => trivial
+lemma Term.PrimFree.rename {n m ρ : ℕ} {t : Term n ρ} (ht : t.PrimFree) (r : Var n → Var m) :
+    (t.rename r).PrimFree := fun h => ht (Binding.Tm.HasOp.of_ren h)
 
 /-- Substituting primitive-free terms preserves being primitive-free. -/
-lemma Term.PrimFree.subst {n m : ℕ} {t : Term n} (ht : t.PrimFree) {σ : Fin n → Term m}
-    (hσ : ∀ i, (σ i).PrimFree) : (t.subst σ).PrimFree := by
-  have hup : ∀ {n m : ℕ} {σ : Fin n → Term m}, (∀ i, (σ i).PrimFree) →
-      ∀ i, (Subst.up σ i).PrimFree := fun hσ i => Fin.cases trivial (fun i => (hσ i).rename _) i
-  induction t generalizing m with
-  | var i => exact hσ i
-  | prim => exact ht.elim
-  | lam t ih => exact ih ht (hup hσ)
-  | bang _ ih | borrow _ ih | star _ ih => exact ih ht hσ
-  | app _ _ ih₁ ih₂ | pair _ _ ih₁ ih₂ | letPair _ _ ih₁ ih₂ | letUnit _ _ ih₁ ih₂
-  | letBang _ _ ih₁ ih₂ | copy _ _ ih₁ ih₂ =>
-    exact ⟨ih₁ ht.1 hσ, ih₂ ht.2 (by first | exact hσ | exact hup hσ | exact hup (hup hσ))⟩
-  | _ => trivial
+lemma Term.PrimFree.subst {n m ρ : ℕ} {t : Term n ρ} (ht : t.PrimFree) {σ : Var n → Term m ρ}
+    (hσ : ∀ i, (σ i).PrimFree) : (t.subst σ).PrimFree := fun h =>
+  (Binding.Tm.HasOp.of_subst h).elim ht fun ⟨i, hi⟩ => hσ i hi
 
-lemma Term.PrimFree.subst1 {n : ℕ} {s : Term n} {t : Term (n + 1)} (hs : s.PrimFree)
-    (ht : t.PrimFree) : (Term.subst1 s t).PrimFree :=
-  ht.subst (Fin.cases hs fun _ => trivial)
+lemma Term.PrimFree.subst1 {n ρ : ℕ} {s : Term n ρ} {t : Term (n + 1) ρ} (ht : t.PrimFree)
+    (hs : s.PrimFree) : (t.subst1 s).PrimFree :=
+  ht.subst fun i => by cases i with | zero => exact hs | succ i => exact Term.primFree_var i
 
-lemma Term.PrimFree.subst2 {n : ℕ} {s₁ s₂ : Term n} {t : Term (n + 2)} (hs₁ : s₁.PrimFree)
-    (hs₂ : s₂.PrimFree) (ht : t.PrimFree) : (Term.subst2 s₁ s₂ t).PrimFree :=
-  ht.subst (Fin.cases hs₂ (Fin.cases hs₁ fun _ => trivial))
+lemma Term.PrimFree.subst2 {n ρ : ℕ} {s₁ s₂ : Term n ρ} {t : Term (n + 2) ρ} (ht : t.PrimFree)
+    (hs₁ : s₁.PrimFree) (hs₂ : s₂.PrimFree) : (t.subst2 s₁ s₂).PrimFree :=
+  ht.subst fun i => by
+    cases i with
+    | zero => exact hs₂
+    | succ i =>
+      cases i with
+      | zero => exact hs₁
+      | succ i => exact Term.primFree_var i
 
 /-! ## The reduction relation -/
 
 /-- Call-by-name single-step reduction `t ⟶ t'` (substitution-based). -/
-inductive CbnStep : {n : ℕ} → Term n → Term n → Prop where
-  | betaLolli {n : ℕ} (t : Term (n + 1)) (u : Term n) : CbnStep (app (lam t) u) (subst1 u t)
-  | betaTensor {n : ℕ} (t₁ t₂ : Term n) (t : Term (n + 2)) :
-      CbnStep (letPair (pair t₁ t₂) t) (subst2 t₁ t₂ t)
-  | betaUnit {n : ℕ} (t : Term n) : CbnStep (letUnit unit t) t
-  | betaBang {n : ℕ} (u : Term n) (t : Term (n + 1)) : CbnStep (letBang (bang u) t) (subst1 u t)
-  | betaBorrow {n : ℕ} (t : Term n) : CbnStep (borrow (star t)) (bang t)
-  | betaCopy {n : ℕ} (u : Term n) (t : Term (n + 1)) :
-      CbnStep (copy (bang u) t) (subst1 (star u) t)
-  | app {n : ℕ} {t t' : Term n} (u : Term n) : CbnStep t t' → CbnStep (app t u) (app t' u)
-  | letPair {n : ℕ} {t t' : Term n} (u : Term (n + 2)) :
+inductive CbnStep : {n ρ : ℕ} → Term n ρ → Term n ρ → Prop where
+  | betaLolli {n ρ : ℕ} (t : Term (n + 1) ρ) (u : Term n ρ) : CbnStep (app (lam t) u) (t.subst1 u)
+  | betaTensor {n ρ : ℕ} (t₁ t₂ : Term n ρ) (t : Term (n + 2) ρ) :
+      CbnStep (letPair (pair t₁ t₂) t) (t.subst2 t₁ t₂)
+  | betaUnit {n ρ : ℕ} (t : Term n ρ) : CbnStep (letUnit unit t) t
+  | betaBang {n ρ : ℕ} (u : Term n ρ) (t : Term (n + 1) ρ) :
+      CbnStep (letBang (bang u) t) (t.subst1 u)
+  | betaBorrow {n ρ : ℕ} (t : Term n ρ) : CbnStep (borrow (star t)) (bang t)
+  | betaCopy {n ρ : ℕ} (u : Term n ρ) (t : Term (n + 1) ρ) :
+      CbnStep (copy (bang u) t) (t.subst1 (star u))
+  | app {n ρ : ℕ} {t t' : Term n ρ} (u : Term n ρ) : CbnStep t t' → CbnStep (app t u) (app t' u)
+  | letPair {n ρ : ℕ} {t t' : Term n ρ} (u : Term (n + 2) ρ) :
       CbnStep t t' → CbnStep (letPair t u) (letPair t' u)
-  | letUnit {n : ℕ} {t t' : Term n} (u : Term n) :
+  | letUnit {n ρ : ℕ} {t t' : Term n ρ} (u : Term n ρ) :
       CbnStep t t' → CbnStep (letUnit t u) (letUnit t' u)
-  | letBang {n : ℕ} {t t' : Term n} (u : Term (n + 1)) :
+  | letBang {n ρ : ℕ} {t t' : Term n ρ} (u : Term (n + 1) ρ) :
       CbnStep t t' → CbnStep (letBang t u) (letBang t' u)
-  | borrow {n : ℕ} {t t' : Term n} : CbnStep t t' → CbnStep (borrow t) (borrow t')
-  | copy {n : ℕ} {t t' : Term n} (u : Term (n + 1)) :
+  | borrow {n ρ : ℕ} {t t' : Term n ρ} : CbnStep t t' → CbnStep (borrow t) (borrow t')
+  | copy {n ρ : ℕ} {t t' : Term n ρ} (u : Term (n + 1) ρ) :
       CbnStep t t' → CbnStep (copy t u) (copy t' u)
 
 /-- Multi-step reduction `t ⟶* t'`: the reflexive-transitive closure of `CbnStep`. -/
-def CbnSteps {n : ℕ} : Term n → Term n → Prop := Relation.ReflTransGen CbnStep
+def CbnSteps {n ρ : ℕ} : Term n ρ → Term n ρ → Prop := Relation.ReflTransGen CbnStep
 
 /-! ## Contexts without variables -/
 
 /-- The context has no assumptions for (de Bruijn) variables. -/
-def Ctx.NoVars {n : ℕ} (Γ : Ctx n) : Prop := ∀ i, Γ (.inl i) = none
+def TCtx.NoVars {n ρ : ℕ} (Γ : TCtx n ρ) : Prop := Γ.vars = .replicate n none
 
 /-- All runtime array references of the context are non-linear. -/
-def Ctx.RefsNonLin {n : ℕ} (Γ : Ctx n) : Prop := ∀ a, NonLin (Γ (.inr a))
+def TCtx.RefsNonLin {n ρ : ℕ} (Γ : TCtx n ρ) : Prop := Γ.refs.All NonLin
 
 /-- Every context for closed terms has no variables. -/
-lemma Ctx.noVars_zero (Γ : Ctx 0) : Γ.NoVars := fun i => i.elim0
+lemma TCtx.noVars_zero {ρ : ℕ} (Γ : TCtx 0 ρ) : Γ.NoVars := Ctx.eq_nil _
 
 /-- Both summands of a context without variables have no variables. -/
-lemma Ctx.NoVars.left {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.NoVars) :
-    Γ₁.NoVars := fun i => by
-  have := h (.inl i); rw [hΓ i] at this; exact this.eq_none.1
+lemma TCtx.NoVars.left {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.NoVars) :
+    Γ₁.NoVars := by
+  have := h.vars; rw [hΓ] at this
+  exact Ctx.ext fun i => by
+    have h' := this.get i
+    rw [Ctx.get_replicate] at h'
+    simpa using h'.eq_none.1
 
-lemma Ctx.NoVars.right {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.NoVars) :
-    Γ₂.NoVars := fun i => by
-  have := h (.inl i); rw [hΓ i] at this; exact this.eq_none.2
+lemma TCtx.NoVars.right {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.NoVars) :
+    Γ₂.NoVars := hΓ.left h.comm
 
-lemma Ctx.RefsNonLin.left {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.RefsNonLin) :
-    Γ₁.RefsNonLin := fun a => (h (.inr a)).nonLin_left (hΓ a)
+lemma TCtx.RefsNonLin.left {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} (h : Γ₁.Add Γ₂ Γ)
+    (hΓ : Γ.RefsNonLin) : Γ₁.RefsNonLin :=
+  Ctx.all_iff.2 fun a => (h.refs.get a).nonLin_left (hΓ.get a)
 
-lemma Ctx.NoVars.refsOnly_eq {n : ℕ} {Γ : Ctx n} (hΓ : Γ.NoVars) : Γ.refsOnly = Γ := by
-  funext x
-  rcases x with i | a
-  · rw [Ctx.refsOnly_inl, hΓ i]
-  · rfl
+lemma TCtx.NoVars.refsOnly_eq {n ρ : ℕ} {Γ : TCtx n ρ} (hΓ : Γ.NoVars) : Γ.refsOnly = Γ :=
+  TCtx.ext rfl hΓ.symm
 
 /-- A context without variables whose references are non-linear is non-linear. -/
-lemma Ctx.NoVars.allNonLin {n : ℕ} {Γ : Ctx n} (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) :
-    Γ.AllNonLin := by
-  rintro (i | a)
-  · rw [hΓ i]; trivial
-  · exact hr a
+lemma TCtx.NoVars.allNonLin {n ρ : ℕ} {Γ : TCtx n ρ} (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) :
+    Γ.AllNonLin :=
+  ⟨hr, by rw [show Γ.vars = _ from hΓ]; exact TCtx.allNonLin_replicate _⟩
 
 /-! ## Subject reduction -/
 
 /-- **Subject reduction.** Reduction preserves typing for terms in a context without
 variable assumptions whose array references are non-linear. -/
-theorem CbnStep.preserves {n : ℕ} {t t' : Term n} (hs : CbnStep t t') {Γ : Ctx n} {A : Ty}
-    (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) (ht : HasType Γ t A) : HasType Γ t' A := by
+theorem CbnStep.preserves {n ρ : ℕ} {t t' : Term n ρ} (hs : CbnStep t t') {Γ : TCtx n ρ}
+    {A : Ty} (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) (ht : HasType Γ t A) : HasType Γ t' A := by
   -- reducing the eliminated subterm `u` of an elimination form `Γ₁ + Γ₂ ⊢ E[u]`
-  have cong : ∀ {Γ Γ₁ Γ₂ : Ctx n} {u u' : Term n} {B : Ty}, Γ.NoVars → Γ.RefsNonLin →
-      (∀ {Γ : Ctx n} {A : Ty}, Γ.NoVars → Γ.RefsNonLin → HasType Γ u A → HasType Γ u' A) →
+  have cong : ∀ {Γ Γ₁ Γ₂ : TCtx n ρ} {u u' : Term n ρ} {B : Ty}, Γ.NoVars → Γ.RefsNonLin →
+      (∀ {Γ : TCtx n ρ} {A : Ty}, Γ.NoVars → Γ.RefsNonLin → HasType Γ u A → HasType Γ u' A) →
       HasTypeD Γ₁ u B → Γ₁.Add Γ₂ Γ → HasTypeD Γ₁ u' B := fun hΓ hr ih h hadd =>
     hasType_iff_hasTypeD.1 (ih (hΓ.left hadd) (hr.left hadd) (hasType_iff_hasTypeD.2 h))
   induction hs generalizing Γ A with
@@ -191,7 +225,7 @@ theorem CbnStep.preserves {n : ℕ} {t t' : Term n} (hs : CbnStep t t') {Γ : Ct
         have hΓ₁ := hΓ.left hadd
         have hstar : HasType _ (star u) _ :=
           hasType_iff_hasTypeD.2 (.nec (by rw [hΓ₁.refsOnly_eq]; exact hu)
-            (fun i => by rw [hΓ₁ i]; trivial))
+            (show Ctx.All _ _ by rw [show _ = _ from hΓ₁]; exact TCtx.allNonLin_replicate _))
         exact hstar.subst_lin (hasType_iff_hasTypeD.2 h₂) hadd
   | app _ _ ih =>
     rw [hasType_iff_hasTypeD] at ht ⊢
@@ -215,28 +249,34 @@ theorem CbnStep.preserves {n : ℕ} {t t' : Term n} (hs : CbnStep t t') {Γ : Ct
       exact .borrow (hasType_iff_hasTypeD.1 (ih hΓ hr (hasType_iff_hasTypeD.2 h)))
 
 /-- Reduction preserves primitive-freeness. -/
-theorem CbnStep.primFree {n : ℕ} {t t' : Term n} (hs : CbnStep t t') (ht : t.PrimFree) :
+theorem CbnStep.primFree {n ρ : ℕ} {t t' : Term n ρ} (hs : CbnStep t t') (ht : t.PrimFree) :
     t'.PrimFree := by
   induction hs with
-  | betaLolli t u => exact Term.PrimFree.subst1 (s := u) ht.2 ht.1
-  | betaTensor t₁ t₂ t => exact ht.1.1.subst2 ht.1.2 ht.2
-  | betaUnit t => exact ht.2
-  | betaBang u t => exact Term.PrimFree.subst1 (s := u) ht.1 ht.2
-  | betaBorrow t => exact ht
-  | betaCopy u t => exact Term.PrimFree.subst1 (s := star u) ht.1 ht.2
+  | betaLolli t u => simp only [Term.primFree_app, Term.primFree_lam] at ht; exact ht.1.subst1 ht.2
+  | betaTensor t₁ t₂ t =>
+    simp only [Term.primFree_letPair, Term.primFree_pair] at ht; exact ht.2.subst2 ht.1.1 ht.1.2
+  | betaUnit t => exact ((Term.primFree_letUnit _ _).1 ht).2
+  | betaBang u t =>
+    simp only [Term.primFree_letBang, Term.primFree_bang] at ht; exact ht.2.subst1 ht.1
+  | betaBorrow t => simpa using ht
+  | betaCopy u t =>
+    simp only [Term.primFree_copy, Term.primFree_bang] at ht
+    exact ht.2.subst1 ((Term.primFree_star _).2 ht.1)
   | app _ _ ih | letPair _ _ ih | letUnit _ _ ih | letBang _ _ ih | copy _ _ ih =>
+    simp only [Term.primFree_app, Term.primFree_letPair, Term.primFree_letUnit,
+      Term.primFree_letBang, Term.primFree_copy] at ht ⊢
     exact ⟨ih ht.1, ht.2⟩
-  | borrow _ ih => exact ih ht
+  | borrow _ ih => simp only [Term.primFree_borrow] at ht ⊢; exact ih ht
 
 /-- Subject reduction for many steps. -/
-theorem CbnSteps.preserves {n : ℕ} {t t' : Term n} (hs : CbnSteps t t') {Γ : Ctx n} {A : Ty}
-    (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) (ht : HasType Γ t A) : HasType Γ t' A := by
+theorem CbnSteps.preserves {n ρ : ℕ} {t t' : Term n ρ} (hs : CbnSteps t t') {Γ : TCtx n ρ}
+    {A : Ty} (hΓ : Γ.NoVars) (hr : Γ.RefsNonLin) (ht : HasType Γ t A) : HasType Γ t' A := by
   induction hs with
   | refl => exact ht
   | tail _ h ih => exact h.preserves hΓ hr ih
 
 /-- Many steps preserve being primitive-free. -/
-theorem CbnSteps.primFree {n : ℕ} {t t' : Term n} (hs : CbnSteps t t') (ht : t.PrimFree) :
+theorem CbnSteps.primFree {n ρ : ℕ} {t t' : Term n ρ} (hs : CbnSteps t t') (ht : t.PrimFree) :
     t'.PrimFree := by
   induction hs with
   | refl => exact ht
@@ -246,14 +286,15 @@ theorem CbnSteps.primFree {n : ℕ} {t t' : Term n} (hs : CbnSteps t t') (ht : t
 necessary: with `x : [1]`, the term `copy !x as y in &y : !1` reduces to `&(*x)`,
 which is not typable since `nec` forbids variable assumptions. -/
 theorem not_cbnStep_preserves_open :
-    ∃ (Γ : Ctx 1) (t t' : Term 1) (A : Ty),
+    ∃ (Γ : TCtx 1 0) (t t' : Term 1 0) (A : Ty),
       HasType Γ t A ∧ CbnStep t t' ∧ ¬ HasType Γ t' A := by
-  refine ⟨(Ctx.empty : Ctx 0).cons (some (.nonlin .unit)), copy (bang (var 0)) (borrow (var 0)),
-    borrow (star (var 0)), .bang .unit, ?_, .betaCopy _ _, ?_⟩
+  refine ⟨(TCtx.empty : TCtx 0 0).cons (some (.nonlin .unit)),
+    copy (bang (var 0)) (borrow (var 0)), borrow (star (var 0)), .bang .unit, ?_,
+    .betaCopy _ _, ?_⟩
   · rw [hasType_iff_hasTypeD]
-    exact .copy (.bangI (Ctx.AllNonLin.cons Ctx.AllNonLin.empty (nonLin_nonlin _))
+    exact .copy (.bangI (TCtx.AllNonLin.cons TCtx.AllNonLin.empty (nonLin_nonlin _))
       (HasTypeD.var_zero_single (.nonlin .unit)))
-      (.borrow (HasTypeD.var_zero_single (.lin (.star .unit)))) (Ctx.Add.empty_right _)
+      (.borrow (HasTypeD.var_zero_single (.lin (.star .unit)))) (TCtx.Add.empty_right _)
   · rw [hasType_iff_hasTypeD]
     intro h
     cases h with
@@ -264,17 +305,17 @@ theorem not_cbnStep_preserves_open :
         generalize Ty.unit = B
         intro h
         cases h with
-        | var hi _ => simp at hi
+        | var hi _ => cases hi.get
 
 /-! ## Progress -/
 
 /-- **Progress.** A well-typed primitive-free term without free variables is either a
 value or can take a reduction step. -/
-theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType Γ t A)
+theorem cbn_progress {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {A : Ty} (ht : HasType Γ t A)
     (hΓ : Γ.NoVars) (hp : t.PrimFree) : IsValue t ∨ ∃ t', CbnStep t t' := by
   rw [hasType_iff_hasTypeD] at ht
   induction ht with
-  | var hi _ => rw [hΓ] at hi; cases hi
+  | var hi _ => have := hi.get; rw [show _ = _ from hΓ, Ctx.get_replicate] at this; cases this
   | abs _ _ => exact .inl (.lam _)
   | tensorI _ _ _ _ _ => exact .inl (.pair _ _)
   | unitI _ => exact .inl .unit
@@ -283,42 +324,46 @@ theorem cbn_progress {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasType 
   | natI _ => exact .inl (.nat _)
   | floatI _ => exact .inl (.float _)
   | ref _ _ => exact .inl (.ref _)
-  | prim _ => exact hp.elim
+  | prim _ => exact (Term.not_primFree_prim _ hp).elim
   | app h₁ _ hadd ih₁ _ | tensorE h₁ _ hadd ih₁ _ | unitE h₁ _ hadd ih₁ _
   | bangE h₁ _ hadd ih₁ _ | copy h₁ _ hadd ih₁ _ =>
     right
+    simp only [Term.primFree_app, Term.primFree_letPair, Term.primFree_letUnit,
+      Term.primFree_letBang, Term.primFree_copy] at hp
     rcases ih₁ (hΓ.left hadd) hp.1 with hv | ⟨t', hs⟩
-    · induction hv using IsValue.induction with
-      | prim => exact hp.1.elim
-      | readArray₁ _ => exact hp.1.1.elim
-      | writeArray₁ _ => exact hp.1.1.elim
-      | writeArray₂ _ _ => exact hp.1.1.1.elim
+    · have hp1 := hp.1
+      induction hv using IsValue.induction with
+      | prim => simp at hp1
+      | readArray₁ _ => simp at hp1
+      | writeArray₁ _ => simp at hp1
+      | writeArray₂ _ _ => simp at hp1
       | _ => first | (cases h₁; done) | exact ⟨_, by constructor⟩
     · exact ⟨_, by constructor; exact hs⟩
   | borrow h₁ ih₁ =>
     right
+    rw [Term.primFree_borrow] at hp
     rcases ih₁ hΓ hp with hv | ⟨t', hs⟩
     · induction hv using IsValue.induction with
-      | prim => exact hp.elim
-      | readArray₁ _ => exact hp.1.elim
-      | writeArray₁ _ => exact hp.1.elim
-      | writeArray₂ _ _ => exact hp.1.1.elim
+      | prim => simp at hp
+      | readArray₁ _ => simp at hp
+      | writeArray₁ _ => simp at hp
+      | writeArray₂ _ _ => simp at hp
       | _ => first | (cases h₁; done) | exact ⟨_, by constructor⟩
     · exact ⟨_, .borrow hs⟩
 
 /-- **Syntactic type safety** for closed terms: a well-typed closed primitive-free term
 (in a context whose runtime array references are non-linear, e.g. the empty context)
 never reduces to a stuck term, and every reduct has the same type. -/
-theorem cbn_type_safety {Γ : Ctx 0} {t t' : Term 0} {A : Ty} (hr : Γ.RefsNonLin)
+theorem cbn_type_safety {ρ : ℕ} {Γ : TCtx 0 ρ} {t t' : Term 0 ρ} {A : Ty} (hr : Γ.RefsNonLin)
     (ht : HasType Γ t A) (hp : t.PrimFree) (hs : CbnSteps t t') :
     HasType Γ t' A ∧ (IsValue t' ∨ ∃ t'', CbnStep t' t'') := by
-  have ht' := hs.preserves (Ctx.noVars_zero Γ) hr ht
-  exact ⟨ht', cbn_progress ht' (Ctx.noVars_zero Γ) (hs.primFree hp)⟩
+  have ht' := hs.preserves (TCtx.noVars_zero Γ) hr ht
+  exact ⟨ht', cbn_progress ht' (TCtx.noVars_zero Γ) (hs.primFree hp)⟩
 
 /-! ## Determinism -/
 
 /-- Values are normal forms. -/
-theorem IsValue.not_cbnStep {n : ℕ} {v t : Term n} (hv : IsValue v) : ¬ CbnStep v t := by
+theorem IsValue.not_cbnStep {n ρ : ℕ} {v t : Term n ρ} (hv : IsValue v) : ¬ CbnStep v t := by
   intro hs
   induction hv using IsValue.induction generalizing t with
   | readArray₁ _ _ ih =>
@@ -335,7 +380,7 @@ theorem IsValue.not_cbnStep {n : ℕ} {v t : Term n} (hv : IsValue v) : ¬ CbnSt
   | _ => cases hs
 
 /-- The call-by-name reduction is deterministic. -/
-theorem CbnStep.deterministic {n : ℕ} {t t₁ t₂ : Term n} (h₁ : CbnStep t t₁)
+theorem CbnStep.deterministic {n ρ : ℕ} {t t₁ t₂ : Term n ρ} (h₁ : CbnStep t t₁)
     (h₂ : CbnStep t t₂) : t₁ = t₂ := by
   induction h₁ generalizing t₂ with
   | app _ h ih | letPair _ h ih | letUnit _ h ih | letBang _ h ih | borrow h ih | copy _ h ih =>

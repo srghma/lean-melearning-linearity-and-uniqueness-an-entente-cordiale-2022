@@ -1,33 +1,34 @@
 module
 public import RequestProject.LCU.Sec3_1_Calculus.RenameSubst
+public import RequestProject.Common.Ctx
 
 /-!
 # Typing contexts of the LCU calculus
 
-The paper's contexts are `Γ ::= ∅ | Γ, x : A | Γ, x : [A]`, i.e. each variable is
-either absent, a linear assumption `x : A`, or a non-linear assumption `x : [A]`.
-Since we use de Bruijn indices, a context for `Term n` assigns to each of the `n`
-variables an optional hypothesis (`none` meaning that the variable does not occur in
-the paper's context).  Runtime array references `a` (Section 3.4) form a separate
-syntactic category of names; we index them by natural numbers, so a context is a
-function `Fin n ⊕ ℕ → Option Hyp`.
+The paper's contexts are `Γ ::= ∅ | Γ, x : A | Γ, x : [A]`: each variable is absent, a
+linear assumption `x : A` or a non-linear assumption `x : [A]`.
+
+## Representation
+
+A typing context for `Term n ρ` is a pair of length-indexed lists (`Ctx` from
+`RequestProject/Common/Ctx.lean`):
+
+* `Γ.vars : Ctx (Option (Hyp Ty)) n`, an optional hypothesis for each of the `n`
+  variables (`none` means that the variable does not occur in the paper's context);
+* `Γ.refs : Ctx (Option (Hyp ArrTy)) ρ`, an optional hypothesis for each of the `ρ`
+  runtime array references.  A reference hypothesis is about an *array type*
+  `Array A` (`ArrTy.array A`), so that `a : Array A` is `Hyp.lin (.array A)`.
 
 ## Main definitions
 
-* `Hyp`: a hypothesis, linear `x : A` (`Hyp.lin A`) or non-linear `x : [A]`
+* `Hyp T`: a hypothesis, linear `x : A` (`Hyp.lin A`) or non-linear `x : [A]`
   (`Hyp.nonlin A`).
-* `Ctx n`: contexts for terms with `n` free variables.
-* `Ctx.Add Γ₁ Γ₂ Γ`: context addition `Γ₁ + Γ₂ = Γ` (Definition 2), as a relation since
-  it is partial; it is defined pointwise from `HypAdd`.
-* `Ctx.AllNonLin Γ`: `Γ` is of the form `[Γ]`, i.e. all assumptions are non-linear
-  (Definition 1).
-* `Ctx.cons Γ h`: extension with a new variable `0` (all other variables shift by one).
-
-## Implementation notes
-
-Because the paper's `[Γ]` is a *condition* on a context rather than an operation, we
-use the predicate `AllNonLin` and write `[Γ], x : A` as `Γ.cons (some (.lin A))` with
-`Γ.AllNonLin`.  The laws of context addition are in `CtxAlgebra.lean`.
+* `HypAdd a b c`: pointwise context addition (Definition 2).
+* `TCtx.Add Γ₁ Γ₂ Γ`: context addition `Γ₁ + Γ₂ = Γ`, the pointwise lifting of `HypAdd`
+  (`Ctx.Forall₃`) to both lists.
+* `TCtx.AllNonLin Γ`: `Γ` is of the form `[Γ]` (Definition 1).
+* `Γ.cons h`: extension with a new variable `Var.zero`.
+* `Γ.refsOnly`: `Γ` without its variable assumptions.
 -/
 
 @[expose] public section
@@ -36,85 +37,126 @@ namespace LCU
 
 /-! ## Hypotheses -/
 
-/-- A hypothesis: linear `x : A` or non-linear `x : [A]`.
-For an array reference `a`, the type stored is the element type, i.e.
-`a ↦ lin A` means `a : Array A`. -/
-inductive Hyp where
-  | lin : Ty → Hyp
-  | nonlin : Ty → Hyp
+/-- A hypothesis about a type `A : T`: linear `x : A` or non-linear `x : [A]`. -/
+inductive Hyp (T : Type) where
+  | lin : T → Hyp T
+  | nonlin : T → Hyp T
   deriving DecidableEq, Repr
 
 /-- The type of a hypothesis. -/
-def Hyp.ty : Hyp → Ty
+def Hyp.ty {T : Type} : Hyp T → T
   | .lin A => A
   | .nonlin A => A
 
+@[simp] lemma Hyp.ty_lin {T : Type} (A : T) : (Hyp.lin A).ty = A := rfl
+@[simp] lemma Hyp.ty_nonlin {T : Type} (A : T) : (Hyp.nonlin A).ty = A := rfl
+
+/-- The types of array references: `Array A`. -/
+inductive ArrTy where
+  | array : Ty → ArrTy
+  deriving DecidableEq, Repr
+
+/-- The array type as a type. -/
+def ArrTy.toTy : ArrTy → Ty
+  | .array A => .array A
+
+/-- The element type of an array type. -/
+def ArrTy.elem : ArrTy → Ty
+  | .array A => A
+
+@[simp] lemma ArrTy.toTy_array (A : Ty) : (ArrTy.array A).toTy = .array A := rfl
+@[simp] lemma ArrTy.elem_array (A : Ty) : (ArrTy.array A).elem = A := rfl
+
+section
+variable {T : Type}
+
 /-- An optional hypothesis is *non-linear* if it is absent or of the form `[A]`. -/
-def NonLin : Option Hyp → Prop
-  | some (.lin _) => False
-  | _ => True
+inductive NonLin : Option (Hyp T) → Prop where
+  /-- no assumption -/
+  | none : NonLin none
+  /-- a non-linear assumption `x : [A]` -/
+  | nonlin (A : T) : NonLin (some (.nonlin A))
 
-@[simp] lemma nonLin_none : NonLin none := trivial
-@[simp] lemma nonLin_nonlin (A : Ty) : NonLin (some (.nonlin A)) := trivial
-@[simp] lemma not_nonLin_lin (A : Ty) : ¬ NonLin (some (.lin A)) := id
+@[simp] lemma nonLin_none : NonLin (none : Option (Hyp T)) := .none
+@[simp] lemma nonLin_nonlin (A : T) : NonLin (some (Hyp.nonlin A)) := .nonlin A
+@[simp] lemma not_nonLin_lin (A : T) : ¬ NonLin (some (Hyp.lin A)) := nofun
+lemma NonLin.elim {A : T} {P : Prop} (h : NonLin (some (Hyp.lin A))) : P := nomatch h
 
-/-- Pointwise context addition (Definition 2): the union of two hypotheses is
-defined if one of them is absent, or if both are the same non-linear
-assumption `[A]`. -/
-inductive HypAdd : Option Hyp → Option Hyp → Option Hyp → Prop where
-  | noneLeft (h : Option Hyp) : HypAdd none h h
-  | noneRight (h : Hyp) : HypAdd (some h) none (some h)
-  | nonlin (A : Ty) : HypAdd (some (.nonlin A)) (some (.nonlin A)) (some (.nonlin A))
+/-- Pointwise context addition (Definition 2): the union of two hypotheses is defined if
+one of them is absent, or if both are the same non-linear assumption `[A]`. -/
+inductive HypAdd : Option (Hyp T) → Option (Hyp T) → Option (Hyp T) → Prop where
+  | noneLeft (h : Option (Hyp T)) : HypAdd none h h
+  | noneRight (h : Hyp T) : HypAdd (some h) none (some h)
+  | nonlin (A : T) : HypAdd (some (.nonlin A)) (some (.nonlin A)) (some (.nonlin A))
 
-/-! ## Contexts -/
+end
 
-/-- Typing contexts: an optional hypothesis for each de Bruijn variable `Sum.inl i`
-and for each array reference `Sum.inr a`. -/
-def Ctx (n : ℕ) : Type := Fin n ⊕ ℕ → Option Hyp
+/-! ## Typing contexts -/
 
-namespace Ctx
+/-- Typing contexts for terms with `n` variables and `ρ` array references. -/
+structure TCtx (n ρ : ℕ) where
+  /-- the hypotheses of the array references -/
+  refs : Ctx (Option (Hyp ArrTy)) ρ
+  /-- the hypotheses of the variables -/
+  vars : Ctx (Option (Hyp Ty)) n
+  deriving DecidableEq
 
-variable {n : ℕ}
+namespace TCtx
+
+variable {n ρ : ℕ}
 
 /-- The empty context `∅`. -/
-def empty : Ctx n := fun _ => none
+def empty : TCtx n ρ := ⟨.replicate ρ none, .replicate n none⟩
 
 /-- The context `Γ` with no variable assumptions, keeping its array references. -/
-def refsOnly (Γ : Ctx n) : Ctx n := Sum.elim (fun _ => none) (fun a => Γ (.inr a))
+def refsOnly (Γ : TCtx n ρ) : TCtx n ρ := ⟨Γ.refs, .replicate n none⟩
 
-/-- Context extension `Γ, x : h` with a new variable `x` (de Bruijn index `0`). -/
-def cons (Γ : Ctx n) (h : Option Hyp) : Ctx (n + 1) :=
-  Sum.elim (Fin.cons h (fun i => Γ (.inl i))) (fun a => Γ (.inr a))
+/-- Context extension `Γ, x : h` with a new variable `x` (`Var.zero`). -/
+def cons (Γ : TCtx n ρ) (h : Option (Hyp Ty)) : TCtx (n + 1) ρ := ⟨Γ.refs, Γ.vars ,, h⟩
 
-/-- Update the hypothesis of a single name. -/
-def set (Γ : Ctx n) (x : Fin n ⊕ ℕ) (h : Option Hyp) : Ctx n := Function.update Γ x h
+/-- Update the hypothesis of a variable. -/
+def setVar (Γ : TCtx n ρ) (i : Var n) (h : Option (Hyp Ty)) : TCtx n ρ :=
+  ⟨Γ.refs, Γ.vars.set i h⟩
+
+/-- Update the hypothesis of an array reference. -/
+def setRef (Γ : TCtx n ρ) (a : Var ρ) (h : Option (Hyp ArrTy)) : TCtx n ρ :=
+  ⟨Γ.refs.set a h, Γ.vars⟩
 
 /-- Context addition `Γ₁ + Γ₂ = Γ` (Definition 2), as a relation (the operation is
-partial). -/
-def Add (Γ₁ Γ₂ Γ : Ctx n) : Prop := ∀ x, HypAdd (Γ₁ x) (Γ₂ x) (Γ x)
+partial): `HypAdd` at every variable and every array reference. -/
+structure Add (Γ₁ Γ₂ Γ : TCtx n ρ) : Prop where
+  refs : Ctx.Forall₃ HypAdd Γ₁.refs Γ₂.refs Γ.refs
+  vars : Ctx.Forall₃ HypAdd Γ₁.vars Γ₂.vars Γ.vars
 
 /-- `[Γ]`: all assumptions in `Γ` are non-linear (Definition 1). -/
-def AllNonLin (Γ : Ctx n) : Prop := ∀ x, NonLin (Γ x)
+structure AllNonLin (Γ : TCtx n ρ) : Prop where
+  refs : Γ.refs.All NonLin
+  vars : Γ.vars.All NonLin
 
 /-- All *variable* assumptions in `Γ` are non-linear. -/
-def VarsNonLin (Γ : Ctx n) : Prop := ∀ i, NonLin (Γ (.inl i))
+def VarsNonLin (Γ : TCtx n ρ) : Prop := Γ.vars.All NonLin
 
-/-! ## Simplification lemmas -/
+@[simp] lemma cons_refs (Γ : TCtx n ρ) (h : Option (Hyp Ty)) : (Γ.cons h).refs = Γ.refs := rfl
+@[simp] lemma cons_vars (Γ : TCtx n ρ) (h : Option (Hyp Ty)) : (Γ.cons h).vars = Γ.vars ,, h := rfl
+@[simp] lemma refsOnly_refs (Γ : TCtx n ρ) : Γ.refsOnly.refs = Γ.refs := rfl
+@[simp] lemma refsOnly_vars (Γ : TCtx n ρ) : Γ.refsOnly.vars = .replicate n none := rfl
+@[simp] lemma empty_refs : (empty : TCtx n ρ).refs = .replicate ρ none := rfl
+@[simp] lemma empty_vars : (empty : TCtx n ρ).vars = .replicate n none := rfl
+@[simp] lemma setVar_refs (Γ : TCtx n ρ) (i : Var n) (h : Option (Hyp Ty)) :
+    (Γ.setVar i h).refs = Γ.refs := rfl
+@[simp] lemma setVar_vars (Γ : TCtx n ρ) (i : Var n) (h : Option (Hyp Ty)) :
+    (Γ.setVar i h).vars = Γ.vars.set i h := rfl
+@[simp] lemma setRef_refs (Γ : TCtx n ρ) (a : Var ρ) (h : Option (Hyp ArrTy)) :
+    (Γ.setRef a h).refs = Γ.refs.set a h := rfl
+@[simp] lemma setRef_vars (Γ : TCtx n ρ) (a : Var ρ) (h : Option (Hyp ArrTy)) :
+    (Γ.setRef a h).vars = Γ.vars := rfl
 
-@[simp] lemma empty_apply (x : Fin n ⊕ ℕ) : (empty : Ctx n) x = none := rfl
-@[simp] lemma refsOnly_inl (Γ : Ctx n) (i : Fin n) : Γ.refsOnly (.inl i) = none := rfl
-@[simp] lemma refsOnly_inr (Γ : Ctx n) (a : ℕ) : Γ.refsOnly (.inr a) = Γ (.inr a) := rfl
-@[simp] lemma cons_inl_zero (Γ : Ctx n) (h : Option Hyp) : Γ.cons h (.inl 0) = h := rfl
-@[simp] lemma cons_inl_succ (Γ : Ctx n) (h : Option Hyp) (i : Fin n) :
-    Γ.cons h (.inl i.succ) = Γ (.inl i) := rfl
-@[simp] lemma cons_inr (Γ : Ctx n) (h : Option Hyp) (a : ℕ) :
-    Γ.cons h (.inr a) = Γ (.inr a) := rfl
-@[simp] lemma set_same (Γ : Ctx n) (x : Fin n ⊕ ℕ) (h : Option Hyp) : Γ.set x h x = h := by
-  simp [set]
-lemma set_ne (Γ : Ctx n) {x y : Fin n ⊕ ℕ} (h : Option Hyp) (hxy : y ≠ x) :
-    Γ.set x h y = Γ y := by
-  simp [set, hxy]
+lemma ext {Γ Δ : TCtx n ρ} (hr : Γ.refs = Δ.refs) (hv : Γ.vars = Δ.vars) : Γ = Δ := by
+  cases Γ; cases Δ; cases hr; cases hv; rfl
 
-end Ctx
+lemma ext_iff' {Γ Δ : TCtx n ρ} : Γ = Δ ↔ Γ.refs = Δ.refs ∧ Γ.vars = Δ.vars :=
+  ⟨fun h => h ▸ ⟨rfl, rfl⟩, fun ⟨h₁, h₂⟩ => ext h₁ h₂⟩
+
+end TCtx
 
 end LCU

@@ -6,25 +6,25 @@ public import RequestProject.LCU.Sec3_1_Calculus.Typing
 
 Context addition is a partial commutative monoid: `none` is the unit, `[A]` is
 idempotent and linear assumptions cannot be combined with anything but `none`.
+
+The laws are proved once for `HypAdd` on single (optional) hypotheses, and lifted to
+contexts by the generic lemmas about pointwise relations of
+`RequestProject/Common/Ctx.lean` (`Ctx.Forall₃.func`, `Ctx.Forall₃.assoc`, …): contexts
+are lists, so every lifted law is a structural induction on the lists.
 -/
 
 @[expose] public section
 
 namespace LCU
 
-/-! ## Pointwise addition of hypotheses
-
-`HypAdd a b c` is the relation `a + b = c` on optional hypotheses. It is functional
-(`func`), commutative (`comm`), associative (`assoc`, `assoc'`) and has unit `none`.
-Non-linear hypotheses are idempotent (`idem`); a linear hypothesis can only be added
-to `none` (`eq_lin`). -/
+/-! ## Pointwise addition of hypotheses -/
 
 namespace HypAdd
 
-variable {a b c d ab bc abc a₁ a₂ b₁ b₂ : Option Hyp}
+variable {T : Type} {a b c d ab bc abc a₁ a₂ b₁ b₂ : Option (Hyp T)}
 
 /-- `none` is also a right unit. -/
-lemma none_right (h : Option Hyp) : HypAdd h none h := by
+lemma none_right (h : Option (Hyp T)) : HypAdd h none h := by
   cases h
   · exact .noneLeft none
   · exact .noneRight _
@@ -43,10 +43,9 @@ lemma func (h : HypAdd a b c) (h' : HypAdd a b d) : c = d := by
 
 /-- Non-linear (or absent) hypotheses can be duplicated: `[A] + [A] = [A]`. -/
 lemma idem (h : NonLin a) : HypAdd a a a := by
-  rcases a with _ | ⟨A | A⟩
+  cases h
   · exact .noneLeft none
-  · exact absurd h (not_nonLin_lin A)
-  · exact .nonlin A
+  · exact .nonlin _
 
 /-- Internal tactic: close a goal `∃ x, HypAdd _ _ x ∧ ...` built from `HypAdd`
 facts by greedily introducing witnesses and applying the constructors. -/
@@ -72,7 +71,10 @@ lemma interchange (h₁ : HypAdd a₁ a₂ a) (h₂ : HypAdd b₁ b₂ b) (h : H
 
 /-- A sum is non-linear iff both summands are. -/
 lemma nonLin_iff (h : HypAdd a b c) : NonLin c ↔ NonLin a ∧ NonLin b := by
-  cases h <;> simp
+  cases h with
+  | noneLeft => simp
+  | noneRight h => cases h <;> simp
+  | nonlin => simp
 
 lemma nonLin_left (h : HypAdd a b c) (hc : NonLin c) : NonLin a := (h.nonLin_iff.1 hc).1
 lemma nonLin_right (h : HypAdd a b c) (hc : NonLin c) : NonLin b := (h.nonLin_iff.1 hc).2
@@ -84,17 +86,17 @@ lemma eq_none (h : HypAdd a b none) : a = none ∧ b = none := by
   cases h; simp only [and_self]
 
 /-- A linear hypothesis `x : A` comes from exactly one summand. -/
-lemma eq_lin {A : Ty} (h : HypAdd a b (some (.lin A))) :
+lemma eq_lin {A : T} (h : HypAdd a b (some (.lin A))) :
     (a = some (.lin A) ∧ b = none) ∨ (a = none ∧ b = some (.lin A)) := by
   cases h <;> simp
 
 /-- Adding a non-linear (or absent) hypothesis to `some h` gives back `some h`. -/
-lemma some_of_nonLin {h : Hyp} (hx : HypAdd (some h) b c) (hb : NonLin b) : c = some h := by
+lemma some_of_nonLin {h : Hyp T} (hx : HypAdd (some h) b c) (hb : NonLin b) : c = some h := by
   cases hx with
   | noneRight => rfl
   | nonlin => rfl
 
-lemma some_of_nonLin' {h : Hyp} (hx : HypAdd a (some h) c) (ha : NonLin a) : c = some h :=
+lemma some_of_nonLin' {h : Hyp T} (hx : HypAdd a (some h) c) (ha : NonLin a) : c = some h :=
   hx.comm.some_of_nonLin ha
 
 /-- Sums with `none` on one side. -/
@@ -102,12 +104,12 @@ lemma left_none (h : HypAdd none b c) : b = c := by cases h; rfl
 lemma right_none (h : HypAdd a none c) : a = c := by cases h; all_goals rfl
 
 /-- Sums with a non-linear hypothesis `[A]` on the left. -/
-lemma nonlin_left {A : Ty} (h : HypAdd (some (.nonlin A)) b c) :
+lemma nonlin_left {A : T} (h : HypAdd (some (.nonlin A)) b c) :
     c = some (.nonlin A) ∧ (b = none ∨ b = some (.nonlin A)) := by
   cases h <;> simp
 
 /-- Turning a linear assumption into a non-linear one in a sum. -/
-lemma der {A : Ty} (h : HypAdd a b (some (.lin A))) :
+lemma der {A : T} (h : HypAdd a b (some (.lin A))) :
     (HypAdd (some (.nonlin A)) b (some (.nonlin A)) ∧ a = some (.lin A)) ∨
     (HypAdd a (some (.nonlin A)) (some (.nonlin A)) ∧ b = some (.lin A)) := by
   cases h
@@ -116,217 +118,180 @@ lemma der {A : Ty} (h : HypAdd a b (some (.lin A))) :
 
 end HypAdd
 
-/-! ## Context addition
+/-! ## Context addition -/
 
-Context addition `Γ₁ + Γ₂ = Γ` (`Ctx.Add`) is `HypAdd` at every name, so all the
-laws of the previous section lift pointwise. -/
+namespace TCtx
 
-namespace Ctx
-
-variable {n : ℕ} {Γ Γ₁ Γ₂ Γ₃ Γ₁₂ Γ₂₃ Γ' Δ Δ₁ Δ₂ : Ctx n}
+variable {n ρ : ℕ} {Γ Γ₁ Γ₂ Γ₃ Γ₁₂ Γ₂₃ Γ' Δ Δ₁ Δ₂ : TCtx n ρ}
 
 /-- Context addition is commutative. -/
-lemma Add.comm (h : Γ₁.Add Γ₂ Γ) : Γ₂.Add Γ₁ Γ := fun x => (h x).comm
+lemma Add.comm (h : Γ₁.Add Γ₂ Γ) : Γ₂.Add Γ₁ Γ :=
+  ⟨h.refs.swap HypAdd.comm, h.vars.swap HypAdd.comm⟩
 
 /-- Context addition is functional. -/
 lemma Add.func (h : Γ₁.Add Γ₂ Γ) (h' : Γ₁.Add Γ₂ Γ') : Γ = Γ' :=
-  funext fun x => (h x).func (h' x)
+  ext (h.refs.func h'.refs HypAdd.func) (h.vars.func h'.vars HypAdd.func)
 
 /-- The empty context is a unit for context addition. -/
-lemma Add.empty_left (Γ : Ctx n) : (empty : Ctx n).Add Γ Γ := fun _ => .noneLeft _
-lemma Add.empty_right (Γ : Ctx n) : Γ.Add empty Γ := fun _ => HypAdd.none_right _
+lemma Add.empty_left (Γ : TCtx n ρ) : (empty : TCtx n ρ).Add Γ Γ :=
+  ⟨Ctx.Forall₃.replicate_left HypAdd.noneLeft _, Ctx.Forall₃.replicate_left HypAdd.noneLeft _⟩
+lemma Add.empty_right (Γ : TCtx n ρ) : Γ.Add empty Γ :=
+  ⟨Ctx.Forall₃.replicate_right HypAdd.none_right _,
+    Ctx.Forall₃.replicate_right HypAdd.none_right _⟩
 
-lemma Add.empty_left_iff : (empty : Ctx n).Add Γ Γ' ↔ Γ = Γ' :=
-  ⟨fun h => funext fun x => (h x).left_none, fun h => h ▸ Add.empty_left Γ⟩
+lemma Add.empty_left_iff : (empty : TCtx n ρ).Add Γ Γ' ↔ Γ = Γ' :=
+  ⟨fun h => ext (h.refs.eq_of_replicate_left HypAdd.left_none)
+    (h.vars.eq_of_replicate_left HypAdd.left_none), fun h => h ▸ Add.empty_left Γ⟩
 
 lemma Add.empty_right_iff : Γ.Add empty Γ' ↔ Γ = Γ' :=
-  ⟨fun h => funext fun x => (h x).right_none, fun h => h ▸ Add.empty_right Γ⟩
+  ⟨fun h => ext (h.refs.eq_of_replicate_right HypAdd.right_none)
+    (h.vars.eq_of_replicate_right HypAdd.right_none), fun h => h ▸ Add.empty_right Γ⟩
 
 /-- `[Γ] + [Γ] = [Γ]`: non-linear contexts can be contracted. -/
-lemma Add.idem (h : Γ.AllNonLin) : Γ.Add Γ Γ := fun x => HypAdd.idem (h x)
+lemma Add.idem (h : Γ.AllNonLin) : Γ.Add Γ Γ :=
+  ⟨Ctx.Forall₃.of_all HypAdd.idem h.refs, Ctx.Forall₃.of_all HypAdd.idem h.vars⟩
 
 /-- Associativity of context addition. -/
 lemma Add.assoc (h₁ : Γ₁.Add Γ₂ Γ₁₂) (h₂ : Γ₁₂.Add Γ₃ Γ) :
     ∃ Γ₂₃, Γ₂.Add Γ₃ Γ₂₃ ∧ Γ₁.Add Γ₂₃ Γ := by
-  have := fun x => HypAdd.assoc (h₁ x) (h₂ x)
-  choose f hf1 hf2 using this
-  exact ⟨f, hf1, hf2⟩
+  obtain ⟨r, hr₁, hr₂⟩ := h₁.refs.assoc h₂.refs HypAdd.assoc
+  obtain ⟨v, hv₁, hv₂⟩ := h₁.vars.assoc h₂.vars HypAdd.assoc
+  exact ⟨⟨r, v⟩, ⟨hr₁, hv₁⟩, ⟨hr₂, hv₂⟩⟩
 
 lemma Add.assoc' (h₁ : Γ₂.Add Γ₃ Γ₂₃) (h₂ : Γ₁.Add Γ₂₃ Γ) :
     ∃ Γ₁₂, Γ₁.Add Γ₂ Γ₁₂ ∧ Γ₁₂.Add Γ₃ Γ := by
-  have := fun x => HypAdd.assoc' (h₁ x) (h₂ x)
-  choose f hf1 hf2 using this
-  exact ⟨f, hf1, hf2⟩
+  obtain ⟨x, hx1, hx2⟩ := Add.assoc h₁.comm h₂.comm
+  exact ⟨x, hx1.comm, hx2.comm⟩
 
 /-- Interchange law for context addition, used e.g. when splitting a context
 between the two premises of a rule and a substituted term. -/
-lemma Add.interchange {A₁ A₂ A B₁ B₂ B C : Ctx n}
+lemma Add.interchange {A₁ A₂ A B₁ B₂ B C : TCtx n ρ}
     (h₁ : A₁.Add A₂ A) (h₂ : B₁.Add B₂ B) (h : A.Add B C) :
     ∃ C₁ C₂, A₁.Add B₁ C₁ ∧ A₂.Add B₂ C₂ ∧ C₁.Add C₂ C := by
-  have := fun x => HypAdd.interchange (h₁ x) (h₂ x) (h x)
-  choose f g hf hg hfg using this
-  exact ⟨f, g, hf, hg, hfg⟩
+  obtain ⟨r₁, r₂, hr₁, hr₂, hr⟩ := h₁.refs.interchange h₂.refs h.refs HypAdd.interchange
+  obtain ⟨v₁, v₂, hv₁, hv₂, hv⟩ := h₁.vars.interchange h₂.vars h.vars HypAdd.interchange
+  exact ⟨⟨r₁, v₁⟩, ⟨r₂, v₂⟩, ⟨hr₁, hv₁⟩, ⟨hr₂, hv₂⟩, ⟨hr, hv⟩⟩
 
-/-! ## Non-linear contexts `[Γ]` and sums
-
-A sum is non-linear iff both summands are (`AllNonLin.of_add`, `AllNonLin.left`,
-`AllNonLin.right`); likewise for contexts whose variable assumptions are non-linear
-(`VarsNonLin`). -/
+/-! ## Non-linear contexts `[Γ]` and sums -/
 
 lemma AllNonLin.of_add (h : Γ₁.Add Γ₂ Γ) (h₁ : Γ₁.AllNonLin) (h₂ : Γ₂.AllNonLin) :
-    Γ.AllNonLin := fun x => (h x).nonLin_of (h₁ x) (h₂ x)
+    Γ.AllNonLin :=
+  ⟨h.refs.all HypAdd.nonLin_of h₁.refs h₂.refs, h.vars.all HypAdd.nonLin_of h₁.vars h₂.vars⟩
 
 lemma AllNonLin.left (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.AllNonLin) : Γ₁.AllNonLin :=
-  fun x => (h x).nonLin_left (hΓ x)
+  ⟨h.refs.all_left HypAdd.nonLin_left hΓ.refs, h.vars.all_left HypAdd.nonLin_left hΓ.vars⟩
 
 lemma AllNonLin.right (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.AllNonLin) : Γ₂.AllNonLin :=
-  fun x => (h x).nonLin_right (hΓ x)
+  ⟨h.refs.all_right HypAdd.nonLin_right hΓ.refs, h.vars.all_right HypAdd.nonLin_right hΓ.vars⟩
 
 lemma VarsNonLin.of_add (h : Γ₁.Add Γ₂ Γ) (h₁ : Γ₁.VarsNonLin) (h₂ : Γ₂.VarsNonLin) :
-    Γ.VarsNonLin := fun i => (h (.inl i)).nonLin_of (h₁ i) (h₂ i)
+    Γ.VarsNonLin := h.vars.all HypAdd.nonLin_of h₁ h₂
 
 lemma VarsNonLin.left (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.VarsNonLin) : Γ₁.VarsNonLin :=
-  fun i => (h (.inl i)).nonLin_left (hΓ i)
+  h.vars.all_left HypAdd.nonLin_left hΓ
 
 lemma VarsNonLin.right (h : Γ₁.Add Γ₂ Γ) (hΓ : Γ.VarsNonLin) : Γ₂.VarsNonLin :=
-  fun i => (h (.inl i)).nonLin_right (hΓ i)
+  h.vars.all_right HypAdd.nonLin_right hΓ
 
-lemma AllNonLin.varsNonLin (h : Γ.AllNonLin) : Γ.VarsNonLin := fun i => h (.inl i)
+lemma AllNonLin.varsNonLin (h : Γ.AllNonLin) : Γ.VarsNonLin := h.vars
 
-lemma AllNonLin.empty : (empty : Ctx n).AllNonLin := fun _ => trivial
+lemma allNonLin_replicate {T : Type} (m : ℕ) : (Ctx.replicate m (none : Option (Hyp T))).All NonLin :=
+  Ctx.all_replicate .none m
 
-lemma AllNonLin.refsOnly (h : Γ.AllNonLin) : Γ.refsOnly.AllNonLin := by
-  rintro (i | a)
-  · trivial
-  · exact h (.inr a)
+lemma AllNonLin.empty : (empty : TCtx n ρ).AllNonLin :=
+  ⟨allNonLin_replicate _, allNonLin_replicate _⟩
+
+lemma VarsNonLin.refsOnly (Γ : TCtx n ρ) : Γ.refsOnly.VarsNonLin := allNonLin_replicate _
+
+lemma AllNonLin.refsOnly (h : Γ.AllNonLin) : Γ.refsOnly.AllNonLin :=
+  ⟨h.refs, allNonLin_replicate _⟩
 
 /-- Dropping all variable assumptions commutes with addition. -/
-lemma Add.refsOnly (h : Γ₁.Add Γ₂ Γ) : Γ₁.refsOnly.Add Γ₂.refsOnly Γ.refsOnly := by
-  rintro (i | a)
-  · exact .noneLeft _
-  · exact h (.inr a)
+lemma Add.refsOnly (h : Γ₁.Add Γ₂ Γ) : Γ₁.refsOnly.Add Γ₂.refsOnly Γ.refsOnly :=
+  ⟨h.refs, Ctx.Forall₃.replicate_left HypAdd.noneLeft _⟩
 
-/-! ## Extending contexts
+/-! ## Extending contexts -/
 
-Context extension `Γ, x : h` (`Ctx.cons`) and pointwise update (`Ctx.set`) are
-compatible with addition and with being non-linear. -/
+lemma Add.cons {h₁ h₂ h : Option (Hyp Ty)} (hΓ : Γ₁.Add Γ₂ Γ) (hh : HypAdd h₁ h₂ h) :
+    (Γ₁.cons h₁).Add (Γ₂.cons h₂) (Γ.cons h) :=
+  ⟨hΓ.refs, .snoc hΓ.vars hh⟩
 
-lemma Add.cons {h₁ h₂ h : Option Hyp} (hΓ : Γ₁.Add Γ₂ Γ) (hh : HypAdd h₁ h₂ h) :
-    (Γ₁.cons h₁).Add (Γ₂.cons h₂) (Γ.cons h) := by
-  rintro (i | a)
-  · cases i using Fin.cases
-    · exact hh
-    · exact hΓ _
-  · exact hΓ _
-
-lemma Add.cons_none (hΓ : Γ₁.Add Γ₂ Γ) (h₀ : Option Hyp) :
+lemma Add.cons_none (hΓ : Γ₁.Add Γ₂ Γ) (h₀ : Option (Hyp Ty)) :
     (Γ₁.cons h₀).Add (Γ₂.cons none) (Γ.cons h₀) :=
   hΓ.cons (HypAdd.none_right _)
 
-lemma Add.of_cons {h₁ h₂ h : Option Hyp} (hΓ : (Γ₁.cons h₁).Add (Γ₂.cons h₂) (Γ.cons h)) :
-    Γ₁.Add Γ₂ Γ ∧ HypAdd h₁ h₂ h := by
-  refine ⟨?_, hΓ (.inl 0)⟩
-  rintro (i | a)
-  · exact hΓ (.inl i.succ)
-  · exact hΓ (.inr a)
+lemma Add.of_cons {h₁ h₂ h : Option (Hyp Ty)}
+    (hΓ : (Γ₁.cons h₁).Add (Γ₂.cons h₂) (Γ.cons h)) : Γ₁.Add Γ₂ Γ ∧ HypAdd h₁ h₂ h := by
+  have := hΓ.vars; simp only [cons_vars, Ctx.forall₃_snoc] at this
+  exact ⟨⟨hΓ.refs, this.1⟩, this.2⟩
 
-lemma Add.set {x : Fin n ⊕ ℕ} {h₁ h₂ h : Option Hyp} (hΓ : Γ₁.Add Γ₂ Γ)
-    (hh : HypAdd h₁ h₂ h) : (Γ₁.set x h₁).Add (Γ₂.set x h₂) (Γ.set x h) := by
-  intro y
-  by_cases hy : y = x
-  · subst hy; simpa using hh
-  · simp only [Ctx.set, Function.update_of_ne hy]; exact hΓ y
+lemma Add.setVar {i : Var n} {h₁ h₂ h : Option (Hyp Ty)} (hΓ : Γ₁.Add Γ₂ Γ)
+    (hh : HypAdd h₁ h₂ h) : (Γ₁.setVar i h₁).Add (Γ₂.setVar i h₂) (Γ.setVar i h) :=
+  ⟨hΓ.refs, hΓ.vars.set i hh⟩
 
-/-! ## Tails, `cons` and `set` -/
+lemma Add.setRef {a : Var ρ} {h₁ h₂ h : Option (Hyp ArrTy)} (hΓ : Γ₁.Add Γ₂ Γ)
+    (hh : HypAdd h₁ h₂ h) : (Γ₁.setRef a h₁).Add (Γ₂.setRef a h₂) (Γ.setRef a h) :=
+  ⟨hΓ.refs.set a hh, hΓ.vars⟩
 
-/-- The tail of a context (dropping variable `0`). -/
-def tail (Γ : Ctx (n + 1)) : Ctx n := Sum.elim (fun i => Γ (.inl i.succ)) (fun a => Γ (.inr a))
+/-- Every context with `n + 1` variables is an extension. -/
+lemma eq_cons (Γ : TCtx (n + 1) ρ) : ∃ (Γ' : TCtx n ρ) (h : Option (Hyp Ty)), Γ = Γ'.cons h := by
+  obtain ⟨r, v⟩ := Γ
+  cases v with
+  | snoc v h => exact ⟨⟨r, v⟩, h, rfl⟩
 
-@[simp] lemma tail_cons (Γ : Ctx n) (h : Option Hyp) : (Γ.cons h).tail = Γ := by
-  funext x; rcases x with i | a <;> rfl
+@[simp] lemma cons_inj {Γ Γ' : TCtx n ρ} {h h' : Option (Hyp Ty)} :
+    Γ.cons h = Γ'.cons h' ↔ Γ = Γ' ∧ h = h' := by
+  simp only [ext_iff', cons_refs, cons_vars, Ctx.snoc_inj]
+  tauto
 
-lemma cons_tail (Γ : Ctx (n + 1)) : Γ.tail.cons (Γ (.inl 0)) = Γ := by
-  funext x; rcases x with i | a
-  · cases i using Fin.cases <;> rfl
-  · rfl
+lemma cons_setVar_succ (Γ : TCtx n ρ) (h : Option (Hyp Ty)) (i : Var n) (h' : Option (Hyp Ty)) :
+    (Γ.setVar i h').cons h = (Γ.cons h).setVar (.succ i) h' := rfl
 
-lemma cons_injective {Γ Γ' : Ctx n} {h h' : Option Hyp} (e : Γ.cons h = Γ'.cons h') :
-    Γ = Γ' ∧ h = h' := by
-  refine ⟨?_, congrFun e (.inl 0)⟩
-  have := congrArg tail e
-  simpa using this
+lemma cons_setVar_zero (Γ : TCtx n ρ) (h h' : Option (Hyp Ty)) :
+    Γ.cons h' = (Γ.cons h).setVar .zero h' := rfl
 
-lemma cons_set_succ (Γ : Ctx n) (h : Option Hyp) (i : Fin n) (h' : Option Hyp) :
-    (Γ.set (.inl i) h').cons h = (Γ.cons h).set (.inl i.succ) h' := by
-  funext x; rcases x with j | a
-  · cases j using Fin.cases with
-    | zero =>
-      rw [cons_inl_zero, set_ne _ _ (by simpa using (Fin.succ_ne_zero i).symm)]; rfl
-    | succ j =>
-      by_cases hj : j = i
-      · subst hj; simp
-      · rw [cons_inl_succ, set_ne _ _ (by simpa using hj), set_ne _ _ (by simpa using hj)]
-        rfl
-  · simp [Ctx.set]
+lemma cons_setRef (Γ : TCtx n ρ) (h : Option (Hyp Ty)) (a : Var ρ) (h' : Option (Hyp ArrTy)) :
+    (Γ.setRef a h').cons h = (Γ.cons h).setRef a h' := rfl
 
-lemma cons_set_zero (Γ : Ctx n) (h h' : Option Hyp) :
-    Γ.cons h' = (Γ.cons h).set (.inl 0) h' := by
-  funext x; rcases x with j | a
-  · cases j using Fin.cases with
-    | zero => simp
-    | succ j => rw [set_ne _ _ (by simp)]; rfl
-  · simp [Ctx.set]
+lemma refsOnly_cons (Γ : TCtx n ρ) (h : Option (Hyp Ty)) :
+    (Γ.cons h).refsOnly = Γ.refsOnly.cons none := rfl
 
-lemma refsOnly_cons (Γ : Ctx n) (h : Option Hyp) : (Γ.cons h).refsOnly = Γ.refsOnly.cons none := by
-  funext x; rcases x with j | a
-  · cases j using Fin.cases <;> rfl
-  · rfl
+lemma refsOnly_setRef (Γ : TCtx n ρ) (a : Var ρ) (h : Option (Hyp ArrTy)) :
+    (Γ.setRef a h).refsOnly = Γ.refsOnly.setRef a h := rfl
 
-lemma AllNonLin.cons {h : Option Hyp} (hΓ : Γ.AllNonLin) (hh : NonLin h) :
-    (Γ.cons h).AllNonLin := by
-  rintro (i | a)
-  · cases i using Fin.cases
-    · exact hh
-    · exact hΓ _
-  · exact hΓ _
+lemma AllNonLin.cons {h : Option (Hyp Ty)} (hΓ : Γ.AllNonLin) (hh : NonLin h) :
+    (Γ.cons h).AllNonLin := ⟨hΓ.refs, .snoc hΓ.vars hh⟩
 
-lemma AllNonLin.cons_none (hΓ : Γ.AllNonLin) : (Γ.cons none).AllNonLin :=
-  hΓ.cons trivial
+lemma AllNonLin.cons_none (hΓ : Γ.AllNonLin) : (Γ.cons none).AllNonLin := hΓ.cons .none
 
-lemma AllNonLin.of_cons {h : Option Hyp} (hΓ : (Γ.cons h).AllNonLin) :
+lemma AllNonLin.of_cons {h : Option (Hyp Ty)} (hΓ : (Γ.cons h).AllNonLin) :
     Γ.AllNonLin ∧ NonLin h := by
-  refine ⟨?_, hΓ (.inl 0)⟩
-  rintro (i | a)
-  · exact hΓ (.inl i.succ)
-  · exact hΓ (.inr a)
+  have := hΓ.vars; simp only [cons_vars, Ctx.all_snoc] at this
+  exact ⟨⟨hΓ.refs, this.1⟩, this.2⟩
 
-lemma set_set (Γ : Ctx n) (x : Fin n ⊕ ℕ) (h h' : Option Hyp) :
-    (Γ.set x h).set x h' = Γ.set x h' := by
-  simp [Ctx.set]
+lemma AllNonLin.setVar (hΓ : Γ.AllNonLin) (i : Var n) {h : Option (Hyp Ty)} (hh : NonLin h) :
+    (Γ.setVar i h).AllNonLin := ⟨hΓ.refs, hΓ.vars.set i hh⟩
 
-lemma set_eq_self {Γ : Ctx n} {x : Fin n ⊕ ℕ} {h : Option Hyp} (e : Γ x = h) :
-    Γ.set x h = Γ := by
-  subst e; simp [Ctx.set]
+lemma AllNonLin.setRef (hΓ : Γ.AllNonLin) (a : Var ρ) {h : Option (Hyp ArrTy)} (hh : NonLin h) :
+    (Γ.setRef a h).AllNonLin := ⟨hΓ.refs.set a hh, hΓ.vars⟩
 
-lemma AllNonLin.of_set {x y : Fin n ⊕ ℕ} {h : Option Hyp} (hΓ : (Γ.set x h).AllNonLin)
-    (hy : y ≠ x) : NonLin (Γ y) := by
-  have := hΓ y; rwa [Ctx.set_ne _ _ hy] at this
+lemma VarsNonLin.setRef (hΓ : Γ.VarsNonLin) (a : Var ρ) (h : Option (Hyp ArrTy)) :
+    (Γ.setRef a h).VarsNonLin := hΓ
 
-lemma AllNonLin.set' {x : Fin n ⊕ ℕ} {h : Option Hyp} (hΓ : ∀ y, y ≠ x → NonLin (Γ y))
-    (hh : NonLin h) : (Γ.set x h).AllNonLin := by
-  intro y
-  by_cases hy : y = x
-  · subst hy; simpa using hh
-  · rw [Ctx.set_ne _ _ hy]; exact hΓ y hy
+/-- A non-linear list of hypotheses contains no linear assumption. -/
+lemma _root_.LCU.not_lin_of_all {T : Type} {m : ℕ} {Δ : Ctx (Option (Hyp T)) m}
+    (hΔ : Δ.All NonLin) {i : Var m} {A : T} (hi : Δ.get i = some (.lin A)) : False := by
+  have := hΔ.get i; rw [hi] at this; exact this.elim
 
-lemma AllNonLin.set (hΓ : Γ.AllNonLin) (x : Fin n ⊕ ℕ) {h : Option Hyp} (hh : NonLin h) :
-    (Γ.set x h).AllNonLin :=
-  AllNonLin.set' (fun y _ => hΓ y) hh
+lemma setVar_setVar (Γ : TCtx n ρ) (i : Var n) (h h' : Option (Hyp Ty)) :
+    (Γ.setVar i h).setVar i h' = Γ.setVar i h' := by simp [setVar]
 
-lemma set_comm (Γ : Ctx n) {x y : Fin n ⊕ ℕ} (hxy : x ≠ y) (h h' : Option Hyp) :
-    (Γ.set x h).set y h' = (Γ.set y h').set x h := by
-  simp [Ctx.set, Function.update_comm hxy]
+lemma setVar_get (Γ : TCtx n ρ) (i : Var n) : Γ.setVar i (Γ.vars.get i) = Γ := by
+  simp [setVar]
 
-end Ctx
+lemma setRef_get (Γ : TCtx n ρ) (a : Var ρ) : Γ.setRef a (Γ.refs.get a) = Γ := by
+  simp [setRef]
+
+end TCtx
 
 end LCU

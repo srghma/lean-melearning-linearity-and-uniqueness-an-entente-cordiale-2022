@@ -2,10 +2,11 @@ module
 public import RequestProject.FOFU.Sec3_CoreCalculus.TypingD
 
 /-!
-# Substituting identifiers in typing derivations
+# Renaming identifiers in typing derivations
 
-`HasTypeD.substNames`: if `Γ ⊢ t : A` and `σ` substitutes identifiers for the bound
-identifiers, then `σ(Γ) ⊢ t : σ(A)`.  Terms carry no types, so `t` is unchanged.
+`HasTypeD.renNames`: if `Γ ⊢ t : A` and `r` renames the identifiers in scope, then
+`r(Γ) ⊢ t : r(A)`.  Terms carry no types, so `t` is unchanged.  Since identifiers can only
+be replaced by identifiers, renaming covers identifier substitution.
 
 This is needed by the substitution lemmas (Lemmas 6.2 and 6.3) in the case of `unpack`,
 whose body is typed in a context extended with a fresh identifier: the substituted term
@@ -23,209 +24,156 @@ variable {R : Type} [Grades.PreorderedSemiring R]
 section
 omit [Grades.PreorderedSemiring R]
 
-variable {k k' k'' n : ℕ}
+variable {k k' k'' n ρ : ℕ}
 
-/-! ## Identifier substitution on contexts and predicates -/
+/-! ## Identifier renaming on contexts -/
 
-lemma Assm.subst_subst (σ : Fin k → Ident k') (τ : Fin k' → Ident k'') (a : Assm R k) :
-    (a.subst σ).subst τ = a.subst (fun i => (σ i).subst τ) := by
-  cases a <;> simp [Assm.subst, Ty.subst_subst]
+namespace TCtx
 
-lemma RefTy.subst_subst (σ : Fin k → Ident k') (τ : Fin k' → Ident k'') (T : RefTy R k) :
-    (T.subst σ).subst τ = T.subst (fun i => (σ i).subst τ) := by
-  simp [RefTy.subst, Ty.subst_subst, Ident.subst_subst]
+lemma renNames_renNames (r : Var k → Var k') (r' : Var k' → Var k'') (Γ : TCtx R k n ρ) :
+    (Γ.renNames r).renNames r' = Γ.renNames (r' ∘ r) := by
+  refine TCtx.ext ?_ ?_
+  · simp only [renNames_refs, Ctx.map_map]
+    congr 1; funext a; cases a <;> simp [RefTy.ren_ren]
+  · simp only [renNames_vars, Ctx.map_map]
+    congr 1; funext a; cases a <;> simp [Assm.ren_ren]
 
-namespace Ctx
-
-lemma substNames_substNames (σ : Fin k → Ident k') (τ : Fin k' → Ident k'') (Γ : Ctx R k n) :
-    (Γ.substNames σ).substNames τ = Γ.substNames (fun i => (σ i).subst τ) := by
-  ext1
-  · funext i; simp only [substNames, Option.map_map]
-    congr 1; funext a; exact Assm.subst_subst σ τ a
-  · funext a; simp only [substNames, Option.map_map]
-    congr 1; funext T; exact RefTy.subst_subst σ τ T
-
-lemma shiftNames_substNames_up (σ : Fin k → Ident k') (Γ : Ctx R k n) :
-    Γ.shiftNames.substNames (ISubst.up σ) = (Γ.substNames σ).shiftNames := by
-  simp only [shiftNames, substNames_substNames]
+lemma shiftNames_renNames_up (r : Var k → Var k') (Γ : TCtx R k n ρ) :
+    Γ.shiftNames.renNames (Ren.up r) = (Γ.renNames r).shiftNames := by
+  simp only [shiftNames, renNames_renNames]
   rfl
 
-lemma cons_substNames (σ : Fin k → Ident k') (Γ : Ctx R k n) (a : Option (Assm R k)) :
-    (Γ.cons a).substNames σ = (Γ.substNames σ).cons (a.map (Assm.subst σ)) := by
-  ext1
-  · funext i; cases i using Fin.cases <;> rfl
-  · rfl
+@[simp] lemma cons_renNames (r : Var k → Var k') (Γ : TCtx R k n ρ) (a : Option (Assm R k)) :
+    (Γ.cons a).renNames r = (Γ.renNames r).cons (a.map (Assm.ren r)) := rfl
 
-lemma refsOnly_substNames (σ : Fin k → Ident k') (Γ : Ctx R k n) :
-    Γ.refsOnly.substNames σ = (Γ.substNames σ).refsOnly := rfl
+@[simp] lemma refsOnly_renNames (r : Var k → Var k') (Γ : TCtx R k n ρ) :
+    Γ.refsOnly.renNames r = (Γ.renNames r).refsOnly :=
+  TCtx.ext rfl (by simp)
 
-end Ctx
+end TCtx
 
-lemma Copyable.subst {A : Ty R k} (h : Copyable A) (σ : Fin k → Ident k') :
-    Copyable (A.subst σ) := by
-  induction h with
-  | unit => exact .unit
-  | float => exact .float
-  | tensor _ _ ih₁ ih₂ => exact .tensor ih₁ ih₂
-
-lemma Cloneable.subst {A : Ty R k} (h : Cloneable A) (σ : Fin k → Ident k') :
-    Cloneable (A.subst σ) := by
-  induction h with
-  | array ι => exact .array _
-  | refCloneable ι _ ih => exact .refCloneable _ ih
-  | refCopyable ι hc => exact .refCopyable _ (hc.subst σ)
-  | tensor _ _ ih₁ ih₂ => exact .tensor ih₁ ih₂
-
-end
-
-variable {k k' n : ℕ}
-
-omit [Grades.PreorderedSemiring R] in
-lemma PrimTy.subst {p : Prim} {A : Ty R k} (h : PrimTy p A) (σ : Fin k → Ident k') :
-    PrimTy p (A.subst σ) := by
+lemma PrimTy.ren {p : Prim} {A : Ty R k} (h : PrimTy p A) (r : Var k → Var k') :
+    PrimTy p (A.ren r) := by
   cases h with
   | newArray => exact .newArray
   | readArray p ι => exact .readArray p _
   | writeArray p ι hp => exact .writeArray p _ hp
   | deleteArray ι => exact .deleteArray _
   | newRef A =>
-    have := PrimTy.newRef (R := R) (A.subst σ)
-    simpa [Ty.subst, Ty.shift_subst_up] using this
-  | readRef p ι r A => exact .readRef p _ r _
-  | readRefSplit ι q r A => exact .readRefSplit _ q r _
+    have := PrimTy.newRef (R := R) (A.ren r)
+    simpa [Ty.ren, Ty.shift_ren_up] using this
+  | readRef p ι q A => exact .readRef p _ q _
+  | readRefSplit ι q q' A => exact .readRefSplit _ q q' _
   | swapRef p ι A hp => exact .swapRef p _ _ hp
   | freezeRef ι A => exact .freezeRef _ _
 
-lemma AssmAdd.substNames {a b c : Option (Assm R k)} (h : AssmAdd a b c)
-    (σ : Fin k → Ident k') :
-    AssmAdd (a.map (Assm.subst σ)) (b.map (Assm.subst σ)) (c.map (Assm.subst σ)) := by
-  cases h with
-  | noneLeft a => exact .noneLeft _
-  | noneRight a => exact .noneRight _
-  | grd A r s => exact .grd _ r s
-
-omit [Grades.PreorderedSemiring R] in
-lemma RefAdd.substNames {a b c : Option (RefTy R k)} (h : RefAdd a b c)
-    (σ : Fin k → Ident k') :
-    RefAdd (a.map (RefTy.subst σ)) (b.map (RefTy.subst σ)) (c.map (RefTy.subst σ)) := by
+lemma RefAdd.renNames {a b c : Option (RefTy R k)} (h : RefAdd a b c) (r : Var k → Var k') :
+    RefAdd (a.map (RefTy.ren r)) (b.map (RefTy.ren r)) (c.map (RefTy.ren r)) := by
   cases h with
   | noneLeft a => exact .noneLeft _
   | noneRight a => exact .noneRight _
   | both T => exact .both _
 
-lemma AssmScale.substNames {r : R} {a b : Option (Assm R k)} (h : AssmScale r a b)
-    (σ : Fin k → Ident k') : AssmScale r (a.map (Assm.subst σ)) (b.map (Assm.subst σ)) := by
+end
+
+variable {k k' n ρ : ℕ}
+
+lemma AssmAdd.renNames {a b c : Option (Assm R k)} (h : AssmAdd a b c) (r : Var k → Var k') :
+    AssmAdd (a.map (Assm.ren r)) (b.map (Assm.ren r)) (c.map (Assm.ren r)) := by
+  cases h with
+  | noneLeft a => exact .noneLeft _
+  | noneRight a => exact .noneRight _
+  | grd A q s => exact .grd _ q s
+
+lemma AssmScale.renNames {q : R} {a b : Option (Assm R k)} (h : AssmScale q a b)
+    (r : Var k → Var k') : AssmScale q (a.map (Assm.ren r)) (b.map (Assm.ren r)) := by
   cases h with
   | none => exact .none
   | grd A s => exact .grd _ s
 
-lemma CtxAdd.substNames {Γ₁ Γ₂ Γ : Ctx R k n} (h : CtxAdd Γ₁ Γ₂ Γ) (σ : Fin k → Ident k') :
-    CtxAdd (Γ₁.substNames σ) (Γ₂.substNames σ) (Γ.substNames σ) :=
-  ⟨fun i => (h.vars i).substNames σ, fun a => (h.refs a).substNames σ⟩
+lemma ZeroAssm.renNames {a : Option (Assm R k)} (h : ZeroAssm a) (r : Var k → Var k') :
+    ZeroAssm (a.map (Assm.ren r)) := by
+  cases h with
+  | none => exact .none
+  | grd A => exact .grd _
 
-lemma CtxScale.substNames {r : R} {Γ Γ' : Ctx R k n} (h : CtxScale r Γ Γ')
-    (σ : Fin k → Ident k') : CtxScale r (Γ.substNames σ) (Γ'.substNames σ) :=
-  ⟨fun i => (h.vars i).substNames σ, by simp [Ctx.substNames, h.refs]⟩
+lemma CtxAdd.renNames {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) (r : Var k → Var k') :
+    CtxAdd (Γ₁.renNames r) (Γ₂.renNames r) (Γ.renNames r) :=
+  ⟨h.refs.map _ _ _ fun _ _ _ habc => habc.renNames r,
+    h.vars.map _ _ _ fun _ _ _ habc => habc.renNames r⟩
 
-lemma Ctx.IsZero.substNames {Γ : Ctx R k n} (h : Γ.IsZero) (σ : Fin k → Ident k') :
-    (Γ.substNames σ).IsZero := by
-  intro i
-  have := h i
-  simp only [Ctx.substNames]
-  rcases e : Γ.vars i with _ | ⟨A | ⟨A, s⟩⟩ <;> rw [e] at this
-  · trivial
-  · exact this.elim
-  · exact this
+lemma CtxScale.renNames {q : R} {Γ Γ' : TCtx R k n ρ} (h : CtxScale q Γ Γ')
+    (r : Var k → Var k') : CtxScale q (Γ.renNames r) (Γ'.renNames r) :=
+  ⟨by simp [h.refs], h.vars.map _ _ fun _ _ hab => hab.renNames r⟩
 
-lemma zeroRest_substNames {Γ : Ctx R k n} {i : Fin n}
-    (h : ∀ j, j ≠ i → ZeroAssm (Γ.vars j)) (σ : Fin k → Ident k') :
-    ∀ j, j ≠ i → ZeroAssm ((Γ.substNames σ).vars j) := by
-  intro j hj
-  have := h j hj
-  simp only [Ctx.substNames]
-  rcases e : Γ.vars j with _ | ⟨A | ⟨A, s⟩⟩ <;> rw [e] at this
-  · trivial
-  · exact this.elim
-  · exact this
+lemma TCtx.IsZero.renNames {Γ : TCtx R k n ρ} (h : Γ.IsZero) (r : Var k → Var k') :
+    (Γ.renNames r).IsZero := h.map _ fun _ ha => ha.renNames r
+
+lemma _root_.Ctx.Pick.renNames {Γ : Ctx (Option (Assm R k)) n} {i : Var n} {a : Assm R k}
+    (h : Γ.Pick ZeroAssm i (some a)) (r : Var k → Var k') :
+    (Γ.map (Option.map (Assm.ren r))).Pick ZeroAssm i (some (a.ren r)) :=
+  h.map (Option.map (Assm.ren r)) fun _ ha => ha.renNames r
 
 /-! ## The lemma -/
 
-theorem HasTypeD.substNames {Γ : Ctx R k n} {t : Term R n} {A : Ty R k}
-    (h : HasTypeD Γ t A) : ∀ {k' : ℕ} (σ : Fin k → Ident k'),
-      HasTypeD (Γ.substNames σ) t (A.subst σ) := by
+theorem HasTypeD.renNames {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k}
+    (h : HasTypeD Γ t A) : ∀ {k' : ℕ} (r : Var k → Var k'),
+      HasTypeD (Γ.renNames r) t (A.ren r) := by
   induction h with
-  | var hi hz =>
-    intro k' σ
-    exact .var (by simp [Ctx.substNames, hi, Assm.subst]) (zeroRest_substNames hz σ)
-  | varG hi hz =>
-    intro k' σ
-    exact .varG (by simp [Ctx.substNames, hi, Assm.subst]) (zeroRest_substNames hz σ)
-  | abs _ ih =>
-    intro k' σ
-    have := ih σ
-    rw [Ctx.cons_substNames] at this
-    exact .abs this
-  | app hadd _ _ ih₁ ih₂ => intro k' σ; exact .app (hadd.substNames σ) (ih₁ σ) (ih₂ σ)
-  | pr hs _ hna ih => intro k' σ; exact .pr (hs.substNames σ) (ih σ) hna
-  | elim hadd _ _ ih₁ ih₂ =>
-    intro k' σ
-    have := ih₂ σ
-    rw [Ctx.cons_substNames] at this
-    exact .elim (hadd.substNames σ) (ih₁ σ) this
-  | @approx k n Γ t B i C r s hi hrs _ ih =>
-    intro k' σ
-    have := HasTypeD.approx (i := i) (A := C.subst σ) (r := r)
-      (by simp [Ctx.substNames, hi, Assm.subst]) hrs (ih σ)
-    rw [Ctx.substNames_update]
+  | var hi => intro k' r; exact .var (hi.renNames r)
+  | varG hi => intro k' r; exact .varG (hi.renNames r)
+  | abs _ ih => intro k' r; exact .abs (ih r)
+  | app hadd _ _ ih₁ ih₂ => intro k' r; exact .app (hadd.renNames r) (ih₁ r) (ih₂ r)
+  | pr hs _ hna ih => intro k' r; exact .pr (hs.renNames r) (ih r) hna
+  | elim hadd _ _ ih₁ ih₂ => intro k' r; exact .elim (hadd.renNames r) (ih₁ r) (ih₂ r)
+  | @approx k n ρ Γ t B i C q s hi hrs _ ih =>
+    intro k' r
+    have := HasTypeD.approx (i := i) (A := C.ren r) (r := q)
+      (hi.map (Option.map (Assm.ren r))) hrs (ih r)
+    rw [TCtx.renNames_setVar]
     exact this
-  | tensorI hadd _ _ ih₁ ih₂ => intro k' σ; exact .tensorI (hadd.substNames σ) (ih₁ σ) (ih₂ σ)
-  | tensorE hadd _ _ ih₁ ih₂ =>
-    intro k' σ
-    have := ih₂ σ
-    rw [Ctx.cons_substNames, Ctx.cons_substNames] at this
-    exact .tensorE (hadd.substNames σ) (ih₁ σ) this
-  | unitI hz => intro k' σ; exact .unitI (hz.substNames σ)
-  | unitE hadd _ _ ih₁ ih₂ => intro k' σ; exact .unitE (hadd.substNames σ) (ih₁ σ) (ih₂ σ)
+  | tensorI hadd _ _ ih₁ ih₂ => intro k' r; exact .tensorI (hadd.renNames r) (ih₁ r) (ih₂ r)
+  | tensorE hadd _ _ ih₁ ih₂ => intro k' r; exact .tensorE (hadd.renNames r) (ih₁ r) (ih₂ r)
+  | unitI hz => intro k' r; exact .unitI (hz.renNames r)
+  | unitE hadd _ _ ih₁ ih₂ => intro k' r; exact .unitE (hadd.renNames r) (ih₁ r) (ih₂ r)
   | pack ι _ ih =>
-    intro k' σ
-    have := ih σ
-    rw [Ty.inst_subst] at this
+    intro k' r
+    have := ih r
+    rw [Ty.inst_ren] at this
     exact .pack _ this
-  | @unpack k n Γ₁ Γ₂ Γ t₁ t₂ A B hadd _ _ ih₁ ih₂ =>
-    intro k' σ
-    have := ih₂ (ISubst.up σ)
-    rw [Ctx.cons_substNames, Ctx.shiftNames_substNames_up, Ty.shift_subst_up] at this
-    exact .unpack (hadd.substNames σ) (ih₁ σ) this
-  | share r _ ih => intro k' σ; exact .share r (ih σ)
-  | @clone k n Γ₁ Γ₂ Γ t₁ t₂ C C' B r ι hadd _ hr hc hA _ ih₁ ih₂ =>
-    intro k' σ
-    have := ih₂ σ
-    rw [Ctx.cons_substNames] at this
-    refine .clone (ι.subst σ) (A' := C'.subst (ISubst.up σ)) (hadd.substNames σ) (ih₁ σ) hr
-      (hc.subst σ) ?_ this
-    rw [← Ty.inst_subst, hA]
+  | @unpack k n ρ Γ₁ Γ₂ Γ t₁ t₂ A B hadd _ _ ih₁ ih₂ =>
+    intro k' r
+    have := ih₂ (Ren.up r)
+    rw [TCtx.cons_renNames, TCtx.shiftNames_renNames_up, Ty.shift_ren_up] at this
+    exact .unpack (hadd.renNames r) (ih₁ r) this
+  | share q _ ih => intro k' r; exact .share q (ih r)
+  | @clone k n ρ Γ₁ Γ₂ Γ t₁ t₂ C C' B q ι hadd _ hr hc hA _ ih₁ ih₂ =>
+    intro k' r
+    refine .clone (r ι) (A' := C'.ren (Ren.up r)) (hadd.renNames r) (ih₁ r) hr
+      (by rw [Ty.cloneable_ren]; exact hc) ?_ (ih₂ r)
+    rw [← Ty.inst_ren, hA]
   | withBorrow hadd _ _ ih₁ ih₂ =>
-    intro k' σ; exact .withBorrow (hadd.substNames σ) (ih₁ σ) (ih₂ σ)
-  | split _ ih => intro k' σ; exact .split (ih σ)
-  | join hfg hadd _ _ ih₁ ih₂ => intro k' σ; exact .join hfg (hadd.substNames σ) (ih₁ σ) (ih₂ σ)
-  | push _ ih => intro k' σ; exact .push (ih σ)
-  | pull _ ih => intro k' σ; exact .pull (ih σ)
-  | nat m hz => intro k' σ; exact .nat m (hz.substNames σ)
-  | float x hz => intro k' σ; exact .float x (hz.substNames σ)
-  | prim hz hp => intro k' σ; exact .prim (hz.substNames σ) (hp.subst σ)
+    intro k' r; exact .withBorrow (hadd.renNames r) (ih₁ r) (ih₂ r)
+  | split _ ih => intro k' r; exact .split (ih r)
+  | join hfg hadd _ _ ih₁ ih₂ => intro k' r; exact .join hfg (hadd.renNames r) (ih₁ r) (ih₂ r)
+  | push _ ih => intro k' r; exact .push (ih r)
+  | pull _ ih => intro k' r; exact .pull (ih r)
+  | nat m hz => intro k' r; exact .nat m (hz.renNames r)
+  | float x hz => intro k' r; exact .float x (hz.renNames r)
+  | prim hz hp => intro k' r; exact .prim (hz.renNames r) (hp.ren r)
   | nec p hz _ ih =>
-    intro k' σ
-    have := ih σ
-    rw [Ctx.refsOnly_substNames] at this
-    exact .nec p (hz.substNames σ) this
-  | unborrow _ ih => intro k' σ; exact .unborrow (ih σ)
-  | @ref k n Γ a T hz ha =>
-    intro k' σ
-    exact .ref (T := T.subst σ) (hz.substNames σ) (by simp [Ctx.substNames, ha])
+    intro k' r
+    have := ih r
+    rw [TCtx.refsOnly_renNames] at this
+    exact .nec p (hz.renNames r) this
+  | unborrow _ ih => intro k' r; exact .unborrow (ih r)
+  | @ref k n ρ Γ a T hz ha =>
+    intro k' r
+    exact .ref (T := T.ren r) (hz.renNames r) (ha.map (Option.map (RefTy.ren r)))
 
 /-- Moving a derivation into a context extended with a fresh identifier. -/
-theorem HasTypeD.shiftNames {Γ : Ctx R k n} {t : Term R n} {A : Ty R k}
+theorem HasTypeD.shiftNames {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k}
     (h : HasTypeD Γ t A) : HasTypeD Γ.shiftNames t A.shift :=
-  h.substNames _
+  h.renNames _
 
 end FOFU

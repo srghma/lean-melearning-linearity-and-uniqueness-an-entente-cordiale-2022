@@ -14,28 +14,39 @@ the paper turned out to be false as stated), see `README.md`.
 **Shared code.** The two formalisations do not share files.  The few definitions that both
 use live in `RequestProject/Common/`:
 
-* `Common/DeBruijn.lean`: lifting of variable renamings under binders (`DeBruijn.Ren.up`
-  and its laws); re-exported in the `LCU` namespace by `Sec3_1_Calculus/RenameSubst.lean`.
+* `Common/Var.lean`: de Bruijn variables `Var n` (constructors `zero` and `succ`) and
+  renamings (`Ren.up`, `Ren.upN`, `Var.shiftN`);
+* `Common/Ctx.lean`: length-indexed snoc lists `Ctx α n` (contexts, heaps and stores),
+  the lookup judgment `Ctx.Lookup` and the pointwise relations `Ctx.All`, `Ctx.Forall₂`,
+  `Ctx.Forall₃`;
+* `Common/Syntax.lean`: the generic binding layer `Binding.Tm S n` (terms over a
+  signature, with renaming, substitution and their laws), of which `Term n ρ` is an
+  instance;
 * `Common/Grades/PreorderedSemiring.lean`: the class of pre-ordered semirings of grades;
   the `{0, 1, ω}` semiring of §4.1 is an instance (`Sec4_Implementation/Granule.lean`).
 
 ## Conventions you need first
 
-* **De Bruijn terms.** `Term n` is the type of terms with `n` free variables, and
-  `Term.var : Fin n → Term n`. `Term 0` is the type of closed terms. A binder binds
-  index `0` and shifts all other indices by one. In `letPair t₁ t₂`
-  (`let (x, y) = t₁ in t₂`), `y` is index `0` and `x` is index `1`.
-* **Contexts.** `Ctx n` gives every variable (`.inl i`) and every runtime array
-  reference (`.inr a`) an optional hypothesis: `none` (absent), `some (.lin A)`
-  (`x : A`), or `some (.nonlin A)` (`x : [A]`). Context addition `Γ₁ + Γ₂ = Γ` is
-  partial, so it is the relation `Γ₁.Add Γ₂ Γ`. The paper's `[Γ]` is the predicate
-  `Γ.AllNonLin`.
+* **De Bruijn terms.** `Term n ρ` is the type of terms with `n` free variables and `ρ`
+  runtime array references in scope, and `Term.var : Var n → Term n ρ`. `Term 0 0` is
+  the type of closed source terms. A binder binds `Var.zero`. In `letPair t₁ t₂`
+  (`let (x, y) = t₁ in t₂`), `y` is `Var.zero` and `x` is `Var.succ Var.zero`. Float
+  literals are `Lean.JsonNumber` (`FloatLit`).
+* **Contexts.** `TCtx n ρ` gives every variable and every runtime array reference an
+  optional hypothesis: `none` (absent), `some (.lin A)` (`x : A`), or `some (.nonlin A)`
+  (`x : [A]`); both parts are length-indexed lists (`Ctx`). Context addition
+  `Γ₁ + Γ₂ = Γ` is partial, so it is the relation `TCtx.Add Γ₁ Γ₂ Γ` (pointwise
+  `Ctx.Forall₃`). The paper's `[Γ]` is the predicate `Γ.AllNonLin`.
+* **Scoped heaps.** A heap `Heap n ρ` has one (optional) entry per variable and array
+  reference in scope; a step `Step H t d e H' t'` adds `d` variables and `e` array
+  references, and the new names are always `Var.zero`, so no freshness side conditions
+  are needed.
 * **Two typing judgments.** `HasType` is the paper's judgment (Figure 1). `HasTypeD`
   is an equivalent version without a separate dereliction rule, which is more
   convenient for induction (`hasType_iff_hasTypeD`). Most proofs are about `HasTypeD`
   and are transferred to `HasType` at the end.
-* **Grammars as types.** Sub-grammars such as values are inductive types (`Value n`,
-  `CoreTerm n`, ...) that embed into `Term n`. A predicate like `IsValue t` just says
+* **Grammars as types.** Sub-grammars such as values are inductive types (`Value n ρ`,
+  `CoreTerm n`, ...) that embed into `Term n ρ`. A predicate like `IsValue t` just says
   that `t` is in the image of the embedding.
 
 ## Directory layout
@@ -62,8 +73,8 @@ material that goes beyond the paper.
 | Paper | Lean | File |
 | --- | --- | --- |
 | Types and terms (§3.1) | `Ty`, `Term`, `CoreTy`, `CoreTerm` | `Sec3_1_Calculus/Syntax.lean` |
-| Definition 1 (`[Γ]`) | `Ctx.AllNonLin` | `Sec3_1_Calculus/Context.lean` |
-| Definition 2 (context addition) | `HypAdd`, `Ctx.Add` | `Sec3_1_Calculus/Context.lean` |
+| Definition 1 (`[Γ]`) | `TCtx.AllNonLin` | `Sec3_1_Calculus/Context.lean` |
+| Definition 2 (context addition) | `HypAdd`, `TCtx.Add` | `Sec3_1_Calculus/Context.lean` |
 | Figure 1 (typing rules), array primitives (§3.3) | `HasType`, `Prim.ty` | `Sec3_1_Calculus/Typing.lean` |
 | Lemma 1 (linear substitution) | `HasType.subst_lin` | `Sec3_1_Calculus/Substitution.lean` |
 | Lemma 2 (non-linear substitution) | `HasType.subst_nonlin` | `Sec3_1_Calculus/Substitution.lean` |
@@ -113,10 +124,10 @@ look at their docstrings.
 
 **§3.1: the calculus** (`Sec3_1_Calculus/`)
 
-1. `Syntax.lean`: `Ty`, `Prim`, `Term n`, `CoreTy`, `CoreTerm n`.
+1. `Syntax.lean`: `Ty`, `Prim`, `Term n ρ`, `CoreTy`, `CoreTerm n`.
 2. `RenameSubst.lean` *(technical)*: parallel renaming and substitution, `subst1`,
    `subst2`, `renameRefs`, and their composition laws.
-3. `Context.lean`: `Hyp`, `Ctx n`, `HypAdd`, `Ctx.Add`, `Ctx.AllNonLin`, `Ctx.cons`.
+3. `Context.lean`: `Hyp`, `TCtx n ρ`, `HypAdd`, `TCtx.Add`, `TCtx.AllNonLin`, `TCtx.cons`.
 4. `Typing.lean`: `HasType` (notation `Γ ⊢ t ∶ A`).
 5. `CtxAlgebra.lean` *(technical)*: context addition is a partial commutative monoid
    (commutativity, associativity, interchange, and so on).
@@ -127,7 +138,7 @@ look at their docstrings.
 8. `Substitution.lean`: the general substitution lemma `HasTypeD.subst_gen`, and
    Lemmas 1 and 2. The docstring explains why the lemma is generalised to substitution
    for an arbitrary variable.
-9. `Values.lean`: the value grammar `Value n`/`PrimFun n` and the induction principle
+9. `Values.lean`: the value grammar `Value n ρ`/`PrimFun n ρ` and the induction principle
    `IsValue.induction`.
 10. `FreeVars.lean`: `FreeIn`, the fact that linear variables must occur
     (`HasTypeD.freeIn_of_lin`), and strengthening (`HasTypeD.unrename`).

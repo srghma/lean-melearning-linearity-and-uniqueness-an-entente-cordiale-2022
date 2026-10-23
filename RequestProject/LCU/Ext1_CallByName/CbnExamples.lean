@@ -26,13 +26,13 @@ theorem progressCounterexample_cbnStep :
 reduces to a value of type `!1`. -/
 theorem conservationCounterexample_cbnSteps :
     CbnSteps ConservationCounterexample.prog (bang (app (lam (var 0)) unit)) ∧
-      HasType Ctx.empty (bang (app (lam (var 0)) unit) : Term 0) (.bang .unit) ∧
-      IsValue (bang (app (lam (var 0)) unit) : Term 0) := by
+      HasType TCtx.empty (bang (app (lam (var 0)) unit) : Term 0 0) (.bang .unit) ∧
+      IsValue (bang (app (lam (var 0)) unit) : Term 0 0) := by
   have hs : CbnSteps ConservationCounterexample.prog (bang (app (lam (var 0)) unit)) :=
     Relation.ReflTransGen.head (.betaCopy _ _)
       (Relation.ReflTransGen.single (.betaBorrow _))
   refine ⟨hs, ?_, .bang _⟩
-  exact hs.preserves (Ctx.noVars_zero _) (fun _ => trivial)
+  exact hs.preserves (TCtx.noVars_zero _) Ctx.All.nil
     ConservationCounterexample.prog_typed
 
 end LCU

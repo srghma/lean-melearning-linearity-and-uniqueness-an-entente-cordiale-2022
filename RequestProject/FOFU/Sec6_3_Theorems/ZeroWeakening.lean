@@ -13,27 +13,35 @@ weakening available in a graded calculus (an assumption `x : [B]_0` may be added
 
 namespace FOFU
 
-variable {R : Type} [Grades.PreorderedSemiring R] {k n : ℕ}
+variable {R : Type} [Grades.PreorderedSemiring R] {k n ρ : ℕ}
 
 omit [Grades.PreorderedSemiring R] in
 lemma RefAdd.eq_of_right {a c : Option (RefTy R k)} {T : RefTy R k}
     (h : RefAdd a (some T) c) : c = some T := by
   cases h <;> rfl
 
-theorem HasTypeD.weakenZero {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (h : HasTypeD Γ t A) :
-    ∀ {Z Γ' : Ctx R k n}, Z.IsZero → CtxAdd Z Γ Γ' → HasTypeD Γ' t A := by
+/-- Adding a zero context preserves the shape `0 · Γ, x : a` of the context of a variable
+rule, for a linear or `1`-graded `a`. -/
+lemma pick_of_zero_add {Z Γ Γ' : Ctx (Option (Assm R k)) n} (hadd : Ctx.Forall₃ AssmAdd Z Γ Γ')
+    (hZ : Z.All ZeroAssm) {i : Var n} {a : Option (Assm R k)}
+    (ha : ∀ {z c}, AssmAdd z a c → ZeroAssm z → c = a)
+    (hi : Γ.Pick ZeroAssm i a) : Γ'.Pick ZeroAssm i a :=
+  Ctx.pick_iff.2 ⟨by have := hadd.get i; rw [hi.get] at this; exact ha this (hZ.get i),
+    fun j hj => (hZ.get j).add (hadd.get j) (hi.other hj)⟩
+
+theorem HasTypeD.weakenZero {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k}
+    (h : HasTypeD Γ t A) :
+    ∀ {Z Γ' : TCtx R k n ρ}, Z.IsZero → CtxAdd Z Γ Γ' → HasTypeD Γ' t A := by
   induction h with
-  | var hi hz =>
+  | var hi =>
     intro Z Γ' hZ hadd
-    exact .var ((hadd.vars _).zero_lin (hZ _) hi)
-      (fun j hj => (hZ j).add (hadd.vars j) (hz j hj))
-  | varG hi hz =>
+    exact .var (pick_of_zero_add hadd.vars hZ (fun h hz => h.zero_lin hz rfl) hi)
+  | varG hi =>
     intro Z Γ' hZ hadd
-    exact .varG ((hadd.vars _).zero_grd (hZ _) hi)
-      (fun j hj => (hZ j).add (hadd.vars j) (hz j hj))
+    exact .varG (pick_of_zero_add hadd.vars hZ (fun h hz => h.zero_grd hz rfl) hi)
   | abs _ ih =>
     intro Z Γ' hZ hadd
-    exact .abs (ih (hZ.cons (a := none) trivial) (hadd.cons (.noneLeft _)))
+    exact .abs (ih (hZ.cons (a := none) .none) (hadd.cons (.noneLeft _)))
   | app hadd₀ _ _ ih₁ _ =>
     intro Z Γ' hZ hadd
     obtain ⟨X, h1, h2⟩ := hadd₀.assoc' hadd
@@ -76,7 +84,7 @@ theorem HasTypeD.weakenZero {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (h : Ha
     exact .pr h2 (ih hZ h1) hna
   | approx hi hrs _ ih =>
     intro Z Γ' hZ hadd
-    obtain ⟨C, h1, h2⟩ := (CtxLe.update hi hrs).add_exists' hadd
+    obtain ⟨C, h1, h2⟩ := (CtxLe.setVar hi.eq hrs).add_exists' hadd
     exact (ih hZ h1).approxCtx h2
   | pack ι _ ih => intro Z Γ' hZ hadd; exact .pack ι (ih hZ hadd)
   | share r _ ih => intro Z Γ' hZ hadd; exact .share r (ih hZ hadd)
@@ -88,13 +96,13 @@ theorem HasTypeD.weakenZero {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (h : Ha
   | nat m hz => intro Z Γ' hZ hadd; exact .nat m (hZ.add hadd hz)
   | float x hz => intro Z Γ' hZ hadd; exact .float x (hZ.add hadd hz)
   | prim hz hp => intro Z Γ' hZ hadd; exact .prim (hZ.add hadd hz) hp
-  | @ref k n Γ a T hz ha =>
+  | @ref k n ρ Γ a T hz ha =>
     intro Z Γ' hZ hadd
-    have := hadd.refs a
-    rw [ha] at this
-    exact .ref (hZ.add hadd hz) this.eq_of_right
+    have := hadd.refs.get a
+    rw [ha.eq] at this
+    exact .ref (hZ.add hadd hz) (Ctx.Lookup.of_eq this.eq_of_right)
   | nec p hz _ ih =>
     intro Z Γ' hZ hadd
-    exact .nec p (hZ.add hadd hz) (ih (Ctx.IsZero.refsOnly Z) hadd.refsOnly)
+    exact .nec p (hZ.add hadd hz) (ih (TCtx.IsZero.refsOnly Z) hadd.refsOnly)
 
 end FOFU

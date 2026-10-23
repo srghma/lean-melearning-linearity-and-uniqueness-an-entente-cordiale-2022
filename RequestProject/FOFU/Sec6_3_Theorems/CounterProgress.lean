@@ -26,49 +26,53 @@ variable {R : Type} [Grades.PreorderedSemiring R]
 open Term
 
 /-- The stuck term `split (*())`. -/
-def stuckSplit {n : ℕ} : Term R n := split (star unit)
+def stuckSplit {n ρ : ℕ} : Term R n ρ := split (star unit)
 
 /-- Its type `&_(1/2) unit ⊗ &_(1/2) unit`. -/
-def stuckSplitTy : Ty R 0 :=
+def stuckSplitTy {k : ℕ} : Ty R k :=
   Ty.tensor (Ty.borrow (.frac Frac.one.half) Ty.unit) (Ty.borrow (.frac Frac.one.half) Ty.unit)
 
-lemma isZero_empty {k : ℕ} : (Ctx.empty : Ctx R k 0).IsZero := fun i => i.elim0
-
 /-- `∅ ⊢ split (*()) : &_(1/2) unit ⊗ &_(1/2) unit`. -/
-theorem stuckSplit_typed : HasType (Ctx.empty : Ctx R 0 0) stuckSplit stuckSplitTy :=
-  HasType.split (HasType.nec (.frac Frac.one) isZero_empty (HasType.unitI (fun i => i.elim0)))
+theorem stuckSplit_typed : HasType (TCtx.empty : TCtx R 0 0 0) stuckSplit stuckSplitTy :=
+  HasType.split (HasType.nec (.frac Frac.one) TCtx.IsZero.empty
+    (HasType.unitI (TCtx.IsZero.refsOnly _)))
 
 omit [Grades.PreorderedSemiring R] in
 /-- `split (*())` is not a value. -/
-theorem stuckSplit_not_value {n : ℕ} : ¬ IsValue (stuckSplit : Term R n) := by
+theorem stuckSplit_not_value {n ρ : ℕ} : ¬ IsValue (stuckSplit : Term R n ρ) := by
   intro h
   cases h with
   | prim hs _ => cases hs
 
 /-- `*()` does not reduce. -/
-theorem star_unit_no_step {n m : ℕ} (H : Heap R n) (s : R) (H' : Heap R m) (t' : Term R m) :
-    ¬ Step H (star unit) s H' t' := by
+theorem star_unit_no_step {n ρ ι d e f : ℕ} (H : Heap R n ρ ι) (s : R)
+    (H' : Heap R (n + d) (ρ + e) (ι + f)) (t' : Term R (n + d) (ρ + e)) :
+    ¬ Step H (star unit) s d e f H' t' := by
   intro h; cases h
 
 /-- `split (*())` does not reduce, in any heap. -/
-theorem stuckSplit_no_step {n m : ℕ} (H : Heap R n) (s : R) (H' : Heap R m) (t' : Term R m) :
-    ¬ Step H stuckSplit s H' t' := by
+theorem stuckSplit_no_step {n ρ ι d e f : ℕ} (H : Heap R n ρ ι) (s : R)
+    (H' : Heap R (n + d) (ρ + e) (ι + f)) (t' : Term R (n + d) (ρ + e)) :
+    ¬ Step H stuckSplit s d e f H' t' := by
   intro h
   cases h with
   | splitCong h' => exact star_unit_no_step _ _ _ _ h'
 
-lemma ctxScale_empty (s : R) : CtxScale s (Ctx.empty : Ctx R 0 0) Ctx.empty :=
-  ⟨fun i => i.elim0, rfl⟩
+lemma ctxScale_empty {k n ρ : ℕ} (s : R) :
+    CtxScale s (TCtx.empty : TCtx R k n ρ) TCtx.empty :=
+  ⟨rfl, Ctx.forall₂_iff.2 fun i => by simpa using AssmScale.none⟩
 
-lemma ctxAdd_empty : CtxAdd (Ctx.empty : Ctx R 0 0) Ctx.empty Ctx.empty :=
-  ⟨fun i => i.elim0, fun _ => RefAdd.noneLeft _⟩
+lemma ctxAdd_empty {k n ρ : ℕ} :
+    CtxAdd (TCtx.empty : TCtx R k n ρ) TCtx.empty TCtx.empty :=
+  ⟨Ctx.Forall₃.replicate_left (fun _ => .noneLeft _) _,
+    Ctx.Forall₃.replicate_left (fun _ => .noneLeft _) _⟩
 
 /-- **Theorem 6.6 is false** (for Definition 6.4 as printed and for its repair). -/
 theorem not_progress (gc : Bool) : ¬ Progress (R := R) gc := by
   intro h
-  rcases h Ctx.empty stuckSplit stuckSplitTy stuckSplit_typed with hv | hstep
+  rcases h TCtx.empty stuckSplit stuckSplitTy stuckSplit_typed with hv | hstep
   · exact stuckSplit_not_value hv
-  · obtain ⟨m, H', t', hs⟩ := hstep 1 Ctx.empty Ctx.empty Ctx.empty Heap.empty
+  · obtain ⟨d, e, f, H', t', hs⟩ := hstep 1 TCtx.empty TCtx.empty TCtx.empty Heap.empty
       (ctxScale_empty 1) ctxAdd_empty Compat.empty
     exact stuckSplit_no_step _ _ _ _ hs
 

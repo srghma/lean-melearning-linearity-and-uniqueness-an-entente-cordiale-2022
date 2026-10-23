@@ -1,34 +1,52 @@
 module
 public import RequestProject.FOFU.Sec3_CoreCalculus.Typing
+public import RequestProject.FOFU.Sec3_CoreCalculus.CtxAlgebra
 public import RequestProject.FOFU.Sec6_1_Preliminaries.Heap
+public import RequestProject.FOFU.Sec6_1_Preliminaries.TypingRefs
 
 /-!
 # Heap compatibility (Definition 6.4) and Example 6.5
 
-`Compat gc H Γ` is the relation `H ⋈ Γ` of Definition 6.4, between a heap with `n`
-variables and a closed-scope context (`k = 0` identifiers) with `n` variables.
+`Compat gc H Γ` is the relation `H ⋈ Γ` of Definition 6.4, between a heap
+`H : Heap R n ρ ι` and a context `Γ : TCtx R ι n ρ` over the same scope (the identifiers of
+the heap are the identifiers of the types of the context).
 
-The rules are those of the paper:
+The rules are those of the paper, read in the scoped representation of heaps (the newly
+added entry is always the most recent name `Var.zero`, so the freshness of the paper's
+names holds by construction):
 
 * `empty`:   `∅ ⋈ ∅`;
 * `extRes`:  `H, id ↦ v_r ⋈ Γ + γ,  γ ⊢ v_r : Res_id A
-              ⟹  H, ref ↦_p id, id ↦ v_r ⋈ (Γ, ref : Res_id A)`;
+              ⟹  H, ref ↦_p id, id ↦ v_r ⋈ (Γ, ref : Res_id A)`.
+  In the scoped representation the entry `id ↦ v_r` is an entry of the premise heap
+  (`H.ress.Lookup id (some v_r)`), and the conclusion adds the new reference
+  (`H.newRef p id`); `γ` is a runtime context (it has no assumptions on variables);
 * `gcArr`:   `H ⋈ ∅  ⟹  H, ref ↦_p id ⋈ ∅`;
 * `ext`:     `H ⋈ Γ + s · Γ',  Γ' ⊢ v : A,  ∃ r'. s + r' ≡ r
               ⟹  (H, x ↦_r v) ⋈ (Γ, x : [A]_s)`;
 * `extLin`:  `H ⋈ Γ + Γ',  Γ' ⊢ v : A,  ∃ r'. 1 + r' ≡ r
               ⟹  (H, x ↦_r v) ⋈ (Γ, x : A)`.
 
+In addition, the structural rule
+
+* `freshId`: `H ⋈ Γ  ⟹  H, id ⋈ Γ, id`
+
+adds an identifier without resource entry to the heap and to the context.  It is an
+artifact of the scoped representation (in the paper, identifiers are drawn from an
+infinite supply and need not be introduced), and it does not add resource entries.
+
 ## The flag `gc`
 
-With these rules alone (`gc = false`) **no heap containing a resource entry `id ↦ v_r`
+With these rules alone (`Compat false`) **no heap containing a resource entry `id ↦ v_r`
 is compatible with any context** (`Compat.ress_eq_none`): the only rule whose conclusion
 contains such an entry is `extRes`, and its premise still contains the same entry.  The
 evident repair is a garbage-collection rule for identifier entries analogous to `gcArr`,
 
 * `gcRes`:   `H ⋈ ∅  ⟹  H, id ↦ v_r ⋈ ∅`,
 
-which is enabled when `gc = true`.  The theorems of §6.3 are stated for both variants.
+which is available in the variant `Compat true` (the Boolean index `gc` of `Compat`
+selects the variant; `gcRes` concludes `Compat true`).  The theorems of §6.3 are stated
+for both variants.
 
 The typing `γ ⊢ v_r : Res_id A` of resource values is not given in the paper; we take
 an array to have type `Array_id A` when all the values written to it have type `A`, and
@@ -41,77 +59,104 @@ namespace FOFU
 
 variable {R : Type} [Grades.PreorderedSemiring R]
 
+/-- Extending a context by a new reference `Var.zero` with the assumption `o`. -/
+def TCtx.addRef {k n ρ : ℕ} (Γ : TCtx R k n ρ) (o : Option (RefTy R k)) : TCtx R k n (ρ + 1) :=
+  ⟨Γ.refs ,, o, Γ.vars⟩
+
+omit [Grades.PreorderedSemiring R] in
+@[simp] lemma TCtx.addRef_refs {k n ρ : ℕ} (Γ : TCtx R k n ρ) (o : Option (RefTy R k)) :
+    (Γ.addRef o).refs = Γ.refs ,, o := rfl
+omit [Grades.PreorderedSemiring R] in
+@[simp] lemma TCtx.addRef_vars {k n ρ : ℕ} (Γ : TCtx R k n ρ) (o : Option (RefTy R k)) :
+    (Γ.addRef o).vars = Γ.vars := rfl
+
 /-- Typing of array values: every written value has the element type. -/
-inductive ArrValTy {n : ℕ} (γ : Ctx R 0 n) : ArrVal R n → Ty R 0 → Prop where
-  | init (A : Ty R 0) : ArrValTy γ .init A
-  | write {a : ArrVal R n} {i : ℕ} {v : Term R n} {A : Ty R 0} :
+inductive ArrValTy {ι n ρ : ℕ} (γ : TCtx R ι n ρ) : ArrVal R n ρ → Ty R ι → Prop where
+  | init (A : Ty R ι) : ArrValTy γ .init A
+  | write {a : ArrVal R n ρ} {i : ℕ} {v : Term R n ρ} {A : Ty R ι} :
       ArrValTy γ a A → HasType γ v A → ArrValTy γ (.write a i v) A
 
 /-- Typing of resource values `γ ⊢ v_r : Res_id A`. -/
-inductive ResValTy {n : ℕ} (γ : Ctx R 0 n) : ResVal R n → RefTy R 0 → Prop where
-  | arr {a : ArrVal R n} {ι : Ident 0} {A : Ty R 0} :
-      ArrValTy γ a A → ResValTy γ (.arr a) ⟨.array, ι, A⟩
-  | ref {v : Term R n} {ι : Ident 0} {A : Ty R 0} :
-      HasType γ v A → ResValTy γ (.ref v) ⟨.ref, ι, A⟩
+inductive ResValTy {ι n ρ : ℕ} (γ : TCtx R ι n ρ) : ResVal R n ρ → RefTy R ι → Prop where
+  | arr {a : ArrVal R n ρ} {id : Var ι} {A : Ty R ι} :
+      ArrValTy γ a A → ResValTy γ (.arr a) ⟨.array, id, A⟩
+  | ref {v : Term R n ρ} {id : Var ι} {A : Ty R ι} :
+      HasType γ v A → ResValTy γ (.ref v) ⟨.ref, id, A⟩
 
-/-- Heap compatibility `H ⋈ Γ` (Definition 6.4); `gc = true` adds the rule `gcRes`. -/
-inductive Compat (gc : Bool) : {n : ℕ} → Heap R n → Ctx R 0 n → Prop where
+/-- Heap compatibility `H ⋈ Γ` (Definition 6.4).  The index `gc` selects the variant:
+the rule `gcRes` only derives judgments `Compat true H Γ`. -/
+inductive Compat : Bool → {n ρ ι : ℕ} → Heap R n ρ ι → TCtx R ι n ρ → Prop where
   /-- `∅ ⋈ ∅` -/
-  | empty : Compat gc Heap.empty Ctx.empty
+  | empty {gc : Bool} : Compat gc Heap.empty TCtx.empty
+  /-- `H ⋈ Γ  ⟹  H, id ⋈ Γ, id` (a new identifier without resource entry) -/
+  | freshId {gc : Bool} {n ρ ι : ℕ} {H : Heap R n ρ ι} {Γ : TCtx R ι n ρ} :
+      Compat gc H Γ → Compat gc (H.addId none) Γ.shiftNames
   /-- `H, id ↦ v_r ⋈ Γ + γ,  γ ⊢ v_r : Res_id A
       ⟹  H, ref ↦_p id, id ↦ v_r ⋈ (Γ, ref : Res_id A)` -/
-  | extRes {n : ℕ} {H : Heap R n} {Γ γ Δ : Ctx R 0 n} {a : ℕ} {p : ℚ} {id : ℕ}
-      {vr : ResVal R n} {T : RefTy R 0} :
-      H.refs a = none → Γ.refs a = none → T.id = .rt id → (∀ i, γ.vars i = none) →
-      ResValTy γ vr T → CtxAdd Γ γ Δ → Compat gc (H.addRes id vr) Δ →
-      Compat gc ((H.addRef a p id).addRes id vr) (Γ.addRef a T)
+  | extRes {gc : Bool} {n ρ ι : ℕ} {H : Heap R n ρ ι} {Γ γ Δ : TCtx R ι n ρ} {p : Frac}
+      {id : Var ι} {vr : ResVal R n ρ} {κ : ResKind} {A : Ty R ι} :
+      H.ress.Lookup id (some vr) → γ.vars = .replicate n none →
+      ResValTy γ vr ⟨κ, id, A⟩ → CtxAdd Γ γ Δ → Compat gc H Δ →
+      Compat gc (H.newRef p id) (Γ.addRef (some ⟨κ, id, A⟩))
   /-- `H ⋈ ∅  ⟹  H, ref ↦_p id ⋈ ∅` -/
-  | gcArr {H : Heap R 0} {a : ℕ} {p : ℚ} {id : ℕ} :
-      H.refs a = none → Compat gc H Ctx.empty → Compat gc (H.addRef a p id) Ctx.empty
-  /-- `H ⋈ ∅  ⟹  H, id ↦ v_r ⋈ ∅` (only when `gc = true`; not in the paper) -/
-  | gcRes {H : Heap R 0} {id : ℕ} {vr : ResVal R 0} :
-      gc = true → H.ress id = none → Compat gc H Ctx.empty → Compat gc (H.addRes id vr) Ctx.empty
+  | gcArr {gc : Bool} {ρ ι : ℕ} {H : Heap R 0 ρ ι} {p : Frac} {id : Var ι} :
+      Compat gc H TCtx.empty → Compat gc (H.newRef p id) TCtx.empty
+  /-- `H ⋈ ∅  ⟹  H, id ↦ v_r ⋈ ∅` (only in the variant `Compat true`; not in the paper) -/
+  | gcRes {ρ ι : ℕ} {H : Heap R 0 ρ ι} {vr : ResVal R 0 ρ} :
+      Compat true H TCtx.empty → Compat true (H.addId (some vr)) TCtx.empty
   /-- `H ⋈ Γ + s · Γ',  Γ' ⊢ v : A,  ∃ r'. s + r' ≡ r  ⟹  (H, x ↦_r v) ⋈ (Γ, x : [A]_s)` -/
-  | ext {n : ℕ} {H : Heap R n} {Γ Γ' Γs Δ : Ctx R 0 n} {v : Term R n} {A : Ty R 0} {r s : R} :
+  | ext {gc : Bool} {n ρ ι : ℕ} {H : Heap R n ρ ι} {Γ Γ' Γs Δ : TCtx R ι n ρ} {v : Term R n ρ}
+      {A : Ty R ι} {r s : R} :
       Compat gc H Δ → CtxScale s Γ' Γs → CtxAdd Γ Γs Δ → HasType Γ' v A → (∃ r', s + r' = r) →
-      Compat gc (H.snoc r v) (Γ.snoc (some (.grd A s)))
+      Compat gc (H.snoc r v) (Γ.cons (some (.grd A s)))
   /-- `H ⋈ Γ + Γ',  Γ' ⊢ v : A,  ∃ r'. 1 + r' ≡ r  ⟹  (H, x ↦_r v) ⋈ (Γ, x : A)` -/
-  | extLin {n : ℕ} {H : Heap R n} {Γ Γ' Δ : Ctx R 0 n} {v : Term R n} {A : Ty R 0} {r : R} :
+  | extLin {gc : Bool} {n ρ ι : ℕ} {H : Heap R n ρ ι} {Γ Γ' Δ : TCtx R ι n ρ} {v : Term R n ρ}
+      {A : Ty R ι} {r : R} :
       Compat gc H Δ → CtxAdd Γ Γ' Δ → HasType Γ' v A → (∃ r', 1 + r' = r) →
-      Compat gc (H.snoc r v) (Γ.snoc (some (.lin A)))
+      Compat gc (H.snoc r v) (Γ.cons (some (.lin A)))
 
 namespace Compat
 
 /-- **Defect of Definition 6.4.** With the rules of the paper, a compatible heap has no
 resource entries `id ↦ v_r`. -/
-theorem ress_eq_none {n : ℕ} {H : Heap R n} {Γ : Ctx R 0 n} (h : Compat false H Γ) :
-    ∀ j, H.ress j = none := by
+theorem ress_eq_none {n ρ ι : ℕ} {H : Heap R n ρ ι} {Γ : TCtx R ι n ρ} (h : Compat false H Γ) :
+    ∀ j, H.ress.get j = none := by
+  generalize hgc : false = gc at h
   induction h with
-  | empty => intro j; rfl
-  | @extRes n H Γ γ Δ a p id' vr T _ _ _ _ _ _ _ ih =>
+  | empty => intro j; cases j
+  | freshId _ ih =>
+    intro j
+    cases j with
+    | zero => rfl
+    | succ j => simpa using ih hgc j
+  | @extRes _ _ _ _ _ _ _ _ _ id _ _ _ hid _ _ _ _ ih =>
     exfalso
-    have := ih id'
-    simp [Heap.addRes] at this
-  | gcArr _ _ ih => exact ih
-  | gcRes hgc => exact absurd hgc Bool.false_ne_true
-  | ext _ _ _ _ _ ih => intro j; simp [Heap.snoc, ih j]
-  | extLin _ _ _ _ ih => intro j; simp [Heap.snoc, ih j]
+    have := ih hgc id
+    simp [hid.eq] at this
+  | gcArr _ ih => intro j; simp [ih hgc j]
+  | gcRes => cases hgc
+  | ext _ _ _ _ _ ih => intro j; simp [ih hgc j]
+  | extLin _ _ _ _ ih => intro j; simp [ih hgc j]
 
 /-- Every reference assumed in a compatible context is allocated in the heap. -/
-theorem refs_ne_none {gc : Bool} {n : ℕ} {H : Heap R n} {Γ : Ctx R 0 n} (h : Compat gc H Γ)
-    {a : ℕ} (ha : Γ.refs a ≠ none) : H.refs a ≠ none := by
+theorem refs_ne_none {gc : Bool} {n ρ ι : ℕ} {H : Heap R n ρ ι} {Γ : TCtx R ι n ρ}
+    (h : Compat gc H Γ) {a : Var ρ} (ha : Γ.refs.get a ≠ none) : H.refs.get a ≠ none := by
   induction h with
-  | empty => exact absurd rfl ha
-  | @extRes n H Γ γ Δ a' p id vr T _ _ _ _ _ hadd _ ih =>
-    by_cases e : a = a'
-    · subst e; simp [Heap.addRef, Heap.addRes]
-    · simp only [Ctx.addRef, Function.update_of_ne e] at ha
-      have := ih ((hadd.refs a).ne_none_left ha)
-      simpa [Heap.addRef, Heap.addRes, Function.update_of_ne e] using this
-  | gcArr _ _ _ => exact absurd rfl ha
-  | gcRes _ _ _ => exact absurd rfl ha
-  | ext _ _ hadd _ _ ih => exact ih ((hadd.refs a).ne_none_left ha)
-  | extLin _ hadd _ _ ih => exact ih ((hadd.refs a).ne_none_left ha)
+  | empty => cases a
+  | freshId _ ih =>
+    simp only [TCtx.shiftNames, TCtx.renNames_refs, Ctx.get_map, ne_eq,
+      Option.map_eq_none_iff] at ha
+    simpa using ih ha
+  | extRes _ _ _ hadd _ ih =>
+    cases a with
+    | zero => simp
+    | succ a =>
+      simp only [TCtx.addRef_refs, Ctx.get_snoc_succ] at ha
+      simpa using ih ((hadd.refs.get a).ne_none_left ha)
+  | gcArr _ _ => simp at ha
+  | gcRes _ _ => simp at ha
+  | ext _ _ hadd _ _ ih => exact ih ((hadd.refs.get a).ne_none_left ha)
+  | extLin _ hadd _ _ ih => exact ih ((hadd.refs.get a).ne_none_left ha)
 
 end Compat
 
@@ -120,20 +165,16 @@ end Compat
 /-- **Example 6.5.** With the natural-number semiring, the context `x : [A]_1, y : [B]_2`
 is compatible with the heap `x ↦_7 v₁, y ↦_2 v₂`, assuming `∅ ⊢ v₁ : A` and
 `x : [A]_3 ⊢ v₂ : B`.  (This holds for both variants of `Compat`.) -/
-theorem example_6_5 (gc : Bool) {A B : Ty ℕ 0} {v₁ : Term ℕ 0} {v₂ : Term ℕ 1}
-    (h₁ : HasType Ctx.empty v₁ A) (h₂ : HasType (Ctx.empty.snoc (some (.grd A 3))) v₂ B) :
+theorem example_6_5 (gc : Bool) {A B : Ty ℕ 0} {v₁ : Term ℕ 0 0} {v₂ : Term ℕ 1 0}
+    (h₁ : HasType TCtx.empty v₁ A) (h₂ : HasType (TCtx.empty.cons (some (.grd A 3))) v₂ B) :
     Compat gc ((Heap.empty.snoc 7 v₁).snoc 2 v₂)
-      ((Ctx.empty.snoc (some (.grd A 1))).snoc (some (.grd B 2))) := by
-  refine Compat.ext (Γ' := Ctx.empty.snoc (some (.grd A 3)))
-    (Γs := Ctx.empty.snoc (some (.grd A 6))) (Δ := Ctx.empty.snoc (some (.grd A 7)))
+      ((TCtx.empty.cons (some (.grd A 1))).cons (some (.grd B 2))) := by
+  refine Compat.ext (Γ' := TCtx.empty.cons (some (.grd A 3)))
+    (Γs := TCtx.empty.cons (some (.grd A 6))) (Δ := TCtx.empty.cons (some (.grd A 7)))
     ?_ ?_ ?_ h₂ ⟨0, rfl⟩
-  · refine Compat.ext (Γ' := Ctx.empty) (Γs := Ctx.empty) (Δ := Ctx.empty) Compat.empty
-      ⟨fun i => i.elim0, rfl⟩ ⟨fun i => i.elim0, fun _ => RefAdd.noneLeft _⟩ h₁ ⟨0, rfl⟩
-  · refine ⟨fun i => ?_, rfl⟩
-    rw [Fin.fin_one_eq_zero i]
-    exact AssmScale.grd A 3
-  · refine ⟨fun i => ?_, fun _ => RefAdd.noneLeft _⟩
-    rw [Fin.fin_one_eq_zero i]
-    exact AssmAdd.grd A 1 6
+  · refine Compat.ext (Γ' := TCtx.empty) (Γs := TCtx.empty) (Δ := TCtx.empty) Compat.empty
+      ⟨rfl, .nil⟩ ⟨.nil, .nil⟩ h₁ ⟨0, rfl⟩
+  · exact ⟨rfl, .snoc .nil (AssmScale.grd A 3)⟩
+  · exact ⟨.nil, .snoc .nil (AssmAdd.grd A 1 6)⟩
 
 end FOFU

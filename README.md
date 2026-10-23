@@ -9,20 +9,60 @@ This Lean 4 / Mathlib project formalises two papers:
    `paper.typ`), in `RequestProject/FOFU/`, namespace `FOFU`. Reading guide:
    `READING_GUIDE-functional-ownership-through-fractional-uniqueness.md`.
 
-The two formalisations do not share files. Code used by both lives in
-`RequestProject/Common/`:
+`RequestProject/LCU.lean` and `RequestProject/FOFU.lean` import the respective
+developments. The whole project builds with no `sorry`, and the only axioms used are the
+standard `propext`, `Classical.choice` and `Quot.sound`.
 
-* `Common/DeBruijn.lean`: lifting a renaming of de Bruijn variables under a binder
-  (`DeBruijn.Ren.up`) and its laws;
+Both formalisations follow the design of `PROPOSAL.md` (with the review decisions: a
+custom variable type `Var n`, a generic binding layer, and `Lean.JsonNumber` for float
+literals).
+
+## Shared infrastructure (`RequestProject/Common/`)
+
+* `Common/Var.lean`: de Bruijn variables. `Var n` is an inductive family with
+  constructors `Var.zero : Var (n + 1)` and `Var.succ : Var n → Var (n + 1)`, so `cases`
+  and dependent pattern matching work on indices of the form `.succ i`. Renamings are
+  functions `Var n → Var m`, lifted under binders by `Ren.up` / `Ren.upN`, and
+  `Var.shiftN k` weakens by `k` new names.
+* `Common/Ctx.lean`: length-indexed snoc lists `Ctx α n` (`Ctx.nil`, `Γ ,, a`). Typing
+  contexts, heaps and stores of both papers are built from them. Lookups are the
+  inductive judgment `Ctx.Lookup Γ i a` (*here* / *there*); `Ctx.Pick P Γ i a` says that
+  `i` carries `a` and every other entry satisfies `P` (this is the paper's
+  "`0 · Γ, x : A`"); `Ctx.All`, `Ctx.Forall₂` and `Ctx.Forall₃` are pointwise predicates
+  and relations defined by recursion on the lists, and context addition and scaling are
+  instances of them.
+* `Common/Syntax.lean`: a generic binding layer. A signature lists the operators of a
+  language with the binding arities of their arguments, and `Binding.Tm S n` is the type
+  of terms with `n` free variables. Renaming, parallel substitution, single and double
+  instantiation, operator maps (`Tm.mapOp`, used to rename runtime names stored in
+  operators), free occurrences (`Tm.Occurs`) and operator occurrences (`Tm.HasOp`) are
+  defined once, with their laws proved once.
 * `Common/Grades/PreorderedSemiring.lean`: the class of pre-ordered semirings of grades,
   with the instance for `ℕ`. The `{0, 1, ω}` semiring of the first paper is an instance,
   and the second paper's calculus is parameterised by it.
 
-`RequestProject/LCU.lean` and `RequestProject/FOFU.lean` import the respective
-developments. In both, terms are intrinsically scoped de Bruijn terms: `Term n` (or
-`Term R n`) has `n` free variables, `Term.var : Fin n → Term n`, and `Term 0` is the type
-of closed terms. The whole project builds with no `sorry`, and the only axioms used are
-the standard `propext`, `Classical.choice` and `Quot.sound`.
+Terms of both papers are instances of the binding layer and are indexed by the number of
+free variables and the number of runtime names in scope: LCU's `Term n ρ` and FOFU's
+`Term R n ρ` have variables `Term.var : Var n → _` and runtime references
+`Term.ref : Var ρ → _`, so `Term R 0 0` is the type of closed source terms. Float
+literals are `Lean.JsonNumber` (`FloatLit`).
+
+## Correct by construction
+
+* **Scoped configurations.** A heap has exactly one entry per variable and runtime name
+  in scope, and a configuration is a heap together with a term over the same scope, so
+  "the free variables and references of the term are in the heap" holds by
+  construction. A reduction step records how many variables (`d`), references (`e`) and,
+  for FOFU, identifiers (`f`) it adds; new names are always `Var.zero` and old ones are
+  weakened, so no freshness premise is needed and the heap only grows by construction.
+* **Premises are structural judgments.** Side conditions such as "`x : a ∈ Γ`",
+  "`ref ↦_p id ∈ H`" or "`0 · Γ, x : A`" are the inductive judgments `Ctx.Lookup` and
+  `Ctx.Pick`, not equations between `Option`s; context addition and scaling are the
+  pointwise relations `Ctx.Forall₃` and `Ctx.Forall₂`. Equational characterisations
+  (`Ctx.lookup_iff`, `Ctx.pick_iff`, `Ctx.forall₃_iff`, …) are theorems.
+* **Meaningful data only.** FOFU heap permissions are fractions `0 < p ≤ 1` (`Frac`), so
+  a heap cannot store a meaningless permission, and LCU heap entries carry the typing
+  derivation of the stored term.
 
 ## *Functional Ownership through Fractional Uniqueness*
 
@@ -32,10 +72,12 @@ The directories of `RequestProject/FOFU/` follow the sections of the paper:
 `Sec6_3_Theorems/`. The reading guide maps every item of the paper to its Lean name and
 lists the formalisation choices.
 
-* **Calculus.** Types, terms, contexts with partial addition and scaling, and the typing
+* **Calculus.** Types `Ty R k` (with `k` de Bruijn identifiers in scope), terms
+  `Term R n ρ`, contexts `TCtx R k n ρ` with partial addition and scaling, and the typing
   rules of all sections (`HasType`), over an arbitrary pre-ordered semiring of grades.
-  Values, heaps, the reduction relation of §6.2 (`Step`, `Steps`), heap compatibility
-  (Definition 6.4, `Compat`) and the equational theory (`Equiv`).
+  Values, scoped heaps `Heap R n ρ ι` (variables, references and identifiers), the
+  reduction relation of §6.2 (`Step`, `Steps`), heap compatibility (Definition 6.4,
+  `Compat`) and the equational theory (`Equiv`).
 * **Examples.** The example derivation of §3 (`exampleNat_typing`), `exampleMove`,
   `exampleShare`, `exampleBorrow`, `exampleReborrow`, `exampleArray`, `exampleClone`,
   `exampleReference`, `examplePartial` (all with `ℕ` grades), and Example 6.5
@@ -46,22 +88,29 @@ lists the formalisation choices.
   `readRefSplit : *(Ref_id (□_(q+r) A)) ⊸ □_q A ⊗ *(Ref_id (□_r A))`, with reduction rule
   `Step.readRefSplit`. The printed `readRef` is unchanged. Because the primitive is part of
   the calculus, the §6.3 statements below range over terms that may use it too. None of
-  the counterexamples uses it, and the two positive results still hold.
+  the counterexamples uses it, and the positive results still hold.
 * **Lemmas 6.2 and 6.3 (substitution) are proved**: `HasType.subst_lin` and
   `HasType.subst_grd`. The proof uses a dereliction-free version of the typing judgment
-  (`hasType_iff_hasTypeD`), the algebra of contexts, identifier substitution, renaming,
+  (`hasType_iff_hasTypeD`), the algebra of contexts, renaming of identifiers, renaming,
   weakening by zero-graded assumptions and approximation of whole contexts.
 * **Theorems 6.6–6.11** are stated literally (`Statements.lean`) for two variants of
   Definition 6.4: as printed, and with a garbage-collection rule for resource entries
-  (as printed, no heap with a resource entry is compatible with any context). Progress
-  (`not_progress`), preservation (`not_preservation_literal`, `not_preservation_gc`) and
-  soundness with respect to `≡` (`not_eqSoundness`) are false for both variants. Borrow
-  safety, multi-reduction borrow safety and uniqueness are false for the repaired
-  variant (`not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_uniqueness_gc`).
-  For the printed variant, borrow safety holds (`borrowSafety_literal`), multi-reduction
-  borrow safety is false (`not_multiBorrowSafety_literal`), and uniqueness holds
-  vacuously (`uniqueness_literal`). These results concern the rules as printed
-  in the provided text, not necessarily the full rule set in the paper's appendices.
+  (as printed, no heap with a resource entry is compatible with any context,
+  `Compat.ress_eq_none`). Progress (`not_progress`), preservation
+  (`not_preservation_literal`, `not_preservation_gc`) and soundness with respect to `≡`
+  (`not_eqSoundness`) are false for both variants. Borrow safety, multi-reduction borrow
+  safety and uniqueness are false for the repaired variant (`not_borrowSafety_gc`,
+  `not_multiBorrowSafety_gc`, `not_uniqueness_gc`). For the printed variant, borrow
+  safety holds (`borrowSafety_literal`), multi-reduction borrow safety is false
+  (`not_multiBorrowSafety_literal`), and uniqueness holds vacuously
+  (`uniqueness_literal`). These results concern the rules as printed in the provided
+  text, not necessarily the full rule set in the paper's appendices.
+* **Scoping in the statements.** Since configurations are scoped, the statements move the
+  result type and the frame `Γ₀` into the scope after the step (`Ty.ren (Var.shiftN f)`,
+  `TCtx.lift`), and follow old references and identifiers through a reduction sequence
+  with the maps recorded by `Steps`. Heap compatibility has one structural rule that the
+  paper does not need, `freshId` (`H ⋈ Γ ⟹ H, id ⋈ Γ, id`), which adds an identifier
+  without resource entry.
 
 ## *Linearity and Uniqueness: An Entente Cordiale*
 
@@ -71,12 +120,14 @@ This part formalises the first paper of the project (its source was the earlier
 
 ### Representation
 
-Terms use de Bruijn indices and are intrinsically scoped: `Term n` is the type of terms
-with `n` free variables, `Term.var : Fin n → Term n`, and `Term 0` is the type of closed
-terms. Binders bind index `0`. In `letPair t₁ t₂` (`let (x, y) = t₁ in t₂`), `y` is index
-`0` and `x` is index `1`. A context `Ctx n` gives each variable (and each runtime array
-reference) an optional linear hypothesis `x : A` or non-linear hypothesis `x : [A]`.
-Context addition (Definition 2) and `[Γ]` (Definition 1) are defined pointwise.
+Terms use de Bruijn variables and are intrinsically scoped: `Term n ρ` is the type of
+terms with `n` free variables and `ρ` runtime array references, `Term.var : Var n → Term n ρ`,
+and `Term 0 0` is the type of closed source terms. Binders bind `Var.zero`. In
+`letPair t₁ t₂` (`let (x, y) = t₁ in t₂`), `y` is `Var.zero` and `x` is
+`Var.succ Var.zero`. A context `TCtx n ρ` gives each variable and each runtime array
+reference an optional linear hypothesis `x : A` or non-linear hypothesis `x : [A]`.
+Context addition (Definition 2, `TCtx.Add`) and `[Γ]` (Definition 1, `TCtx.AllNonLin`)
+are pointwise relations on the length-indexed lists.
 
 ### Grammars by construction
 
@@ -87,14 +138,14 @@ terms, the predicate only says that the term is the image of an element of that 
 | Grammar | Lean type | Notes |
 | --- | --- | --- |
 | core types `A ::= A ⊸ B \| A ⊗ B \| 1 \| !A \| *A` (§3.1) | `CoreTy` | embeds into the extended types `Ty` (`CoreTy.toTy`, injective) |
-| core terms (§3.1) | `CoreTerm n` | embeds into the extended terms `Term n` (`CoreTerm.toTerm`, injective); `cbn_eval_core` states evaluation for them |
-| values `v ::= (t₁, t₂) \| unit \| *t \| !t \| λx. t \| i \| a \| p` (Theorem 6) | `Value n` | `IsValue t := ∃ v : Value n, v.toTerm = t` |
-| partially applied primitives `p` | `PrimFun n` | a primitive applied to fewer arguments than its arity, each argument being a `Value`; `IsPrimFun` |
+| core terms (§3.1) | `CoreTerm n` | embeds into the extended terms `Term n ρ` (`CoreTerm.toTerm`, injective); `cbn_eval_core` states evaluation for them |
+| values `v ::= (t₁, t₂) \| unit \| *t \| !t \| λx. t \| i \| a \| p` (Theorem 6) | `Value n ρ` | `IsValue t := ∃ v : Value n ρ, v.toTerm = t` |
+| partially applied primitives `p` | `PrimFun n ρ` | a primitive applied to fewer arguments than its arity, each argument being a `Value`; `IsPrimFun` |
 | usage `r ::= 1 \| ω` | `Usage` | a `PartialOrder` with `1 ≤ ω` (decidable) |
-| heaps `H ::= ∅ \| H, x ↦ᵣ (Γ ⊢ t : A) \| H, a ↦ᵣ arr` | `Heap n`, `VarEntry n` | each entry contains a proof of its judgment `Γ ⊢ t : A`; only finitely many arrays are allocated |
+| heaps `H ::= ∅ \| H, x ↦ᵣ (Γ ⊢ t : A) \| H, a ↦ᵣ arr` | `Heap n ρ`, `VarEntry n ρ` | each entry contains a proof of its judgment `Γ ⊢ t : A`; one optional entry per variable and array reference in scope |
 | arrays `arr` | `ArrObj := List Float` | finite arrays, no holes |
-| stores of the array semantics | `Store` | a structure with a proof that only finitely many references are allocated |
-| values of the array semantics | `StoreValue n`, `ReadyPrim n` | embed into `Value n` and `PrimFun n`; `AValue`, `PrimReady` |
+| stores of the array semantics | `Store ρ` | one optional array per reference in scope |
+| values of the array semantics | `StoreValue n ρ`, `ReadyPrim n ρ` | embed into `Value n ρ` and `PrimFun n ρ`; `AValue`, `PrimReady` |
 
 Because a heap entry carries its typing derivation, a step rule can only add derivable
 judgments to the heap. For `copy_β` this means the rule requires `Γ ⊢ *θ(v) : *A`, in a
@@ -110,13 +161,13 @@ its Lean name, and suggests reading orders. `RequestProject/LCU.lean` imports ev
 | Directory (under `RequestProject/LCU/`) | Files | Contents |
 | --- | --- | --- |
 | `Sec2_KeyIdeas/` | `KeyIdeas.lean` | the examples of Section 2 (impossible/possible cake and coffee programs, `sip`, dereliction, borrowing, `uniqueReturn`/`uniqueBind`) |
-| `Sec3_1_Calculus/` | `Syntax.lean`, `RenameSubst.lean` | types `Ty`, primitives, terms `Term n`, the core grammars `CoreTy` and `CoreTerm n`; renaming and substitution |
+| `Sec3_1_Calculus/` | `Syntax.lean`, `RenameSubst.lean` | types `Ty`, primitives, terms `Term n ρ`, the core grammars `CoreTy` and `CoreTerm n`; renaming and substitution |
 | | `Context.lean`, `CtxAlgebra.lean` | contexts, context addition and its algebra |
 | | `Typing.lean` | the typing judgment `HasType` (Figure 1 plus the array primitives of §3.3) |
 | | `TypingD.lean` | an equivalent system with no separate dereliction rule (`hasType_iff_hasTypeD`) |
 | | `Weakening.lean` | **Lemma 3** (weakening) `HasType.weaken`, plus renaming/shifting |
 | | `Substitution.lean` | **Lemma 1** `HasType.subst_lin`, **Lemma 2** `HasType.subst_nonlin` |
-| | `Values.lean` | the value grammar `Value n` and partially applied primitives `PrimFun n`, with an induction principle `IsValue.induction` |
+| | `Values.lean` | the value grammar `Value n ρ` and partially applied primitives `PrimFun n ρ`, with an induction principle `IsValue.induction` |
 | | `FreeVars.lean` | free variables; linear variables must occur; strengthening |
 | `Sec3_2_Equational/` | `Equational.lean`, `EqAxiomTyping.lean` | the equational theory `≡ₗ` (§3.2); every axiom preserves typing (`EqAxiom.preserves`) |
 | `Sec3_4_HeapModel/` | `Heap.lean` | the heap model (§3.4): heaps, single-step reduction `Step`, multi-step `Steps`, full β-reduction, compatibility `Compat` (**Definition 3**) |
@@ -214,7 +265,8 @@ arrays. The reduction `σ ⊢ t ⟶ σ' ⊢ t'` (`AStep`) uses these rules:
 * `readArray (*a) k` reads from the store;
 * `writeArray (*a) k x` updates the store destructively;
 * `copy !u as x in t ⟶ [*θ(u)/x]t` copies every array referenced by `u` to a fresh
-  reference (`θ(a) = N + a`), as in the paper's `copy_β`;
+  reference (all arrays of the store are duplicated, `Store.copyAll`), as in the paper's
+  `copy_β`;
 * arguments of primitives are evaluated, including under `*`.
 
 Configurations are typed by a context `Γ` compatible with the store (`ConfOK`): no

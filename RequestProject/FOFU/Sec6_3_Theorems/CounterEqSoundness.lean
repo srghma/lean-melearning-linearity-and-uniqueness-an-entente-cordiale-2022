@@ -19,23 +19,25 @@ namespace FOFU
 
 variable {R : Type} [Grades.PreorderedSemiring R]
 
-/-- Every multi-step reduction from `split (*())` is trivial. -/
-theorem stuckSplit_steps {n m : ℕ} {H : Heap R n} {s : R} {H' : Heap R m} {t' : Term R m}
-    (h : Steps H stuckSplit s H' t') : ∃ e : n = m, t' = e ▸ stuckSplit := by
-  cases h with
-  | refl => exact ⟨rfl, rfl⟩
-  | ext h₁ _ => exact absurd h₁ (stuckSplit_no_step _ _ _ _)
+/-- A multi-step reduction from `split (*())` never ends in a value. -/
+theorem stuckSplit_steps_not_value {n ρ ι n' ρ' ι' : ℕ} {H : Heap R n ρ ι} {t : Term R n ρ}
+    {s : R} {H' : Heap R n' ρ' ι'} {t' : Term R n' ρ'} {θr : Var ρ → Var ρ'}
+    {θi : Var ι → Var ι'} (h : Steps H t s H' t' θr θi) (ht : t = stuckSplit) :
+    ¬ IsValue t' := by
+  induction h with
+  | refl => subst ht; exact stuckSplit_not_value
+  | ext h₁ _ _ => subst ht; exact absurd h₁ (stuckSplit_no_step _ _ _ _)
 
 /-- **Theorem 6.11 is false** (for both variants of Definition 6.4 and every choice of
 the relation `H'(v₁) ≡ H''(v₂)`). -/
 theorem not_eqSoundness (gc : Bool)
-    (heapEq : ∀ {m₁ m₂ : ℕ}, Heap R m₁ → Term R m₁ → Heap R m₂ → Term R m₂ → Prop) :
+    (heapEq : ∀ {n₁ ρ₁ ι₁ n₂ ρ₂ ι₂ : ℕ}, Heap R n₁ ρ₁ ι₁ → Term R n₁ ρ₁ →
+      Heap R n₂ ρ₂ ι₂ → Term R n₂ ρ₂ → Prop) :
     ¬ EqSoundness gc heapEq := by
   intro h
-  obtain ⟨m₁, H₁, v₁, -, -, -, hs, hv, -⟩ :=
-    h Ctx.empty stuckSplit stuckSplit stuckSplitTy Heap.empty stuckSplit_typed stuckSplit_typed
-      (Equiv.refl _) Compat.empty
-  obtain ⟨rfl, rfl⟩ := stuckSplit_steps hs
-  exact stuckSplit_not_value hv
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, hs, hv, -⟩ :=
+    h TCtx.empty stuckSplit stuckSplit stuckSplitTy Heap.empty stuckSplit_typed
+      stuckSplit_typed (Equiv.refl _) Compat.empty
+  exact stuckSplit_steps_not_value hs rfl hv
 
 end FOFU

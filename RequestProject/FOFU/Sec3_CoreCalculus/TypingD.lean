@@ -1,7 +1,7 @@
 module
 public import RequestProject.FOFU.Sec3_CoreCalculus.CtxAlgebra
 public import RequestProject.FOFU.Sec3_CoreCalculus.TypingLemmas
-public import Mathlib.Data.Finset.Insert
+public import Mathlib.Data.Fintype.Basic
 
 /-!
 # A dereliction-free presentation of the typing judgment
@@ -33,173 +33,141 @@ open Ty
 variable {R : Type} [Grades.PreorderedSemiring R]
 
 /-- The dereliction-free typing judgment (see the module docstring). -/
-inductive HasTypeD : {k n : ℕ} → Ctx R k n → Term R n → Ty R k → Prop where
+inductive HasTypeD : {k n ρ : ℕ} → TCtx R k n ρ → Term R n ρ → Ty R k → Prop where
   /-- `0 · Γ, x : A ⊢ x : A` -/
-  | var {k n : ℕ} {Γ : Ctx R k n} {i : Fin n} {A : Ty R k}
-      (hi : Γ.vars i = some (.lin A)) (hz : ∀ j, j ≠ i → ZeroAssm (Γ.vars j)) :
-      HasTypeD Γ (.var i) A
+  | var {k n ρ : ℕ} {Γ : TCtx R k n ρ} {i : Var n} {A : Ty R k} :
+      Γ.vars.Pick ZeroAssm i (some (.lin A)) → HasTypeD Γ (.var i) A
   /-- `0 · Γ, x : [A]_1 ⊢ x : A` (the derived rule `var'`) -/
-  | varG {k n : ℕ} {Γ : Ctx R k n} {i : Fin n} {A : Ty R k}
-      (hi : Γ.vars i = some (.grd A 1)) (hz : ∀ j, j ≠ i → ZeroAssm (Γ.vars j)) :
-      HasTypeD Γ (.var i) A
+  | varG {k n ρ : ℕ} {Γ : TCtx R k n ρ} {i : Var n} {A : Ty R k} :
+      Γ.vars.Pick ZeroAssm i (some (.grd A 1)) → HasTypeD Γ (.var i) A
   /-- `Γ, x : A ⊢ t : B  ⟹  Γ ⊢ λx. t : A ⊸ B` -/
-  | abs {k n : ℕ} {Γ : Ctx R k n} {t : Term R (n + 1)} {A B : Ty R k} :
+  | abs {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R (n + 1) ρ} {A B : Ty R k} :
       HasTypeD (Γ.cons (some (.lin A))) t B → HasTypeD Γ (.lam t) (lolli A B)
   /-- `Γ₁ ⊢ t₁ : A ⊸ B,  Γ₂ ⊢ t₂ : A  ⟹  Γ₁ + Γ₂ ⊢ t₁ t₂ : B` -/
-  | app {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ t₂ : Term R n} {A B : Ty R k} :
+  | app {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ t₂ : Term R n ρ} {A B : Ty R k} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (lolli A B) → HasTypeD Γ₂ t₂ A → HasTypeD Γ (.app t₁ t₂) B
   /-- `[Γ] ⊢ t : A,  ¬ resourceAllocator(t)  ⟹  r · Γ ⊢ [t]_r : □_r A` -/
-  | pr {k n : ℕ} {Γ₀ Γ : Ctx R k n} {t : Term R n} {A : Ty R k} {r : R} :
+  | pr {k n ρ : ℕ} {Γ₀ Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k} {r : R} :
       CtxScale r Γ₀ Γ → HasTypeD Γ₀ t A → ¬ t.Allocates → HasTypeD Γ (.box r t) (box r A)
   /-- `Γ₁ ⊢ t₁ : □_r A,  Γ₂, x : [A]_r ⊢ t₂ : B  ⟹  Γ₁ + Γ₂ ⊢ let [x] = t₁ in t₂ : B` -/
-  | elim {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ : Term R n} {t₂ : Term R (n + 1)}
+  | elim {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ : Term R n ρ} {t₂ : Term R (n + 1) ρ}
       {A B : Ty R k} {r : R} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (box r A) → HasTypeD (Γ₂.cons (some (.grd A r))) t₂ B →
       HasTypeD Γ (.letBox t₁ t₂) B
   /-- approximation: `Γ, x : [A]_r ⊢ t : B,  r ⊑ s  ⟹  Γ, x : [A]_s ⊢ t : B` -/
-  | approx {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k} {i : Fin n} {A : Ty R k}
+  | approx {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k} {i : Var n} {A : Ty R k}
       {r s : R} :
-      Γ.vars i = some (.grd A r) → r ≤ s → HasTypeD Γ t B →
-      HasTypeD (Γ.update i (some (.grd A s))) t B
+      Γ.vars.Lookup i (some (.grd A r)) → r ≤ s → HasTypeD Γ t B →
+      HasTypeD (Γ.setVar i (some (.grd A s))) t B
   /-- `Γ₁ ⊢ t₁ : A,  Γ₂ ⊢ t₂ : B  ⟹  Γ₁ + Γ₂ ⊢ (t₁, t₂) : A ⊗ B` -/
-  | tensorI {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ t₂ : Term R n} {A B : Ty R k} :
+  | tensorI {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ t₂ : Term R n ρ} {A B : Ty R k} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ A → HasTypeD Γ₂ t₂ B → HasTypeD Γ (.pair t₁ t₂) (tensor A B)
   /-- `Γ₁ ⊢ t₁ : A ⊗ B,  Γ₂, x : A, y : B ⊢ t₂ : C  ⟹  Γ₁ + Γ₂ ⊢ let (x, y) = t₁ in t₂ : C` -/
-  | tensorE {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ : Term R n} {t₂ : Term R (n + 2)}
+  | tensorE {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ : Term R n ρ} {t₂ : Term R (n + 2) ρ}
       {A B C : Ty R k} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (tensor A B) →
       HasTypeD ((Γ₂.cons (some (.lin A))).cons (some (.lin B))) t₂ C →
       HasTypeD Γ (.letPair t₁ t₂) C
   /-- `0 · Γ ⊢ () : unit` -/
-  | unitI {k n : ℕ} {Γ : Ctx R k n} : Γ.IsZero → HasTypeD Γ .unit unit
+  | unitI {k n ρ : ℕ} {Γ : TCtx R k n ρ} : Γ.IsZero → HasTypeD Γ .unit unit
   /-- `Γ₁ ⊢ t₁ : unit,  Γ₂ ⊢ t₂ : A  ⟹  Γ₁ + Γ₂ ⊢ let () = t₁ in t₂ : A` -/
-  | unitE {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ t₂ : Term R n} {A : Ty R k} :
+  | unitE {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ t₂ : Term R n ρ} {A : Ty R k} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ unit → HasTypeD Γ₂ t₂ A → HasTypeD Γ (.letUnit t₁ t₂) A
   /-- `Γ ⊢ t : A [ι / id]  ⟹  Γ ⊢ pack ⟨ι, t⟩ : ∃ id. A` -/
-  | pack {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A : Ty R (k + 1)} (ι : Ident k) :
+  | pack {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R (k + 1)} (ι : Var k) :
       HasTypeD Γ t (A.inst ι) → HasTypeD Γ (.pack t) (ex A)
   /-- `Γ₁ ⊢ t₁ : ∃ id. A,  Γ₂, id, x : A ⊢ t₂ : B,  id ∉ fv(B)
       ⟹  Γ₁ + Γ₂ ⊢ unpack ⟨id, x⟩ = t₁ in t₂ : B` -/
-  | unpack {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ : Term R n} {t₂ : Term R (n + 1)}
+  | unpack {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ : Term R n ρ} {t₂ : Term R (n + 1) ρ}
       {A : Ty R (k + 1)} {B : Ty R k} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (ex A) →
       HasTypeD (Γ₂.shiftNames.cons (some (.lin A))) t₂ B.shift →
       HasTypeD Γ (.unpack t₁ t₂) B
   /-- `Γ ⊢ t : *A  ⟹  Γ ⊢ share t : □_r A` (§4) -/
-  | share {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (r : R) :
+  | share {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k} (r : R) :
       HasTypeD Γ t (star A) → HasTypeD Γ (.share r t) (box r A)
   /-- `Γ₁ ⊢ t₁ : □_r A,  Γ₂, x : ∃ id. *A' ⊢ t₂ : B,  1 ⊑ r,  cloneable(A)
       ⟹  Γ₁ + Γ₂ ⊢ clone t₁ as x in t₂ : B` (§4), where `A'` abstracts an identifier
       of `A` -/
-  | clone {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ : Term R n} {t₂ : Term R (n + 1)}
-      {A : Ty R k} {A' : Ty R (k + 1)} {B : Ty R k} {r : R} (ι : Ident k) :
-      CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (box r A) → 1 ≤ r → Cloneable A → A'.inst ι = A →
+  | clone {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ : Term R n ρ} {t₂ : Term R (n + 1) ρ}
+      {A : Ty R k} {A' : Ty R (k + 1)} {B : Ty R k} {r : R} (ι : Var k) :
+      CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (box r A) → 1 ≤ r → A.cloneable = true → A'.inst ι = A →
       HasTypeD (Γ₂.cons (some (.lin (ex (star A'))))) t₂ B →
       HasTypeD Γ (.clone t₁ t₂) B
   /-- `Γ₁ ⊢ t₁ : &₁ A ⊸ &₁ B,  Γ₂ ⊢ t₂ : *A  ⟹  Γ₁ + Γ₂ ⊢ withBorrow t₁ t₂ : *B` (§5) -/
-  | withBorrow {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ t₂ : Term R n} {A B : Ty R k} :
+  | withBorrow {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ t₂ : Term R n ρ} {A B : Ty R k} :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (lolli (borrow Perm.one A) (borrow Perm.one B)) →
       HasTypeD Γ₂ t₂ (star A) → HasTypeD Γ (.withBorrow t₁ t₂) (star B)
   /-- `Γ ⊢ t : &_p A  ⟹  Γ ⊢ split t : &_(p/2) A ⊗ &_(p/2) A` (§5) -/
-  | split {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} {f : Frac} :
+  | split {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k} {f : Frac} :
       HasTypeD Γ t (borrow (.frac f) A) →
       HasTypeD Γ (.split t) (tensor (borrow (.frac f.half) A) (borrow (.frac f.half) A))
   /-- `Γ₁ ⊢ t₁ : &_p A,  Γ₂ ⊢ t₂ : &_q A  ⟹  Γ₁ + Γ₂ ⊢ join t₁ t₂ : &_(p+q) A` (§5) -/
-  | join {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} {t₁ t₂ : Term R n} {A : Ty R k} {f g : Frac}
+  | join {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} {t₁ t₂ : Term R n ρ} {A : Ty R k} {f g : Frac}
       (h : f.1 + g.1 ≤ 1) :
       CtxAdd Γ₁ Γ₂ Γ → HasTypeD Γ₁ t₁ (borrow (.frac f) A) → HasTypeD Γ₂ t₂ (borrow (.frac g) A) →
       HasTypeD Γ (.join t₁ t₂) (borrow (.frac (f.add g h)) A)
   /-- `Γ ⊢ t : &_p (A ⊗ B)  ⟹  Γ ⊢ push t : &_p A ⊗ &_p B` (§5.2) -/
-  | push {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A B : Ty R k} {p : Perm} :
+  | push {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A B : Ty R k} {p : Perm} :
       HasTypeD Γ t (borrow p (tensor A B)) →
       HasTypeD Γ (.push t) (tensor (borrow p A) (borrow p B))
   /-- `Γ ⊢ t : &_p A ⊗ &_p B  ⟹  Γ ⊢ pull t : &_p (A ⊗ B)` (§5.2) -/
-  | pull {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A B : Ty R k} {p : Perm} :
+  | pull {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A B : Ty R k} {p : Perm} :
       HasTypeD Γ t (tensor (borrow p A) (borrow p B)) →
       HasTypeD Γ (.pull t) (borrow p (tensor A B))
   /-- natural number literals: `0 · Γ ⊢ n : ℕ` -/
-  | nat {k n : ℕ} {Γ : Ctx R k n} (m : ℕ) : Γ.IsZero → HasTypeD Γ (.nat m) nat
+  | nat {k n ρ : ℕ} {Γ : TCtx R k n ρ} (m : ℕ) : Γ.IsZero → HasTypeD Γ (.nat m) nat
   /-- float literals: `0 · Γ ⊢ x : 𝔽` -/
-  | float {k n : ℕ} {Γ : Ctx R k n} (x : Float) : Γ.IsZero → HasTypeD Γ (.float x) float
+  | float {k n ρ : ℕ} {Γ : TCtx R k n ρ} (x : FloatLit) : Γ.IsZero → HasTypeD Γ (.float x) float
   /-- the resource primitives: `0 · Γ ⊢ p : A` for the types `A` of `PrimTy` -/
-  | prim {k n : ℕ} {Γ : Ctx R k n} {p : Prim} {A : Ty R k} :
+  | prim {k n ρ : ℕ} {Γ : TCtx R k n ρ} {p : Prim} {A : Ty R k} :
       Γ.IsZero → PrimTy p A → HasTypeD Γ (.prim p) A
   /-- `γ ⊢ t : A  ⟹  0 · Γ, γ ⊢ *t : &_p A` (§6.1) -/
-  | nec {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} (p : Perm) :
+  | nec {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k} (p : Perm) :
       Γ.IsZero → HasTypeD Γ.refsOnly t A → HasTypeD Γ (.star t) (borrow p A)
   /-- `Γ ⊢ t : &₁ A  ⟹  Γ ⊢ unborrow t : *A` (§6.1) -/
-  | unborrow {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A : Ty R k} :
+  | unborrow {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k} :
       HasTypeD Γ t (borrow Perm.one A) → HasTypeD Γ (.unborrow t) (star A)
   /-- `0 · Γ, ref : Res_id A ⊢ ref : Res_id A` (§6.1) -/
-  | ref {k n : ℕ} {Γ : Ctx R k n} {a : ℕ} {T : RefTy R k} :
-      Γ.IsZero → Γ.refs a = some T → HasTypeD Γ (.ref a) T.toTy
+  | ref {k n ρ : ℕ} {Γ : TCtx R k n ρ} {a : Var ρ} {T : RefTy R k} :
+      Γ.IsZero → Γ.refs.Lookup a (some T) → HasTypeD Γ (.ref a) T.toTy
 
 
-/-! ## Context lemmas about `update` -/
+/-! ## Context lemmas about `setVar` -/
 
-namespace Ctx
+lemma Ctx.map_set {α β : Type} {n : ℕ} (f : α → β) (Γ : Ctx α n) (i : Var n) (a : α) :
+    (Γ.set i a).map f = (Γ.map f).set i (f a) :=
+  Ctx.ext fun j => by simp only [Ctx.get_map, Ctx.get_set]; split_ifs <;> rfl
+
+namespace TCtx
 
 section
 omit [Grades.PreorderedSemiring R]
 
-variable {k k' n : ℕ}
+variable {k k' n ρ : ℕ}
 
-lemma cons_update_succ (Γ : Ctx R k n) (a b : Option (Assm R k)) (i : Fin n) :
-    (Γ.cons a).update i.succ b = (Γ.update i b).cons a := by
-  ext1
-  · funext j
-    cases j using Fin.cases with
-    | zero => simp [Ctx.update, Ctx.cons, (Fin.succ_ne_zero i).symm]
-    | succ j =>
-      by_cases h : j = i
-      · subst h; simp [Ctx.update, Ctx.cons]
-      · simp [Ctx.update, Ctx.cons]
-  · rfl
+@[simp] lemma cons_setVar_succ (Γ : TCtx R k n ρ) (a b : Option (Assm R k)) (i : Var n) :
+    (Γ.cons a).setVar (.succ i) b = (Γ.setVar i b).cons a := rfl
 
-lemma substNames_update (σ : Fin k → Ident k') (Γ : Ctx R k n) (i : Fin n)
+lemma renNames_setVar (r : Var k → Var k') (Γ : TCtx R k n ρ) (i : Var n)
     (a : Option (Assm R k)) :
-    (Γ.update i a).substNames σ = (Γ.substNames σ).update i (a.map (Assm.subst σ)) := by
-  ext1
-  · funext j
-    by_cases h : j = i
-    · subst h; simp [Ctx.update, Ctx.substNames]
-    · simp [Ctx.update, Ctx.substNames, Function.update_of_ne h]
-  · rfl
+    (Γ.setVar i a).renNames r = (Γ.renNames r).setVar i (a.map (Assm.ren r)) :=
+  TCtx.ext rfl (Ctx.map_set _ _ _ _)
 
-lemma update_comm (Γ : Ctx R k n) {i j : Fin n} (h : i ≠ j) (a b : Option (Assm R k)) :
-    (Γ.update i a).update j b = (Γ.update j b).update i a := by
-  ext1
-  · exact Function.update_comm h a b Γ.vars
-  · rfl
+lemma setVar_comm (Γ : TCtx R k n ρ) {i j : Var n} (h : i ≠ j) (a b : Option (Assm R k)) :
+    (Γ.setVar i a).setVar j b = (Γ.setVar j b).setVar i a :=
+  TCtx.ext rfl (Ctx.set_comm _ h a b)
 
-lemma update_vars_self (Γ : Ctx R k n) (i : Fin n) (a : Option (Assm R k)) :
-    (Γ.update i a).vars i = a := by simp [Ctx.update]
+@[simp] lemma setVar_get (Γ : TCtx R k n ρ) (i : Var n) : Γ.setVar i (Γ.vars.get i) = Γ :=
+  TCtx.ext rfl (Ctx.set_get _ _)
 
-lemma update_vars_ne (Γ : Ctx R k n) {i j : Fin n} (h : j ≠ i) (a : Option (Assm R k)) :
-    (Γ.update i a).vars j = Γ.vars j := by simp [Ctx.update, Function.update_of_ne h]
-
-lemma update_eq_self (Γ : Ctx R k n) (i : Fin n) : Γ.update i (Γ.vars i) = Γ := by
-  ext1
-  · exact Function.update_eq_self i Γ.vars
-  · rfl
-
-lemma update_update (Γ : Ctx R k n) (i : Fin n) (a b : Option (Assm R k)) :
-    (Γ.update i a).update i b = Γ.update i b := by
-  ext1
-  · simp [Ctx.update]
-  · rfl
+@[simp] lemma setVar_setVar (Γ : TCtx R k n ρ) (i : Var n) (a b : Option (Assm R k)) :
+    (Γ.setVar i a).setVar i b = Γ.setVar i b :=
+  TCtx.ext rfl (Ctx.set_set _ _ _ _)
 
 end
 
-end Ctx
-
-lemma CtxAdd.update {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} (h : CtxAdd Γ₁ Γ₂ Γ) (i : Fin n)
-    {a b c : Option (Assm R k)} (habc : AssmAdd a b c) :
-    CtxAdd (Γ₁.update i a) (Γ₂.update i b) (Γ.update i c) := by
-  refine ⟨fun j => ?_, h.refs⟩
-  by_cases hj : j = i
-  · subst hj; simpa [Ctx.update] using habc
-  · simpa [Ctx.update, Function.update_of_ne hj] using h.vars j
+end TCtx
 
 lemma AssmAdd.noneRight' {k : ℕ} (a : Option (Assm R k)) : AssmAdd a none a := by
   cases a
@@ -221,81 +189,75 @@ lemma AssmLe.cases' {k : ℕ} {a b : Option (Assm R k)} (h : AssmLe a b) :
   | grd A h => exact Or.inr ⟨A, _, _, rfl, rfl, h⟩
 
 /-- Splitting a linear assumption of a sum, and updating it on the side it comes from. -/
-lemma CtxAdd.lin_split {k n : ℕ} {Γ₁ Γ₂ Γ : Ctx R k n} (h : CtxAdd Γ₁ Γ₂ Γ) {i : Fin n}
-    {A : Ty R k} (hi : Γ.vars i = some (.lin A)) (g : Option (Assm R k)) :
-    (Γ₁.vars i = some (.lin A) ∧ CtxAdd (Γ₁.update i g) Γ₂ (Γ.update i g)) ∨
-    (Γ₂.vars i = some (.lin A) ∧ CtxAdd Γ₁ (Γ₂.update i g) (Γ.update i g)) := by
-  have := h.vars i
+lemma CtxAdd.lin_split {k n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) {i : Var n}
+    {A : Ty R k} (hi : Γ.vars.get i = some (.lin A)) (g : Option (Assm R k)) :
+    (Γ₁.vars.get i = some (.lin A) ∧ CtxAdd (Γ₁.setVar i g) Γ₂ (Γ.setVar i g)) ∨
+    (Γ₂.vars.get i = some (.lin A) ∧ CtxAdd Γ₁ (Γ₂.setVar i g) (Γ.setVar i g)) := by
+  have := h.vars.get i
   rw [hi] at this
   rcases this.lin_cases with ⟨h1, h2⟩ | ⟨h1, h2⟩
   · refine Or.inl ⟨h1, ?_⟩
-    have := h.update i (a := g) (AssmAdd.noneRight' g)
-    rwa [← h2, Ctx.update_eq_self] at this
+    have := h.setVar i (a := g) (AssmAdd.noneRight' g)
+    rwa [← h2, TCtx.setVar_get] at this
   · refine Or.inr ⟨h2, ?_⟩
-    have := h.update i (b := g) (AssmAdd.noneLeft g)
-    rwa [← h1, Ctx.update_eq_self] at this
+    have := h.setVar i (b := g) (AssmAdd.noneLeft g)
+    rwa [← h1, TCtx.setVar_get] at this
 
 /-! ## Approximation of whole contexts -/
 
 namespace HasTypeD
 
-theorem approxCtx {k n : ℕ} {Γ Γ' : Ctx R k n} {t : Term R n} {B : Ty R k}
+theorem approxCtx {k n ρ : ℕ} {Γ Γ' : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k}
     (h : HasTypeD Γ t B) (hle : CtxLe Γ Γ') : HasTypeD Γ' t B := by
   classical
-  suffices H : ∀ S : Finset (Fin n), ∀ Γ' : Ctx R k n, CtxLe Γ Γ' →
-      (∀ j, j ∉ S → Γ'.vars j = Γ.vars j) → HasTypeD Γ' t B from
+  suffices H : ∀ S : Finset (Var n), ∀ Γ' : TCtx R k n ρ, CtxLe Γ Γ' →
+      (∀ j, j ∉ S → Γ'.vars.get j = Γ.vars.get j) → HasTypeD Γ' t B from
     H Finset.univ Γ' hle (fun j hj => absurd (Finset.mem_univ j) hj)
   intro S
   induction S using Finset.induction_on with
   | empty =>
     intro Γ' hle hS
-    have e : Γ' = Γ := by
-      ext1
-      · funext j; exact hS j (Finset.notMem_empty j)
-      · exact hle.refs
+    have e : Γ' = Γ := TCtx.ext hle.refs (Ctx.ext fun j => hS j (Finset.notMem_empty j))
     rw [e]; exact h
   | insert j S hj ih =>
     intro Γ' hle hS
-    have h₁ : HasTypeD (Γ'.update j (Γ.vars j)) t B := by
-      refine ih _ ⟨fun i => ?_, hle.refs⟩ (fun i hi => ?_)
-      · by_cases hij : i = j
-        · subst hij; rw [Ctx.update_vars_self]; exact .refl _
-        · rw [Ctx.update_vars_ne _ hij]; exact hle.vars i
-      · by_cases hij : i = j
-        · subst hij; rw [Ctx.update_vars_self]
-        · rw [Ctx.update_vars_ne _ hij]
-          exact hS i (by simp [hij, hi])
-    rcases (hle.vars j).cases' with e | ⟨A, r, s, e₁, e₂, hrs⟩
-    · rw [← e, Ctx.update_eq_self] at h₁; exact h₁
+    have h₁ : HasTypeD (Γ'.setVar j (Γ.vars.get j)) t B := by
+      refine ih _ ⟨hle.refs, Ctx.forall₂_iff.2 fun i => ?_⟩ (fun i hi => ?_)
+      · simp only [TCtx.setVar_vars, Ctx.get_set]
+        split_ifs with hij
+        · subst hij; exact .refl _
+        · exact hle.vars.get i
+      · simp only [TCtx.setVar_vars, Ctx.get_set]
+        split_ifs with hij
+        · subst hij; rfl
+        · exact hS i (by simp [hij, hi])
+    rcases (hle.vars.get j).cases' with e | ⟨A, r, s, e₁, e₂, hrs⟩
+    · rw [← e, TCtx.setVar_get] at h₁; exact h₁
     · rw [e₁] at h₁
-      have := HasTypeD.approx (i := j) (Ctx.update_vars_self _ _ _) hrs h₁
-      rw [Ctx.update_update, ← e₂, Ctx.update_eq_self] at this
+      have := HasTypeD.approx (i := j) (A := A) (r := r) (Ctx.Lookup.of_eq (by simp)) hrs h₁
+      rw [TCtx.setVar_setVar, ← e₂, TCtx.setVar_get] at this
       exact this
 
 /-! ## Dereliction is admissible -/
 
-theorem der {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k} (h : HasTypeD Γ t B) :
-    ∀ {i : Fin n} {A : Ty R k}, Γ.vars i = some (.lin A) →
-      HasTypeD (Γ.update i (some (.grd A 1))) t B := by
+theorem der {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k} (h : HasTypeD Γ t B) :
+    ∀ {i : Var n} {A : Ty R k}, Γ.vars.get i = some (.lin A) →
+      HasTypeD (Γ.setVar i (some (.grd A 1))) t B := by
   induction h with
-  | @var k n Γ j C hj hz =>
+  | @var k n ρ Γ j C hj =>
     intro i A hi
-    by_cases hji : j = i
-    · subst hji
-      rw [hi] at hj; cases hj
-      exact .varG (Ctx.update_vars_self _ _ _)
-        (fun l hl => by rw [Ctx.update_vars_ne _ hl]; exact hz l hl)
-    · have := hz i (Ne.symm hji); rw [hi] at this; exact this.elim
-  | @varG k n Γ j C hj hz =>
+    have hji : i = j := hj.eq_of_not (by rw [hi]; exact not_zeroAssm_lin A)
+    subst hji
+    rw [hj.get] at hi; cases hi
+    exact .varG (hj.set _)
+  | @varG k n ρ Γ j C hj =>
     intro i A hi
-    by_cases hji : j = i
-    · subst hji; rw [hi] at hj; cases hj
-    · have := hz i (Ne.symm hji); rw [hi] at this; exact this.elim
+    have hji : i = j := hj.eq_of_not (by rw [hi]; exact not_zeroAssm_lin A)
+    subst hji
+    rw [hj.get] at hi; cases hi
   | abs _ ih =>
     intro i A hi
-    have := ih (i := i.succ) hi
-    rw [Ctx.cons_update_succ] at this
-    exact .abs this
+    exact .abs (ih (i := .succ i) hi)
   | app hadd _ _ ih₁ ih₂ =>
     intro i A hi
     rcases hadd.lin_split hi (some (.grd A 1)) with ⟨h1, h⟩ | ⟨h2, h⟩
@@ -325,43 +287,38 @@ theorem der {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k} (h : HasTyp
     intro i A hi
     rcases hadd.lin_split hi (some (.grd A 1)) with ⟨h1, h⟩ | ⟨h2, h⟩
     · exact .elim h (ih₁ h1) ‹_›
-    · have := ih₂ (i := i.succ) h2
-      rw [Ctx.cons_update_succ] at this
-      exact .elim h ‹_› this
+    · exact .elim h ‹_› (ih₂ (i := .succ i) h2)
   | tensorE hadd _ _ ih₁ ih₂ =>
     intro i A hi
     rcases hadd.lin_split hi (some (.grd A 1)) with ⟨h1, h⟩ | ⟨h2, h⟩
     · exact .tensorE h (ih₁ h1) ‹_›
-    · have := ih₂ (i := i.succ.succ) h2
-      rw [Ctx.cons_update_succ, Ctx.cons_update_succ] at this
-      exact .tensorE h ‹_› this
+    · exact .tensorE h ‹_› (ih₂ (i := .succ (.succ i)) h2)
   | unpack hadd _ _ ih₁ ih₂ =>
     intro i A hi
     rcases hadd.lin_split hi (some (.grd A 1)) with ⟨h1, h⟩ | ⟨h2, h⟩
     · exact .unpack h (ih₁ h1) ‹_›
-    · have := ih₂ (i := i.succ) (A := A.shift) (by simp [Ctx.shiftNames, Ctx.substNames, h2,
-        Assm.subst, Ty.shift])
-      rw [Ctx.cons_update_succ] at this
+    · have := ih₂ (i := .succ i) (A := A.shift) (by
+        simp [TCtx.shiftNames, h2, Ty.shift])
       refine .unpack h ‹_› ?_
-      rw [Ctx.shiftNames, Ctx.substNames_update]
+      rw [TCtx.shiftNames, TCtx.renNames_setVar]
       exact this
   | clone ι hadd _ hr hc hA _ ih₁ ih₂ =>
     intro i A hi
     rcases hadd.lin_split hi (some (.grd A 1)) with ⟨h1, h⟩ | ⟨h2, h⟩
     · exact .clone ι h (ih₁ h1) hr hc hA ‹_›
-    · have := ih₂ (i := i.succ) h2
-      rw [Ctx.cons_update_succ] at this
-      exact .clone ι h ‹_› hr hc hA this
+    · exact .clone ι h ‹_› hr hc hA (ih₂ (i := .succ i) h2)
   | pr hs _ _ _ =>
     intro i A hi
-    have := hs.vars i; rw [hi] at this; exact this.not_lin_right.elim
-  | @approx k n Γ t B j C r s hj hrs _ ih =>
+    have := hs.vars.get i; rw [hi] at this; exact this.not_lin_right.elim
+  | @approx k n ρ Γ t B j C r s hj hrs _ ih =>
     intro i A hi
     by_cases hji : j = i
-    · subst hji; rw [Ctx.update_vars_self] at hi; cases hi
-    · rw [Ctx.update_vars_ne _ (Ne.symm hji)] at hi
-      have := HasTypeD.approx (i := j) (by rw [Ctx.update_vars_ne _ hji]; exact hj) hrs (ih hi)
-      rwa [Ctx.update_comm _ (Ne.symm hji)] at this
+    · subst hji; simp at hi
+    · rw [TCtx.setVar_vars, Ctx.get_set_ne _ _ (Ne.symm hji)] at hi
+      have := HasTypeD.approx (i := j)
+        (Ctx.Lookup.of_eq (by rw [TCtx.setVar_vars, Ctx.get_set_ne _ _ hji]; exact hj.eq)) hrs
+        (ih hi)
+      rwa [TCtx.setVar_comm _ (Ne.symm hji)] at this
   | pack ι _ ih => intro i A hi; exact .pack ι (ih hi)
   | share r _ ih => intro i A hi; exact .share r (ih hi)
   | split _ ih => intro i A hi; exact .split (ih hi)
@@ -370,17 +327,17 @@ theorem der {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k} (h : HasTyp
   | unborrow _ ih => intro i A hi; exact .unborrow (ih hi)
   | unitI hz | nat _ hz | float _ hz | prim hz _ | nec _ hz _ _ | ref hz _ =>
     intro i A hi
-    have := hz i; rw [hi] at this; exact this.elim
+    have := hz.get i; rw [hi] at this; exact this.elim
 
 end HasTypeD
 
 /-! ## Equivalence with `HasType` -/
 
-theorem HasType.toD {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k}
+theorem HasType.toD {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k}
     (h : HasType Γ t B) : HasTypeD Γ t B := by
   induction h with
-  | der hi _ ih => exact ih.der hi
-  | var hi hz => exact .var hi hz
+  | der hi _ ih => exact ih.der hi.eq
+  | var hi => exact .var hi
   | abs _ ih => exact .abs ih
   | app hadd _ _ ih₁ ih₂ => exact .app hadd ih₁ ih₂
   | pr hs _ hna ih => exact .pr hs ih hna
@@ -406,11 +363,11 @@ theorem HasType.toD {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k}
   | unborrow _ ih => exact .unborrow ih
   | ref hz ha => exact .ref hz ha
 
-theorem HasTypeD.toHasType {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k}
+theorem HasTypeD.toHasType {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k}
     (h : HasTypeD Γ t B) : HasType Γ t B := by
   induction h with
-  | varG hi hz => exact .var' hi hz
-  | var hi hz => exact .var hi hz
+  | varG hi => exact .var' hi
+  | var hi => exact .var hi
   | abs _ ih => exact .abs ih
   | app hadd _ _ ih₁ ih₂ => exact .app hadd ih₁ ih₂
   | pr hs _ hna ih => exact .pr hs ih hna
@@ -437,11 +394,11 @@ theorem HasTypeD.toHasType {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R
   | ref hz ha => exact .ref hz ha
 
 /-- The dereliction-free judgment is equivalent to the paper's. -/
-theorem hasType_iff_hasTypeD {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {B : Ty R k} :
+theorem hasType_iff_hasTypeD {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k} :
     HasType Γ t B ↔ HasTypeD Γ t B := ⟨HasType.toD, HasTypeD.toHasType⟩
 
 /-- Approximation of whole contexts, for the paper's judgment. -/
-theorem HasType.approxCtx {k n : ℕ} {Γ Γ' : Ctx R k n} {t : Term R n} {B : Ty R k}
+theorem HasType.approxCtx {k n ρ : ℕ} {Γ Γ' : TCtx R k n ρ} {t : Term R n ρ} {B : Ty R k}
     (h : HasType Γ t B) (hle : CtxLe Γ Γ') : HasType Γ' t B :=
   (h.toD.approxCtx hle).toHasType
 

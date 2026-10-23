@@ -25,101 +25,76 @@ variable {R : Type} [Grades.PreorderedSemiring R]
 
 omit [Grades.PreorderedSemiring R] in
 /-- Copying resources out of a heap without resource entries copies nothing. -/
-lemma CopyHeap.eq_of_ress_none {n : ℕ} {H H' : Heap R n} {as : List ℕ} {θ : ℕ → ℕ}
-    (h : CopyHeap H as θ H') (hH : ∀ j, H.ress j = none) : H' = H := by
-  cases h with
-  | nil => rfl
-  | cons _ hres => rw [hH] at hres; cases hres
+lemma CopyHeap.ress_none {n ρ ι e : ℕ} {H : Heap R n ρ ι} {as : List (Var ρ)}
+    {H' : Heap R n (ρ + e) (ι + e)} {θ : Var ρ → Var (ρ + e)} (h : CopyHeap H as e H' θ)
+    (hH : ∀ j, H.ress.get j = none) : ∀ j, H'.ress.get j = none := by
+  induction h with
+  | nil => exact hH
+  | cons _ _ hres ih => exact absurd (hres.eq.symm.trans (ih _)) (by simp)
 
 /-- **Identifiers created by a step.**  If `H` has no resource entries and
 `H ⊢ t ⤳_s H' ⊢ t'`, then every identifier with an entry in `H'` has exactly one
 reference in `H'`, of permission `1`, and this reference occurs in `t'`. -/
-theorem Step.new_ident {n m : ℕ} {H : Heap R n} {t : Term R n} {s : R} {H' : Heap R m}
-    {t' : Term R m} (hst : Step H t s H' t') (hH : ∀ j, H.ress j = none) :
-    ∀ id', H'.ress id' ≠ none →
-      ∃ a ∈ t'.refs, ∀ b p, H'.refs b = some (p, id') ↔ (b = a ∧ p = 1) := by
+theorem Step.new_ident {n ρ ι d e f : ℕ} {H : Heap R n ρ ι} {t : Term R n ρ} {s : R}
+    {H' : Heap R (n + d) (ρ + e) (ι + f)} {t' : Term R (n + d) (ρ + e)}
+    (hst : Step H t s d e f H' t') (hH : ∀ j, H.ress.get j = none) :
+    ∀ id', H'.ress.get id' ≠ none →
+      ∃ a, t'.RefOccurs a ∧ ∀ b p, H'.refs.get b = some (p, id') ↔ (b = a ∧ p = Frac.one) := by
   induction hst with
-  | var => intro id' h; exact absurd (hH id') h
-  | beta => intro id' h; simp [Heap.snoc, hH id'] at h
-  | exBeta => intro id' h; simp [Heap.snoc, hH id'] at h
-  | tensorBeta => intro id' h; simp [Heap.snoc, hH id'] at h
-  | boxBeta => intro id' h; simp [Heap.snoc, hH id'] at h
-  | withBorrow => intro id' h; simp [Heap.snoc, hH id'] at h
+  | var | share | unborrow | push | pull | unitBeta =>
+    intro id' h; exact absurd (hH id') h
+  | beta | exBeta | boxBeta | withBorrow | tensorBeta =>
+    intro id' h; simp [hH] at h
   | clone _ _ _ hc =>
-    rw [hc.eq_of_ress_none hH]
-    intro id' h; simp [Heap.snoc, hH id'] at h
-  | @newArray H k s a id ha hfresh =>
+    intro id' h; simp [hc.ress_none hH] at h
+  | newArray | newRef =>
     intro id' h
-    have e : id' = id := by
-      by_contra hne
-      simp [Heap.addRes, Function.update_of_ne hne, hH id'] at h
-    subst e
-    refine ⟨a, by simp [Term.refs], fun b p => ?_⟩
-    by_cases hb : b = a
-    · subst hb; simp [Heap.addRes, Heap.addRef, eq_comm]
-    · simp only [Heap.addRes_refs, Heap.addRef, Function.update_of_ne hb, hb, false_and,
-        iff_false]
-      exact hfresh.2 b p
-  | @newRef H v s a id _ ha hfresh =>
-    intro id' h
-    have e : id' = id := by
-      by_contra hne
-      simp [Heap.addRes, Function.update_of_ne hne, hH id'] at h
-    subst e
-    refine ⟨a, by simp [Term.refs], fun b p => ?_⟩
-    by_cases hb : b = a
-    · subst hb; simp [Heap.addRes, Heap.addRef, eq_comm]
-    · simp only [Heap.addRes_refs, Heap.addRef, Function.update_of_ne hb, hb, false_and,
-        iff_false]
-      exact hfresh.2 b p
-  | readArray _ hres => rw [hH] at hres; cases hres
-  | writeArray _ hres => rw [hH] at hres; cases hres
-  | deleteArray _ hres => rw [hH] at hres; cases hres
-  | readRef _ hres => rw [hH] at hres; cases hres
-  | readRefSplit _ hres => rw [hH] at hres; cases hres
-  | swapRef _ hres => rw [hH] at hres; cases hres
-  | freezeRef _ hres => rw [hH] at hres; cases hres
-  | share => intro id' h; exact absurd (hH id') h
-  | unborrow => intro id' h; exact absurd (hH id') h
-  | push => intro id' h; exact absurd (hH id') h
-  | pull => intro id' h; exact absurd (hH id') h
-  | splitRef _ hres => rw [hH] at hres; cases hres
-  | joinRef _ _ _ hres => rw [hH] at hres; cases hres
-  | unitBeta => intro id' h; exact absurd (hH id') h
-  | appL _ _ ih | appR _ _ _ ih | pairL _ _ ih | pairR _ _ _ ih | letPairCong _ _ ih
-  | letUnitCong _ _ ih | letBoxCong _ _ ih | unpackCong _ _ ih | cloneCong _ _ ih
-  | withBorrowL _ _ ih | withBorrowR _ _ _ ih | joinL _ _ ih | joinR _ _ _ ih =>
-    intro id' h
-    obtain ⟨a, ha, hu⟩ := ih hH id' h
-    exact ⟨a, by simp [Term.refs, ha], hu⟩
+    cases id' with
+    | succ j => simp [hH] at h
+    | zero =>
+      refine ⟨.zero, .arg (.head (.arg (.head (.here rfl)))), fun b p => ?_⟩
+      cases b with
+      | zero => simp [eq_comm]
+      | succ b => simp
+  | readArray _ hres | writeArray _ hres | deleteArray _ hres | readRef _ hres
+  | readRefSplit _ hres | swapRef _ hres | freezeRef _ hres | splitRef _ hres
+  | joinRef _ _ _ _ hres =>
+    exact absurd (hres.eq.symm.trans (hH _)) (by simp)
+  | appL _ ih | pairL _ ih | letPairCong _ ih | letUnitCong _ ih | letBoxCong _ ih
+  | unpackCong _ ih | cloneCong _ ih | withBorrowL _ ih | joinL _ ih
   | boxCong _ ih | packCong _ ih | shareCong _ ih | splitCong _ ih | pushCong _ ih
   | pullCong _ ih | unborrowCong _ ih =>
     intro id' h
     obtain ⟨a, ha, hu⟩ := ih hH id' h
-    exact ⟨a, by simp [Term.refs, ha], hu⟩
+    exact ⟨a, .arg (.head ha), hu⟩
+  | appR _ _ ih | pairR _ _ ih | withBorrowR _ _ ih | joinR _ _ ih =>
+    intro id' h
+    obtain ⟨a, ha, hu⟩ := ih hH id' h
+    exact ⟨a, .arg (.tail (.head ha)), hu⟩
 
 omit [Grades.PreorderedSemiring R] in
 /-- If `a ∈ refs(t)` is the only reference to `id` in `H`, with permission `1`, the
 permissions of `id` in `t` sum to `1`. -/
-lemma permSum_eq_one {n m : ℕ} {H : Heap R n} {t : Term R m} {id a : ℕ} (ha : a ∈ t.refs)
-    (hu : ∀ b p, H.refs b = some (p, id) ↔ (b = a ∧ p = 1)) : permSum H t id = 1 := by
+lemma permSum_eq_one {n ρ ι : ℕ} {H : Heap R n ρ ι} {t : Term R n ρ} {id : Var ι} {a : Var ρ}
+    (ha : t.RefOccurs a) (hu : ∀ b p, H.refs.get b = some (p, id) ↔ (b = a ∧ p = Frac.one)) :
+    permSum H t id = 1 := by
   unfold permSum
   rw [Finset.sum_eq_single a]
-  · rw [(hu a 1).2 ⟨rfl, rfl⟩]; simp
+  · rw [(hu a Frac.one).2 ⟨rfl, rfl⟩]; simp [permOf]
   · intro b _ hb
-    rcases e : H.refs b with _ | ⟨p, id''⟩
+    rcases e : H.refs.get b with _ | ⟨p, id''⟩
     · rfl
-    · simp only
+    · simp only [permOf]
       split_ifs with hid
       · subst hid; exact absurd ((hu b p).1 e).1 hb
       · rfl
-  · intro h; exact absurd ha h
+  · intro h; exact absurd (Term.mem_refs.2 ha) h
 
 /-- **Lemma 6.8 holds** for Definition 6.4 as printed.  The part about identifiers of the
 initial heap is vacuous (`Compat.ress_eq_none`); the part about new identifiers follows
 from `Step.new_ident`. -/
 theorem borrowSafety_literal : BorrowSafety (R := R) false := by
-  intro n m Γ t A _ s Γ₀ Γs Δ H H' t' _ _ hc hst
+  intro n ρ ι d e f Γ t A _ s Γ₀ Γs Δ H H' t' _ _ hc hst
   have hH := Compat.ress_eq_none hc
   refine ⟨fun id hid => absurd (hH id) hid, fun id' hid' _ => ?_⟩
   obtain ⟨a, ha, hu⟩ := hst.new_ident hH id' hid'

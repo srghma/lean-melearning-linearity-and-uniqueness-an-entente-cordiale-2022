@@ -26,22 +26,23 @@ open Term
 
 namespace CbnSteps
 
-variable {n : ℕ}
+variable {n ρ : ℕ}
 
 /-- Multi-step reduction is closed under any one-step congruence `f`. -/
-lemma congr {t t' : Term n} (f : Term n → Term n) (hf : ∀ a b, CbnStep a b → CbnStep (f a) (f b))
-    (h : CbnSteps t t') : CbnSteps (f t) (f t') :=
+lemma congr {t t' : Term n ρ} (f : Term n ρ → Term n ρ)
+    (hf : ∀ a b, CbnStep a b → CbnStep (f a) (f b)) (h : CbnSteps t t') :
+    CbnSteps (f t) (f t') :=
   Relation.ReflTransGen.lift f hf h
 
 /-- Transitivity of multi-step reduction. -/
-lemma trans {t₁ t₂ t₃ : Term n} (h₁ : CbnSteps t₁ t₂) (h₂ : CbnSteps t₂ t₃) :
+lemma trans {t₁ t₂ t₃ : Term n ρ} (h₁ : CbnSteps t₁ t₂) (h₂ : CbnSteps t₂ t₃) :
     CbnSteps t₁ t₃ := Relation.ReflTransGen.trans h₁ h₂
 
 /-- A single step is a multi-step reduction. -/
-lemma single {t₁ t₂ : Term n} (h : CbnStep t₁ t₂) : CbnSteps t₁ t₂ :=
+lemma single {t₁ t₂ : Term n ρ} (h : CbnStep t₁ t₂) : CbnSteps t₁ t₂ :=
   Relation.ReflTransGen.single h
 
-lemma refl' (t : Term n) : CbnSteps t t := Relation.ReflTransGen.refl
+lemma refl' (t : Term n ρ) : CbnSteps t t := Relation.ReflTransGen.refl
 
 end CbnSteps
 
@@ -49,8 +50,8 @@ end CbnSteps
 
 /-- `Reducible A t`: the closed term `t` evaluates to a value of the shape of `A` whose
 components are again reducible. -/
-def Reducible : Ty → Term 0 → Prop
-  | .lolli A B, t => ∃ b, CbnSteps t (lam b) ∧ ∀ u, Reducible A u → Reducible B (subst1 u b)
+def Reducible {ρ : ℕ} : Ty → Term 0 ρ → Prop
+  | .lolli A B, t => ∃ b, CbnSteps t (lam b) ∧ ∀ u, Reducible A u → Reducible B (b.subst1 u)
   | .tensor A B, t => ∃ t₁ t₂, CbnSteps t (pair t₁ t₂) ∧ Reducible A t₁ ∧ Reducible B t₂
   | .unit, t => CbnSteps t unit
   | .bang A, t => ∃ u, CbnSteps t (bang u) ∧ Reducible A u
@@ -60,8 +61,8 @@ def Reducible : Ty → Term 0 → Prop
   | .float, t => ∃ x, CbnSteps t (float x)
 
 /-- Reducibility is closed under backwards reduction. -/
-lemma Reducible.of_steps {A : Ty} {t t' : Term 0} (h : Reducible A t') (hs : CbnSteps t t') :
-    Reducible A t := by
+lemma Reducible.of_steps {ρ : ℕ} {A : Ty} {t t' : Term 0 ρ} (h : Reducible A t')
+    (hs : CbnSteps t t') : Reducible A t := by
   cases A with
   | lolli A B => obtain ⟨b, h₁, h₂⟩ := h; exact ⟨b, hs.trans h₁, h₂⟩
   | tensor A B => obtain ⟨t₁, t₂, h₁, h₂, h₃⟩ := h; exact ⟨t₁, t₂, hs.trans h₁, h₂, h₃⟩
@@ -73,7 +74,7 @@ lemma Reducible.of_steps {A : Ty} {t t' : Term 0} (h : Reducible A t') (hs : Cbn
   | float => obtain ⟨x, h₁⟩ := h; exact ⟨x, hs.trans h₁⟩
 
 /-- A reducible term evaluates to a value. -/
-lemma Reducible.eval {A : Ty} {t : Term 0} (h : Reducible A t) :
+lemma Reducible.eval {ρ : ℕ} {A : Ty} {t : Term 0 ρ} (h : Reducible A t) :
     ∃ v, CbnSteps t v ∧ IsValue v := by
   cases A with
   | lolli A B => obtain ⟨b, h₁, -⟩ := h; exact ⟨_, h₁, .lam _⟩
@@ -89,135 +90,148 @@ lemma Reducible.eval {A : Ty} {t : Term 0} (h : Reducible A t) :
 
 /-- Substituting `u` for the bound variable after a lifted closing substitution `σ`
 is the closing substitution `u, σ`. -/
-lemma subst1_subst_up {n : ℕ} (σ : Fin n → Term 0) (u : Term 0) (t : Term (n + 1)) :
-    subst1 u (subst (Subst.up σ) t) = subst (Fin.cons u σ) t := by
-  simp only [subst1, subst_subst]
+lemma subst1_subst_up {n ρ : ℕ} (σ : Var n → Term 0 ρ) (u : Term 0 ρ) (t : Term (n + 1) ρ) :
+    (t.subst (Binding.Subst.upN 1 σ)).subst1 u = t.subst (Var.cons u σ) := by
+  simp only [subst1, Binding.Tm.inst1, subst, Binding.Tm.subst_subst]
   congr 1
   funext i
-  cases i using Fin.cases with
+  cases i with
   | zero => rfl
   | succ i => exact subst1_rename_succ u (σ i)
 
 /-- The same for the two variables bound by `let (x, y) = _ in _`. -/
-lemma subst2_subst_up_up {n : ℕ} (σ : Fin n → Term 0) (u₁ u₂ : Term 0) (t : Term (n + 2)) :
-    subst2 u₁ u₂ (subst (Subst.up (Subst.up σ)) t) =
-      subst (Fin.cons u₂ (Fin.cons u₁ σ)) t := by
-  simp only [subst2, subst_subst]
+lemma subst2_subst_up_up {n ρ : ℕ} (σ : Var n → Term 0 ρ) (u₁ u₂ : Term 0 ρ)
+    (t : Term (n + 2) ρ) :
+    (t.subst (Binding.Subst.upN 2 σ)).subst2 u₁ u₂ = t.subst (Var.cons u₂ (Var.cons u₁ σ)) := by
+  simp only [subst2, Binding.Tm.inst2, subst, Binding.Tm.subst_subst]
   congr 1
   funext i
-  cases i using Fin.cases with
+  cases i with
   | zero => rfl
   | succ i =>
-    cases i using Fin.cases with
+    cases i with
     | zero => rfl
     | succ i =>
-      show _ = σ i
-      simp only [Function.comp, Subst.up_succ, subst_rename]
-      conv_rhs => rw [← subst_var (σ i)]
-      rfl
+      show (((σ i).rename .succ).rename .succ).subst _ = σ i
+      rw [subst_rename, subst_rename]
+      exact subst_var' (σ i)
 
 /-! ## The fundamental lemma -/
 
 /-- A closing substitution `σ` is reducible for `Γ` if it maps each variable with an
 assumption `x : A` or `x : [A]` in `Γ` to a term reducible at `A`. -/
-def RedSubst {n : ℕ} (Γ : Ctx n) (σ : Fin n → Term 0) : Prop :=
-  ∀ i h, Γ (.inl i) = some h → Reducible h.ty (σ i)
+def RedSubst {n ρ : ℕ} (Γ : TCtx n ρ) (σ : Var n → Term 0 ρ) : Prop :=
+  ∀ i h, Γ.vars.get i = some h → Reducible h.ty (σ i)
 
 /-- A reducible substitution for `Γ₁ + Γ₂` is reducible for `Γ₁` (and `Γ₂`). -/
-lemma RedSubst.left {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {σ : Fin n → Term 0} (hσ : RedSubst Γ σ)
+lemma RedSubst.left {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {σ : Var n → Term 0 ρ} (hσ : RedSubst Γ σ)
     (hadd : Γ₁.Add Γ₂ Γ) : RedSubst Γ₁ σ := by
   intro i h hi
-  have := hadd (.inl i)
+  have := hadd.vars.get i
   rw [hi] at this
-  generalize Γ₂ (.inl i) = b at this
-  generalize hc : Γ (.inl i) = c at this
+  generalize Γ₂.vars.get i = b at this
+  generalize hc : Γ.vars.get i = c at this
   cases this <;> exact hσ i _ hc
 
-lemma RedSubst.right {n : ℕ} {Γ₁ Γ₂ Γ : Ctx n} {σ : Fin n → Term 0} (hσ : RedSubst Γ σ)
+lemma RedSubst.right {n ρ : ℕ} {Γ₁ Γ₂ Γ : TCtx n ρ} {σ : Var n → Term 0 ρ} (hσ : RedSubst Γ σ)
     (hadd : Γ₁.Add Γ₂ Γ) : RedSubst Γ₂ σ := hσ.left hadd.comm
 
 /-- Extending a reducible substitution by a reducible term. -/
-lemma RedSubst.cons {n : ℕ} {Γ : Ctx n} {σ : Fin n → Term 0} (hσ : RedSubst Γ σ) {h : Hyp}
-    {u : Term 0} (hu : Reducible h.ty u) : RedSubst (Γ.cons (some h)) (Fin.cons u σ) := by
+lemma RedSubst.cons {n ρ : ℕ} {Γ : TCtx n ρ} {σ : Var n → Term 0 ρ} (hσ : RedSubst Γ σ)
+    {h : Hyp Ty} {u : Term 0 ρ} (hu : Reducible h.ty u) :
+    RedSubst (Γ.cons (some h)) (Var.cons u σ) := by
   intro i h' hi
-  cases i using Fin.cases with
+  cases i with
   | zero => cases hi; exact hu
   | succ i => exact hσ i h' hi
 
 /-- Any substitution is reducible for a context without variables. -/
-lemma RedSubst.refsOnly {n : ℕ} (Γ : Ctx n) (σ : Fin n → Term 0) :
+lemma RedSubst.refsOnly {n ρ : ℕ} (Γ : TCtx n ρ) (σ : Var n → Term 0 ρ) :
     RedSubst Γ.refsOnly σ := by
   intro i h hi; simp at hi
 
 /-- **Fundamental lemma** of the logical relation. -/
-theorem HasTypeD.reducible {n : ℕ} {Γ : Ctx n} {t : Term n} {A : Ty} (ht : HasTypeD Γ t A)
-    (hp : t.PrimFree) {σ : Fin n → Term 0} (hσ : RedSubst Γ σ) :
-    Reducible A (subst σ t) := by
+theorem HasTypeD.reducible {n ρ : ℕ} {Γ : TCtx n ρ} {t : Term n ρ} {A : Ty}
+    (ht : HasTypeD Γ t A) (hp : t.PrimFree) {σ : Var n → Term 0 ρ} (hσ : RedSubst Γ σ) :
+    Reducible A (t.subst σ) := by
   induction ht with
-  | var hi _ => exact hσ _ _ hi
+  | var hi _ => exact hσ _ _ hi.get
   | abs _ ih =>
+    rw [Term.primFree_lam] at hp
     refine ⟨_, CbnSteps.refl' _, fun u hu => ?_⟩
     rw [subst1_subst_up]
     exact ih hp (hσ.cons (h := .lin _) hu)
   | app _ _ hadd ih₁ ih₂ =>
+    rw [Term.primFree_app] at hp
     obtain ⟨b, hs, hb⟩ := ih₁ hp.1 (hσ.left hadd)
     exact (hb _ (ih₂ hp.2 (hσ.right hadd))).of_steps
       ((hs.congr _ fun _ _ => .app _).trans (CbnSteps.single (.betaLolli _ _)))
   | tensorI _ _ hadd ih₁ ih₂ =>
+    rw [Term.primFree_pair] at hp
     exact ⟨_, _, CbnSteps.refl' _, ih₁ hp.1 (hσ.left hadd), ih₂ hp.2 (hσ.right hadd)⟩
   | tensorE _ _ hadd ih₁ ih₂ =>
+    rw [Term.primFree_letPair] at hp
     obtain ⟨u₁, u₂, hs, hu₁, hu₂⟩ := ih₁ hp.1 (hσ.left hadd)
     have := ih₂ hp.2 (((hσ.right hadd).cons (h := .lin _) hu₁).cons (h := .lin _) hu₂)
     rw [← subst2_subst_up_up] at this
-    exact this.of_steps ((hs.congr _ fun _ _ => .letPair _).trans (CbnSteps.single (.betaTensor _ _ _)))
+    exact this.of_steps
+      ((hs.congr _ fun _ _ => .letPair _).trans (CbnSteps.single (.betaTensor _ _ _)))
   | unitI _ => exact CbnSteps.refl' _
   | unitE _ _ hadd ih₁ ih₂ =>
+    rw [Term.primFree_letUnit] at hp
     have hs : CbnSteps _ unit := ih₁ hp.1 (hσ.left hadd)
     exact (ih₂ hp.2 (hσ.right hadd)).of_steps
       ((hs.congr _ fun _ _ => .letUnit _).trans (CbnSteps.single (.betaUnit _)))
-  | bangI _ _ ih => exact ⟨_, CbnSteps.refl' _, ih hp hσ⟩
+  | bangI _ _ ih => rw [Term.primFree_bang] at hp; exact ⟨_, CbnSteps.refl' _, ih hp hσ⟩
   | bangE _ _ hadd ih₁ ih₂ =>
+    rw [Term.primFree_letBang] at hp
     obtain ⟨u, hs, hu⟩ := ih₁ hp.1 (hσ.left hadd)
     have := ih₂ hp.2 ((hσ.right hadd).cons (h := .nonlin _) hu)
     rw [← subst1_subst_up] at this
-    exact this.of_steps ((hs.congr _ fun _ _ => .letBang _).trans (CbnSteps.single (.betaBang _ _)))
+    exact this.of_steps
+      ((hs.congr _ fun _ _ => .letBang _).trans (CbnSteps.single (.betaBang _ _)))
   | borrow _ ih =>
+    rw [Term.primFree_borrow] at hp
     obtain ⟨u, hs, hu⟩ := ih hp hσ
     exact ⟨u, (hs.congr _ fun _ _ => .borrow).trans (CbnSteps.single (.betaBorrow _)), hu⟩
   | copy _ _ hadd ih₁ ih₂ =>
+    rw [Term.primFree_copy] at hp
     obtain ⟨u, hs, hu⟩ := ih₁ hp.1 (hσ.left hadd)
     have := ih₂ hp.2 ((hσ.right hadd).cons (h := .lin (.star _))
       (u := star u) ⟨u, CbnSteps.refl' _, hu⟩)
     rw [← subst1_subst_up] at this
-    exact this.of_steps ((hs.congr _ fun _ _ => .copy _).trans (CbnSteps.single (.betaCopy _ _)))
-  | nec _ _ ih => exact ⟨_, CbnSteps.refl' _, ih hp (RedSubst.refsOnly _ σ)⟩
+    exact this.of_steps
+      ((hs.congr _ fun _ _ => .copy _).trans (CbnSteps.single (.betaCopy _ _)))
+  | nec _ _ ih =>
+    rw [Term.primFree_star] at hp
+    exact ⟨_, CbnSteps.refl' _, ih hp (RedSubst.refsOnly _ σ)⟩
   | natI _ => exact ⟨_, CbnSteps.refl' _⟩
   | floatI _ => exact ⟨_, CbnSteps.refl' _⟩
-  | prim _ => exact hp.elim
+  | prim _ => exact (Term.not_primFree_prim _ hp).elim
   | ref _ _ => exact ⟨_, CbnSteps.refl' _⟩
 
 /-! ## Termination -/
 
 /-- **Termination of evaluation.** Every well-typed closed primitive-free term reduces
 (in the call-by-name semantics `CbnStep`) to a value. -/
-theorem cbn_normalization {Γ : Ctx 0} {t : Term 0} {A : Ty} (ht : HasType Γ t A)
+theorem cbn_normalization {ρ : ℕ} {Γ : TCtx 0 ρ} {t : Term 0 ρ} {A : Ty} (ht : HasType Γ t A)
     (hp : t.PrimFree) : ∃ v, CbnSteps t v ∧ IsValue v := by
   have h := (hasType_iff_hasTypeD.1 ht).reducible hp (σ := Term.var)
     (fun i => i.elim0)
-  rw [subst_var] at h
+  rw [subst_var'] at h
   exact h.eval
 
 /-- **Evaluation.** A well-typed closed primitive-free term (in a context whose runtime
 array references are non-linear, e.g. the empty context) evaluates to a value of the
 same type. -/
-theorem cbn_eval {Γ : Ctx 0} {t : Term 0} {A : Ty} (hr : Γ.RefsNonLin) (ht : HasType Γ t A)
-    (hp : t.PrimFree) : ∃ v, CbnSteps t v ∧ IsValue v ∧ HasType Γ v A := by
+theorem cbn_eval {ρ : ℕ} {Γ : TCtx 0 ρ} {t : Term 0 ρ} {A : Ty} (hr : Γ.RefsNonLin)
+    (ht : HasType Γ t A) (hp : t.PrimFree) : ∃ v, CbnSteps t v ∧ IsValue v ∧ HasType Γ v A := by
   obtain ⟨v, hs, hv⟩ := cbn_normalization ht hp
-  exact ⟨v, hs, hv, hs.preserves (Ctx.noVars_zero Γ) hr ht⟩
+  exact ⟨v, hs, hv, hs.preserves (TCtx.noVars_zero Γ) hr ht⟩
 
 /-- Reduction sequences ending in values are unique: the value a term evaluates to is
 uniquely determined. -/
-theorem cbn_value_unique {n : ℕ} {t v₁ v₂ : Term n} (h₁ : CbnSteps t v₁) (hv₁ : IsValue v₁)
+theorem cbn_value_unique {n ρ : ℕ} {t v₁ v₂ : Term n ρ} (h₁ : CbnSteps t v₁) (hv₁ : IsValue v₁)
     (h₂ : CbnSteps t v₂) (hv₂ : IsValue v₂) : v₁ = v₂ := by
   induction h₁ using Relation.ReflTransGen.head_induction_on generalizing v₂ with
   | refl =>
@@ -234,15 +248,16 @@ theorem cbn_value_unique {n : ℕ} {t v₁ v₂ : Term n} (h₁ : CbnSteps t v�
 /-! ## The core calculus -/
 
 /-- Terms of the core grammar of Section 3.1 contain no array primitives. -/
-lemma CoreTerm.primFree {n : ℕ} (t : CoreTerm n) : t.toTerm.PrimFree := by
-  induction t <;> simp_all [Term.PrimFree]
+lemma CoreTerm.primFree {n ρ : ℕ} (t : CoreTerm n) : (t.toTerm : Term n ρ).PrimFree := fun h => by
+  obtain ⟨o, p, hp⟩ := (Binding.Tm.HasOp.of_mapOp h).exists_op
+  cases o <;> cases hp
 
 /-- **Termination for the core calculus.** Every well-typed closed term of the core grammar
 (Section 3.1) evaluates, in the call-by-name semantics `CbnStep`, to (the embedding of) an
-element of the value grammar `Value 0`, of the same type. -/
-theorem cbn_eval_core {Γ : Ctx 0} {t : CoreTerm 0} {A : Ty} (hr : Γ.RefsNonLin)
+element of the value grammar `Value 0 ρ`, of the same type. -/
+theorem cbn_eval_core {ρ : ℕ} {Γ : TCtx 0 ρ} {t : CoreTerm 0} {A : Ty} (hr : Γ.RefsNonLin)
     (ht : HasType Γ t.toTerm A) :
-    ∃ v : Value 0, CbnSteps t.toTerm v.toTerm ∧ HasType Γ v.toTerm A := by
+    ∃ v : Value 0 ρ, CbnSteps t.toTerm v.toTerm ∧ HasType Γ v.toTerm A := by
   obtain ⟨_, hs, ⟨v, rfl⟩, hv⟩ := cbn_eval hr ht t.primFree
   exact ⟨v, hs, hv⟩
 

@@ -16,7 +16,9 @@ and each place where the FOFU code reuses something says so in a comment:
 
 | Shared file | Contents | Use in FOFU | Use in LCU |
 | --- | --- | --- | --- |
-| `Common/DeBruijn.lean` | `DeBruijn.Ren.up` (lifting a renaming of variables under a binder) and its laws | renaming of terms (`Sec3_CoreCalculus/RenameSubst.lean`), the renaming lemma (`Sec6_3_Theorems/Renaming.lean`), the substitution lemmas | renaming and weakening |
+| `Common/Var.lean` | de Bruijn variables `Var n` (constructors `zero`, `succ`), renamings `Ren.up`, `Ren.upN`, `Var.shiftN` | term variables, runtime references and identifiers | term variables and array references |
+| `Common/Ctx.lean` | length-indexed snoc lists `Ctx α n`, the lookup judgment `Ctx.Lookup`, `Ctx.Pick`, and the pointwise relations `Ctx.All`, `Ctx.Forall₂`, `Ctx.Forall₃` | typing contexts, context addition and scaling, heaps | typing contexts, heaps, stores |
+| `Common/Syntax.lean` | the generic binding layer: terms `Binding.Tm S n` over a signature `S`, renaming, substitution and their laws, `Tm.Occurs`, `Tm.HasOp` | `Term R n ρ` is `Tm (sig R ρ) n` | `Term n ρ` is `Tm (sig ρ) n` |
 | `Common/Grades/PreorderedSemiring.lean` | the class `Grades.PreorderedSemiring R` (semiring, preorder, monotone `+` and `*`), with the instance for `ℕ` | the parameter `R` of the whole calculus (§3) | the `{0, 1, ω}` semiring of §4.1 is an instance |
 
 Two proof techniques are also reused from the first paper (the code is separate because
@@ -29,19 +31,35 @@ judgment (`TypingD.lean`), and the structure of the general substitution lemma
 * **Grades.** Everything is parameterised by a type `R` of grades with
   `[Grades.PreorderedSemiring R]`. The semiring need not be commutative. The paper's
   examples use the natural numbers (`ℕ`), and so do ours.
-* **De Bruijn terms.** `Term R n` is the type of terms with `n` free variables, and
-  `Term.var : Fin n → Term R n`. `Term R 0` is the type of closed terms. A binder binds
-  index `0`. In `letPair t₁ t₂` (`let (x, y) = t₁ in t₂`), `y` is index `0` and `x` is
-  index `1`.
+* **De Bruijn terms.** `Term R n ρ` is the type of terms with `n` free variables and `ρ`
+  runtime references in scope, and `Term.var : Var n → Term R n ρ`. `Term R 0 0` is the
+  type of closed source terms. A binder binds `Var.zero`. In `letPair t₁ t₂`
+  (`let (x, y) = t₁ in t₂`), `y` is `Var.zero` and `x` is `Var.succ Var.zero`. Runtime
+  references are scoped too: `Term.ref : Var ρ → Term R n ρ`. Terms are an instance of
+  the generic binding layer (`Common/Syntax.lean`), so renaming and substitution and
+  their laws come from there.
 * **De Bruijn identifiers.** Identifiers (type variables of kind `Name`) are de Bruijn
-  too. `Ty R k` is the type of types with `k` bound identifiers, and `∃ id. A` is
-  `Ty.ex A` with `A : Ty R (k + 1)`. Runtime identifiers of resources are `Ident.rt a`.
-  `pack` and `unpack` are Curry-style: the identifiers only appear in types.
-* **Contexts.** `Ctx R k n` gives every variable an optional assumption, linear
+  too. `Ty R k` is the type of types with `k` identifiers in scope, `Ty.res κ id A` has
+  `id : Var k`, and `∃ id. A` is `Ty.ex A` with `A : Ty R (k + 1)`. Runtime identifiers of
+  resources are identifiers in scope like any other (there is no separate kind of
+  runtime identifier). `pack` and `unpack` are Curry-style: the identifiers only appear
+  in types.
+* **Float literals** are `Lean.JsonNumber` (exact decimal numbers, `FloatLit`).
+* **Contexts.** `TCtx R k n ρ` gives every variable an optional assumption, linear
   (`Assm.lin A`, `x : A`) or graded (`Assm.grd A r`, `x : [A]_r`), and every runtime
-  reference an optional `Res_id A`. Context addition `Γ₁ + Γ₂ = Γ` and scaling
-  `r · Γ = Γ'` are partial, so they are relations, `CtxAdd Γ₁ Γ₂ Γ` and
-  `CtxScale r Γ Γ'`. "`0 · Γ`" is the predicate `Γ.IsZero`.
+  reference an optional `Res_id A` (`RefTy`). Both parts are length-indexed lists
+  (`Ctx`). Context addition `Γ₁ + Γ₂ = Γ` and scaling `r · Γ = Γ'` are partial, so they
+  are relations, `CtxAdd Γ₁ Γ₂ Γ` and `CtxScale r Γ Γ'`, built from the pointwise
+  relations `Ctx.Forall₃` and `Ctx.Forall₂`. "`0 · Γ`" is the predicate `Γ.IsZero`, and
+  "`0 · Γ, x : A`" (rule `var`) is the structural judgment
+  `Γ.vars.Pick ZeroAssm i (some (.lin A))`.
+* **Heaps and configurations are scoped.** A heap `Heap R n ρ ι` has exactly one entry
+  for each of its `n` variables, `ρ` references (`none` once deallocated) and `ι`
+  identifiers (`none` if the identifier has no resource). A configuration is a heap and a
+  term `Term R n ρ`, so the free variables and references of the term are in the heap by
+  construction. A step `Step H t s d e f H' t'` adds `d` variables, `e` references and
+  `f` identifiers; new names are always `Var.zero` and old ones are weakened, so no
+  freshness side conditions are needed.
 * **One syntax for all sections.** The paper extends types and terms section by section.
   A Lean inductive type cannot be extended later, so `Ty` and `Term` contain all
   constructors at once, and `HasType` contains the typing rules of all sections. Each
@@ -70,10 +88,10 @@ because the single type of types contains the borrowing modality.
 
 | Paper | Lean | File (under `RequestProject/FOFU/`) |
 | --- | --- | --- |
-| Types and terms (§3–§6.1) | `Ty`, `Term`, `Ident`, `Prim` | `Sec3_CoreCalculus/Syntax.lean` |
-| `A [ι / id]`, weakening by an identifier | `Ty.inst`, `Ty.shift`, `Ty.subst` | `Sec3_CoreCalculus/TypeSubst.lean` |
-| `t [t' / x]` | `Term.subst1`, `Term.subst`, `Term.rename` | `Sec3_CoreCalculus/RenameSubst.lean` |
-| Contexts, `Γ₁ + Γ₂`, `r · Γ`, `0 · Γ` | `Ctx`, `CtxAdd`, `CtxScale`, `Ctx.IsZero` | `Sec3_CoreCalculus/Context.lean` |
+| Types and terms (§3–§6.1) | `Ty`, `Term`, `Prim`, `FloatLit` | `Sec3_CoreCalculus/Syntax.lean` |
+| `A [ι / id]`, weakening by an identifier | `Ty.inst`, `Ty.shift`, `Ty.ren` | `Sec3_CoreCalculus/TypeSubst.lean` |
+| `t [t' / x]`, renaming of references | `Term.subst1`, `Term.subst`, `Term.rename`, `renameRefs`, `Term.refs` | `Sec3_CoreCalculus/RenameSubst.lean` |
+| Contexts, `Γ₁ + Γ₂`, `r · Γ`, `0 · Γ` | `TCtx`, `CtxAdd`, `CtxScale`, `TCtx.IsZero` | `Sec3_CoreCalculus/Context.lean` |
 | Algebra of contexts | `CtxAdd.assoc`, `CtxAdd.interchange`, `CtxScale.add_scale`, `CtxLe` | `Sec3_CoreCalculus/CtxAlgebra.lean` |
 | Typing rules (all sections) | `HasType` | `Sec3_CoreCalculus/Typing.lean` |
 | Rule `(var')` | `HasType.var'` | `Sec3_CoreCalculus/TypingLemmas.lean` |
@@ -81,13 +99,13 @@ because the single type of types contains the borrowing modality.
 | Example derivation of §3 (`exampleNat`) | `exampleNat_typing` | `Sec3_CoreCalculus/Example.lean` |
 | `exampleMove`, `exampleShare` (§4) | `exampleMove_typing`, `exampleShare_typing` | `Sec4_Uniqueness/Examples.lean` |
 | Permissions `p ::= * \| f` (§5) | `Frac`, `Perm` | `Sec5_Fractional/Permission.lean` |
-| Resource interfaces, `copyable`, `cloneable`, `resourceAllocator` | `PrimTy`, `Copyable`, `Cloneable`, `Term.Allocates` | `Sec5_Fractional/Resources.lean` |
+| Resource interfaces, `copyable`, `cloneable`, `resourceAllocator` | `PrimTy`, `Ty.copyable`, `Ty.cloneable`, `Term.Allocates` | `Sec5_Fractional/Resources.lean` |
 | `exampleBorrow`, `exampleReborrow`, `exampleArray`, `exampleClone`, `exampleReference` | `…_typing` | `Sec5_Fractional/Examples.lean` |
 | Equational theory (§4, §5.1) | `EqAxiom`, `Equiv` (`≡`) | `Sec5_1_Equational/Equational.lean` |
 | `examplePartial` (§5.2) | `examplePartial_typing` | `Sec5_2_Distributive/Examples.lean` |
 | Values (§6.1) | `IsValue`, `PrimSpine` | `Sec6_1_Preliminaries/Values.lean` |
-| Heaps (§6.1) | `Heap`, `ArrVal`, `ResVal` | `Sec6_1_Preliminaries/Heap.lean` |
-| Reduction (§6.2) | `Step`, `Steps` | `Sec6_2_Reduction/Step.lean` |
+| Heaps (§6.1) | `Heap`, `ArrVal`, `ResVal`, `ArrVal.Reads` | `Sec6_1_Preliminaries/Heap.lean` |
+| Reduction (§6.2) | `Step`, `Steps`, `CopyHeap` | `Sec6_2_Reduction/Step.lean` |
 | Definition 6.4 (heap compatibility) | `Compat gc` | `Sec6_3_Theorems/Compat.lean` |
 | Example 6.5 | `example_6_5` | `Sec6_3_Theorems/Compat.lean` |
 | **Lemma 6.2** (linear substitution) | `HasType.subst_lin` | `Sec6_3_Theorems/Substitution.lean` |
@@ -105,7 +123,8 @@ because the single type of types contains the borrowing modality.
 `Γ₁` has only graded assumptions follows from `r · Γ₁` being defined. The proof uses
 these lemmas, all in `Sec6_3_Theorems/`:
 
-* `HasTypeD.substNames` (`NameSubst.lean`): identifier substitution, needed for `unpack`;
+* `HasTypeD.renNames` and `HasTypeD.shiftNames` (`NameSubst.lean`): renaming of
+  identifiers, needed for `unpack`;
 * `HasTypeD.rename` and `HasTypeD.shift` (`Renaming.lean`): renaming and weakening by an
   absent variable;
 * `HasTypeD.weakenZero` (`ZeroWeakening.lean`): weakening by zero-graded assumptions;
@@ -117,7 +136,16 @@ these lemmas, all in `Sec6_3_Theorems/`:
 **Theorems 6.6–6.11.** Definition 6.4 is formalised in two variants: `gc = false` is the
 definition as printed, and `gc = true` adds a garbage-collection rule `gcRes` for
 resource entries. The rule is needed because, as printed, no heap that contains a
-resource entry `id ↦ v_r` is compatible with any context (`Compat.ress_eq_none`).
+resource entry `id ↦ v_r` is compatible with any context (`Compat.ress_eq_none`). Both
+variants also have a structural rule `freshId` (`H ⋈ Γ ⟹ H, id ⋈ Γ, id`) that adds an
+identifier without resource entry; it only reflects that identifiers are scoped in the
+formalisation, and it adds no resource entries.
+
+The statements are over scoped configurations: after a step, the type and the frame
+`Γ₀` are moved into the larger scope (`Ty.ren (Var.shiftN f)`, `TCtx.lift`), an old
+identifier `id` is called `Var.shiftN f id`, and after a reduction sequence (`Steps`)
+the old references and identifiers are tracked by the maps `θr`, `θi` recorded by
+`Steps`.
 
 | Paper | `gc = false` (as printed) | `gc = true` (with `gcRes`) |
 | --- | --- | --- |
@@ -145,16 +173,16 @@ The counterexamples (details in the docstrings of the `Counter*.lean` files):
   `(unpack ⟨id, x⟩ = newArray 3 in withBorrow (λb. unpack ⟨id', c⟩ = newRef (split b) in
   let [d] = share₀ c in *()) x, newArray 3)` creates an array, splits the borrow into two
   halves, stores them in a new reference cell and discards the cell with `share₀`. The
-  value is `(*(), pack ⟨id₂, *ref₄⟩)`, and the first array's identifier has two
-  references of permission `1/2` and none of permission `1`.
+  value is `(*(), pack ⟨id, *ref⟩)` for the second array, and the first array's
+  identifier has two references of permission `1/2` and none of permission `1`.
+* **Uniqueness:** after `split` and `join` the original reference `ref₀` has been
+  replaced by a new one.
 
 **Lemma 6.8 with the printed rules** holds (`borrowSafety_literal`). The part about
 identifiers of the initial heap is vacuous. For the part about new identifiers,
 `Step.new_ident` shows that if the heap has no resource entries, every identifier
 created by a step has exactly one reference, with permission `1`, and that reference
 occurs in the reduced term. The proof does not use typing.
-* **Uniqueness:** after `split` and `join` the original reference `ref₀` has been
-  replaced by a new one.
 
 These results concern the rules as printed in the provided text. They do not
 necessarily apply to the full rule set in the paper's appendices.
@@ -197,9 +225,12 @@ main ones are:
 
 ## Suggested reading order
 
-1. `Sec3_CoreCalculus/Syntax.lean`, `Context.lean`, `Typing.lean`: the calculus.
+1. `Common/Var.lean`, `Common/Ctx.lean`, `Common/Syntax.lean`: variables, contexts and
+   the generic binding layer; then `Sec3_CoreCalculus/Syntax.lean`, `Context.lean`,
+   `Typing.lean`: the calculus.
 2. `Sec3_CoreCalculus/Example.lean` and the examples of §4, §5 and §5.2: concrete
-   derivations, built with the tactics `ctx_add` and `zero_rest` of `TypingLemmas.lean`.
+   derivations, built with the tactics `ctx_add`, `zero_ctx` and `pick_var` of
+   `TypingLemmas.lean`.
 3. `Sec6_1_Preliminaries/`, `Sec6_2_Reduction/Step.lean`, `Sec6_3_Theorems/Compat.lean`:
    the semantics and heap compatibility.
 4. `Sec6_3_Theorems/Statements.lean`, then the `Counter*.lean` files.

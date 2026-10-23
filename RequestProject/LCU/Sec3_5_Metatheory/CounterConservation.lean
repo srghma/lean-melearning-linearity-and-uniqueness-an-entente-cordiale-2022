@@ -29,70 +29,62 @@ namespace ConservationCounterexample
 /-! ## The program, its type and its first step -/
 
 /-- `copy !((λz. z) unit) as x in &x` -/
-def prog : Term 0 := copy (bang (app (lam (var 0)) unit)) (borrow (var 0))
+def prog : Term 0 0 := copy (bang (app (lam (var 0)) unit)) (borrow (var 0))
 
 /-- The reduct `copy !z as x in &x` (with `z` the new variable `0`). -/
-def prog' : Term 1 := copy (bang (var 0)) (borrow (var 0))
+def prog' : Term 1 0 := copy (bang (var 0)) (borrow (var 0))
 
 /-- The program has type `!1` in the empty context. -/
-lemma prog_typed : HasType Ctx.empty prog (.bang .unit) := by
+lemma prog_typed : HasType TCtx.empty prog (.bang .unit) := by
   rw [hasType_iff_hasTypeD]
-  have hid : HasTypeD (Ctx.empty : Ctx 0) (app (lam (var 0)) unit) .unit :=
-    .app (.abs (HasTypeD.var_zero_single (.lin .unit))) (.unitI Ctx.AllNonLin.empty)
-      (Ctx.Add.empty_left _)
-  exact .copy (.bangI Ctx.AllNonLin.empty hid)
-    (.borrow (HasTypeD.var_zero_single (.lin (.star .unit)))) (Ctx.Add.empty_left _)
+  have hid : HasTypeD (TCtx.empty : TCtx 0 0) (app (lam (var 0)) unit) .unit :=
+    .app (.abs (HasTypeD.var_zero_single (.lin .unit))) (.unitI TCtx.AllNonLin.empty)
+      (TCtx.Add.empty_left _)
+  exact .copy (.bangI TCtx.AllNonLin.empty hid)
+    (.borrow (HasTypeD.var_zero_single (.lin (.star .unit)))) (TCtx.Add.empty_left _)
+
+/-- The heap entry `z ↦₁ (∅ ⊢ unit : 1)`. -/
+def e₀ : VarEntry 0 0 := ⟨.one, TCtx.empty, unit, .unit, HasType.unitI TCtx.AllNonLin.empty⟩
 
 /-- The heap after the reduction. -/
-def H₁ : Heap 1 :=
-  (Heap.empty : Heap 0).push ⟨.one, Ctx.empty, unit, .unit, HasType.unitI Ctx.AllNonLin.empty⟩
+def H₁ : Heap 1 0 := (Heap.empty : Heap 0 0).push e₀
 
 /-- The first step: `β` under `!` (rule `copy_!`) binds `z ↦₁ unit`. -/
-lemma step : Step (Heap.empty : Heap 0) prog H₁ prog' (BCtx.single (Fin.last 0) (.lin .unit))
-    UCtx.empty := by
-  have := Step.copyBang (t₂ := borrow (var 0)) (Nat.zero_le 1)
-    (Step.beta (H := (Heap.empty : Heap 0)) (t := var 0) (Γ := Ctx.empty) (A := .unit)
-      (HasType.unitI Ctx.AllNonLin.empty))
-  exact this
+lemma step : Step (Heap.empty : Heap 0 0) prog 1 0 H₁ prog' (BCtx.new1 (.lin .unit))
+    UCtx.empty :=
+  Step.copyBang (t₂ := borrow (var 0))
+    (Step.beta (H := (Heap.empty : Heap 0 0)) (t := var 0) (Γ := TCtx.empty) (A := .unit)
+      (HasType.unitI TCtx.AllNonLin.empty))
 
 /-! ## Compatibility with the new heap forces `z` to be linear -/
 
-/-- A heap without any bindings is only compatible with the empty context. -/
-lemma compat_empty_heap {n : ℕ} {H : Heap n} {Γ : Ctx n} (hc : Compat H Γ)
-    (hv : ∀ y, H.vars y = none) (ha : ∀ a, H.arrs a = none) : Γ = Ctx.empty := by
-  cases hc with
-  | empty => rfl
-  | @ref _ _ a _ _ _ _ => have := ha a; simp [Heap.setArr] at this
-  | @lin _ _ _ x' _ _ _ _ => have := hv x'; simp [Heap.setVar] at this
-  | @omega _ _ _ x' _ _ _ _ _ _ => have := hv x'; simp [Heap.setVar] at this
-
 /-- A heap with a single linear-use binding `x ↦₁ t` is compatible only with contexts
 in which `x` is a linear assumption. -/
-lemma compat_single {n : ℕ} {H : Heap n} {Γ : Ctx n} (hc : Compat H Γ) {x : Fin n}
-    {e : VarEntry n} (hx : H.vars x = some e) (he : e.r = .one)
-    (hv : ∀ y, y ≠ x → H.vars y = none) (ha : ∀ a, H.arrs a = none) :
-    Γ (.inl x) = some (.lin e.ty) := by
+lemma compat_single {n ρ : ℕ} {H : Heap n ρ} {Γ : TCtx n ρ} (hc : Compat H Γ) {x : Var n}
+    {e : VarEntry n ρ} (hx : H.vars.get x = some e) (hr : e.r = .one)
+    (hv : ∀ y, y ≠ x → H.vars.get y = none) (ha : ∀ a, H.arrs.get a = none) :
+    Γ.vars.get x = some (.lin e.ty) := by
   cases hc with
-  | empty => simp [Heap.empty] at hx
-  | @ref _ _ a _ _ _ _ => have := ha a; simp [Heap.setArr] at this
-  | @lin Hp Γ₁ Γ₁₂ x' e' hc' hadd hx' =>
+  | empty => simp at hx
+  | @ref _ _ a _ _ _ _ => have := ha a; simp at this
+  | @lin _ _ _ x' e' _ _ _ =>
     by_cases hxx : x' = x
     · subst hxx
-      simp only [Heap.setVar, Function.update_self, Option.some.injEq] at hx
+      simp only [Heap.setVar_vars, Ctx.get_set_same, Option.some.injEq] at hx
       subst hx
       simp
-    · have := hv x' hxx; simp [Heap.setVar] at this
-  | @omega Hp Γ₁ Γ₁₂ x' e' hc' hadd hr _ hx' =>
+    · have := hv x' hxx; simp at this
+  | @omega _ _ _ _ x' _ _ _ _ _ _ _ =>
     by_cases hxx : x' = x
     · subst hxx
-      simp only [Heap.setVar, Function.update_self, Option.some.injEq] at hx
+      simp only [Heap.setVar_vars, Ctx.get_set_same, Option.some.injEq] at hx
       subst hx
-      rw [hr] at he; cases he
-    · have := hv x' hxx; simp [Heap.setVar] at this
+      cases hr
+    · have := hv x' hxx; simp at this
 
 /-- Any typing of the reduct uses only non-linear assumptions. -/
-lemma prog'_typing_nonLin {Γ : Ctx 1} {A : Ty} (ht : HasType Γ prog' A) :
-    NonLin (Γ (.inl 0)) := by
+lemma prog'_typing_nonLin {Γ : TCtx 1 0} {A : Ty} (ht : HasType Γ prog' A) :
+    NonLin (Γ.vars.get .zero) := by
   rw [hasType_iff_hasTypeD] at ht
   cases ht with
   | copy h₁ h₂ hadd =>
@@ -100,10 +92,9 @@ lemma prog'_typing_nonLin {Γ : Ctx 1} {A : Ty} (ht : HasType Γ prog' A) :
     | bangI hΓa _ =>
       cases h₂ with
       | borrow h₂ =>
-        obtain ⟨_, _, _, hrest⟩ := h₂.var_inv
-        have := hrest (.inl (Fin.succ 0))
-        rw [Ctx.set_ne _ _ (fun e => Fin.succ_ne_zero _ (Sum.inl_injective e))] at this
-        exact (hadd (.inl 0)).nonLin_of (hΓa _) this
+        obtain ⟨_, hpick, _, _⟩ := h₂.var_inv
+        have := hpick.other (j := .succ .zero) (Var.succ_ne_zero _)
+        exact (hadd.vars.get .zero).nonLin_of (hΓa.vars.get _) this
 
 end ConservationCounterexample
 
@@ -113,17 +104,15 @@ open ConservationCounterexample in
 /-- **Theorem 4 (Conservation) is false as stated.** -/
 theorem not_conservation : ¬ Conservation := by
   intro hC
-  obtain ⟨Γ', Γs', ht, hadd, hc, -⟩ := hC Ctx.empty prog (.bang .unit) prog_typed Ctx.empty
-    Ctx.empty Heap.empty (Ctx.Add.empty_left _) Compat.empty _ _ _ _ step
-  have h1 : Γs' (.inl 0) = some (.lin .unit) := by
-    refine compat_single hc (x := 0) (e := VarEntry.lift (Nat.le_succ 0)
-      ⟨.one, Ctx.empty, unit, .unit, HasType.unitI Ctx.AllNonLin.empty⟩) ?_ rfl ?_ ?_
-    · simp [H₁, Heap.push, Heap.setVar]
-    · intro y hy; exact absurd (Subsingleton.elim y 0) hy
-    · intro a; rfl
-  have h2 : Γs' (.inl 0) = Γ' (.inl 0) := ((hadd (.inl 0)).left_none).symm
+  obtain ⟨Γ', Γs', ht, hadd, hc, -⟩ := hC TCtx.empty prog (.bang .unit) prog_typed TCtx.empty
+    TCtx.empty Heap.empty (TCtx.Add.empty_left _) Compat.empty _ _ _ _ _ _ step
+  have h1 : Γs'.vars.get .zero = some (.lin .unit) :=
+    compat_single hc (x := .zero) (e := e₀.lift 1 0) rfl rfl
+      (fun y hy => by cases y with | zero => exact absurd rfl hy | succ y => exact y.elim0)
+      (fun a => a.elim0)
+  have h2 : Γ'.vars.get .zero = Γs'.vars.get .zero := (hadd.vars.get .zero).left_none
   have h3 := prog'_typing_nonLin ht
-  rw [← h2, h1] at h3
-  exact h3
+  rw [h2, h1] at h3
+  exact h3.elim
 
 end LCU

@@ -8,18 +8,23 @@ public import RequestProject.LCU.Ext2_MutableArrays.RefShift
 without array primitives.  Here we extend it with a *store* of mutable floating-point
 arrays, following the array rules of the heap model (Section 3.4):
 
-* `newArray k ⟶ *a` allocates a fresh array `a` (filled with `0`);
+* `newArray k ⟶ *a` allocates a new array `a` (filled with `0`);
 * `readArray (*a) k ⟶ (arr[k], *a)` reads the array;
 * `writeArray (*a) k x ⟶ *a` destructively updates the array in the store;
 * `deleteArray (*a) ⟶ unit`;
 * `copy !u as x in t ⟶ [*θ(u)/x]t`, where `θ` renames the array references of `u` to
-  fresh references pointing to copies of the arrays (rule `copy_β`); concretely `θ`
-  maps `a` to `N + a` for a bound `N` above all allocated references;
+  new references pointing to copies of the arrays (rule `copy_β`); concretely every
+  array is copied, and `θ` maps `a` to its copy;
 * the arguments of primitives are evaluated (also under `*`), and otherwise the rules
   are those of `CbnStep`.
 
 This file contains the definitions: stores (`Store`), the reduction `AStep` and its
 reflexive-transitive closure `ASteps`, and well-typed configurations (`ConfOK`).
+
+As in the heap model, configurations are scoped: a configuration `σ ⊢ t` has
+`t : Term n ρ` and a store `σ : Store ρ` with one (optional) array for each of the `ρ`
+references in scope, and a step `AStep σ t e σ' t'` allocates `e` new references (the most
+recent ones, at index zero); the other subterms are weakened along `Var.shiftN e`.
 The metatheory is split over two further files:
 
 * `ArrayPreservation.lean`: **subject reduction** (`AStep.preserves`);
@@ -41,54 +46,27 @@ open Term
 
 /-! ## Stores -/
 
-/-- A store maps array references to arrays of floats (`none`: unallocated).
-Out-of-bounds accesses are ignored, as in the paper, so arrays are total functions.
-Stores are finite by construction: only finitely many references are allocated. -/
-structure Store where
-  /-- the array allocated at a reference, if any -/
-  get : ℕ → Option (ℕ → Float)
-  /-- only finitely many references are allocated -/
-  finite : ∃ N, ∀ b, N ≤ b → get b = none
-
-instance : CoeFun Store (fun _ => ℕ → Option (ℕ → Float)) := ⟨Store.get⟩
+/-- A store for `ρ` array references: each reference is allocated to an array of floats, or
+unallocated (`none`).  Out-of-bounds accesses are ignored, as in the paper, so arrays are
+total functions. -/
+abbrev Store (ρ : ℕ) : Type := Ctx (Option (ℕ → FloatLit)) ρ
 
 namespace Store
 
-/-- All references from `N` on are unallocated. -/
-def FreshFrom (σ : Store) (N : ℕ) : Prop := ∀ b, N ≤ b → σ b = none
-
-/-- Update the array allocated at a reference. -/
-def set (σ : Store) (a : ℕ) (v : Option (ℕ → Float)) : Store where
-  get := Function.update σ.get a v
-  finite := by
-    obtain ⟨N, hN⟩ := σ.finite
-    refine ⟨max N (a + 1), fun b hb => ?_⟩
-    rw [Function.update_of_ne (by omega)]
-    exact hN b (by omega)
-
-@[simp] lemma set_apply (σ : Store) (a : ℕ) (v : Option (ℕ → Float)) (b : ℕ) :
-    σ.set a v b = Function.update σ.get a v b := rfl
-
-/-- Extend a store (whose references from `N` on are unallocated) with a copy of every
-array: the copy of `a` lives at `N + a`. -/
-def copyShift (σ : Store) (N : ℕ) : Store where
-  get b := if N ≤ b then σ (b - N) else σ b
-  finite := by
-    obtain ⟨M, hM⟩ := σ.finite
-    refine ⟨N + M, fun b hb => ?_⟩
-    simp only [show N ≤ b by omega, if_true]
-    exact hM _ (by omega)
-
-@[simp] lemma copyShift_apply (σ : Store) (N b : ℕ) :
-    σ.copyShift N b = if N ≤ b then σ (b - N) else σ b := rfl
+variable {ρ : ℕ}
 
 /-- The empty store. -/
-def empty : Store := ⟨fun _ => none, ⟨0, fun _ _ => rfl⟩⟩
+def empty : Store 0 := .nil
 
-@[simp] lemma empty_apply (b : ℕ) : Store.empty b = none := rfl
+/-- Extend a store with a copy of every array: the copy of `a` is `Var.lowAdd a`, the
+original is `Var.shiftN ρ a`. -/
+def copyAll (σ : Store ρ) : Store (ρ + ρ) := σ.append σ
 
-/-- Every store has a fresh bound. -/
-lemma exists_freshFrom (σ : Store) : ∃ N, σ.FreshFrom N := σ.finite
+/-- `a ↦ arr ∈ σ`: the reference `a` is allocated with contents `arr`. -/
+def At (σ : Store ρ) (a : Var ρ) (arr : ℕ → FloatLit) : Prop := σ.Lookup a (some arr)
+
+@[simp] lemma at_iff {σ : Store ρ} {a : Var ρ} {arr : ℕ → FloatLit} :
+    σ.At a arr ↔ σ.get a = some arr := Ctx.lookup_iff
 
 end Store
 
@@ -98,128 +76,150 @@ end Store
 (the array argument to a reference `*a`, the index to a literal `k`); the next argument
 of such a term is evaluated.  This is a sub-grammar of the partially applied primitives
 `PrimFun` of the paper. -/
-inductive ReadyPrim (n : ℕ) : Type where
+inductive ReadyPrim (n ρ : ℕ) : Type where
   /-- a primitive applied to no argument -/
   | const (p : Prim)
   /-- `readArray (*a)` -/
-  | read₁ (a : ℕ)
+  | read₁ (a : Var ρ)
   /-- `writeArray (*a)` -/
-  | write₁ (a : ℕ)
+  | write₁ (a : Var ρ)
   /-- `writeArray (*a) k` -/
-  | write₂ (a k : ℕ)
+  | write₂ (a : Var ρ) (k : ℕ)
 
 namespace ReadyPrim
 
-variable {n : ℕ}
+variable {n ρ : ℕ}
 
 /-- The embedding into terms. -/
-@[simp] def toTerm : ReadyPrim n → Term n
+@[simp] def toTerm : ReadyPrim n ρ → Term n ρ
   | const p => .prim p
   | read₁ a => .app (.prim .readArray) (.star (.ref a))
   | write₁ a => .app (.prim .writeArray) (.star (.ref a))
   | write₂ a k => .app (.app (.prim .writeArray) (.star (.ref a))) (.nat k)
 
 /-- The embedding into the partially applied primitives of the paper. -/
-def toPrimFun : ReadyPrim n → PrimFun n
+def toPrimFun : ReadyPrim n ρ → PrimFun n ρ
   | const p => .const p
   | read₁ a => .readArray₁ (.star (.ref a))
   | write₁ a => .writeArray₁ (.star (.ref a))
   | write₂ a k => .writeArray₂ (.star (.ref a)) (.nat k)
 
-@[simp] lemma toPrimFun_toTerm (p : ReadyPrim n) : p.toPrimFun.toTerm = p.toTerm := by
+@[simp] lemma toPrimFun_toTerm (p : ReadyPrim n ρ) : p.toPrimFun.toTerm = p.toTerm := by
+  cases p <;> rfl
+
+/-- Renaming the array references of a ready primitive. -/
+def renameRefs {ρ' : ℕ} (θ : Var ρ → Var ρ') : ReadyPrim n ρ → ReadyPrim n ρ'
+  | const p => const p
+  | read₁ a => read₁ (θ a)
+  | write₁ a => write₁ (θ a)
+  | write₂ a k => write₂ (θ a) k
+
+@[simp] lemma renameRefs_toTerm {ρ' : ℕ} (θ : Var ρ → Var ρ') (p : ReadyPrim n ρ) :
+    (p.renameRefs θ).toTerm = LCU.renameRefs θ p.toTerm := by
   cases p <;> rfl
 
 end ReadyPrim
 
-/-- `t` is (the embedding of) an element of the grammar `ReadyPrim n`. -/
-def PrimReady {n : ℕ} (t : Term n) : Prop := ∃ p : ReadyPrim n, p.toTerm = t
+/-- `t` is (the embedding of) an element of the grammar `ReadyPrim n ρ`. -/
+def PrimReady {n ρ : ℕ} (t : Term n ρ) : Prop := ∃ p : ReadyPrim n ρ, p.toTerm = t
 
 namespace PrimReady
 
-variable {n : ℕ}
+variable {n ρ : ℕ}
 
-lemma prim (p : Prim) : PrimReady (Term.prim p : Term n) := ⟨.const p, rfl⟩
-lemma read₁ (a : ℕ) : PrimReady (app (Term.prim .readArray) (star (ref a)) : Term n) :=
+lemma prim (p : Prim) : PrimReady (Term.prim p : Term n ρ) := ⟨.const p, rfl⟩
+lemma read₁ (a : Var ρ) : PrimReady (app (Term.prim .readArray) (star (ref a)) : Term n ρ) :=
   ⟨.read₁ a, rfl⟩
-lemma write₁ (a : ℕ) : PrimReady (app (Term.prim .writeArray) (star (ref a)) : Term n) :=
+lemma write₁ (a : Var ρ) : PrimReady (app (Term.prim .writeArray) (star (ref a)) : Term n ρ) :=
   ⟨.write₁ a, rfl⟩
-lemma write₂ (a k : ℕ) :
-    PrimReady (app (app (Term.prim .writeArray) (star (ref a))) (nat k) : Term n) :=
+lemma write₂ (a : Var ρ) (k : ℕ) :
+    PrimReady (app (app (Term.prim .writeArray) (star (ref a))) (nat k) : Term n ρ) :=
   ⟨.write₂ a k, rfl⟩
 
 /-- Ready primitives are partially applied primitives in the sense of `Values.lean`. -/
-lemma isPrimFun {t : Term n} : PrimReady t → IsPrimFun t
+lemma isPrimFun {t : Term n ρ} : PrimReady t → IsPrimFun t
   | ⟨p, hp⟩ => ⟨p.toPrimFun, by rw [ReadyPrim.toPrimFun_toTerm, hp]⟩
 
 end PrimReady
 
-/-- Single-step reduction `σ ⊢ t ⟶ σ' ⊢ t'` of the store-based semantics. -/
-inductive AStep : {n : ℕ} → Store → Term n → Store → Term n → Prop where
-  | betaLolli {n : ℕ} (σ : Store) (t : Term (n + 1)) (u : Term n) :
-      AStep σ (app (lam t) u) σ (subst1 u t)
-  | betaTensor {n : ℕ} (σ : Store) (t₁ t₂ : Term n) (t : Term (n + 2)) :
-      AStep σ (letPair (pair t₁ t₂) t) σ (subst2 t₁ t₂ t)
-  | betaUnit {n : ℕ} (σ : Store) (t : Term n) : AStep σ (letUnit unit t) σ t
-  | betaBang {n : ℕ} (σ : Store) (u : Term n) (t : Term (n + 1)) :
-      AStep σ (letBang (bang u) t) σ (subst1 u t)
-  | betaBorrow {n : ℕ} (σ : Store) (t : Term n) : AStep σ (borrow (star t)) σ (bang t)
-  /-- `copy_β`: the arrays of `u` are copied to the fresh references `N + a`. -/
-  | betaCopy {n : ℕ} (σ : Store) (N : ℕ) (u : Term n) (t : Term (n + 1)) :
-      σ.FreshFrom N → AStep σ (copy (bang u) t) (σ.copyShift N) (subst1 (star (u.shiftRefs N)) t)
-  | app {n : ℕ} {σ σ' : Store} {t t' : Term n} (u : Term n) :
-      AStep σ t σ' t' → AStep σ (app t u) σ' (app t' u)
-  | letPair {n : ℕ} {σ σ' : Store} {t t' : Term n} (u : Term (n + 2)) :
-      AStep σ t σ' t' → AStep σ (letPair t u) σ' (letPair t' u)
-  | letUnit {n : ℕ} {σ σ' : Store} {t t' : Term n} (u : Term n) :
-      AStep σ t σ' t' → AStep σ (letUnit t u) σ' (letUnit t' u)
-  | letBang {n : ℕ} {σ σ' : Store} {t t' : Term n} (u : Term (n + 1)) :
-      AStep σ t σ' t' → AStep σ (letBang t u) σ' (letBang t' u)
-  | borrow {n : ℕ} {σ σ' : Store} {t t' : Term n} :
-      AStep σ t σ' t' → AStep σ (borrow t) σ' (borrow t')
-  | copy {n : ℕ} {σ σ' : Store} {t t' : Term n} (u : Term (n + 1)) :
-      AStep σ t σ' t' → AStep σ (copy t u) σ' (copy t' u)
+/-- Single-step reduction `σ ⊢ t ⟶ σ' ⊢ t'` of the store-based semantics, allocating `e`
+new array references. -/
+inductive AStep : {n ρ : ℕ} → Store ρ → Term n ρ → (e : ℕ) → Store (ρ + e) →
+    Term n (ρ + e) → Prop where
+  | betaLolli {n ρ : ℕ} (σ : Store ρ) (t : Term (n + 1) ρ) (u : Term n ρ) :
+      AStep σ (app (lam t) u) 0 σ (t.subst1 u)
+  | betaTensor {n ρ : ℕ} (σ : Store ρ) (t₁ t₂ : Term n ρ) (t : Term (n + 2) ρ) :
+      AStep σ (letPair (pair t₁ t₂) t) 0 σ (t.subst2 t₁ t₂)
+  | betaUnit {n ρ : ℕ} (σ : Store ρ) (t : Term n ρ) : AStep σ (letUnit unit t) 0 σ t
+  | betaBang {n ρ : ℕ} (σ : Store ρ) (u : Term n ρ) (t : Term (n + 1) ρ) :
+      AStep σ (letBang (bang u) t) 0 σ (t.subst1 u)
+  | betaBorrow {n ρ : ℕ} (σ : Store ρ) (t : Term n ρ) : AStep σ (borrow (star t)) 0 σ (bang t)
+  /-- `copy_β`: every array is copied; the references of `u` are renamed to the copies. -/
+  | betaCopy {n ρ : ℕ} (σ : Store ρ) (u : Term n ρ) (t : Term (n + 1) ρ) :
+      AStep σ (copy (bang u) t) ρ σ.copyAll
+        ((LCU.renameRefs (Var.shiftN ρ) t).subst1 (star (LCU.renameRefs Var.lowAdd u)))
+  | app {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {t : Term n ρ} {t' : Term n (ρ + e)}
+      (u : Term n ρ) :
+      AStep σ t e σ' t' → AStep σ (app t u) e σ' (app t' (LCU.renameRefs (Var.shiftN e) u))
+  | letPair {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {t : Term n ρ} {t' : Term n (ρ + e)}
+      (u : Term (n + 2) ρ) :
+      AStep σ t e σ' t' →
+      AStep σ (letPair t u) e σ' (letPair t' (LCU.renameRefs (Var.shiftN e) u))
+  | letUnit {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {t : Term n ρ} {t' : Term n (ρ + e)}
+      (u : Term n ρ) :
+      AStep σ t e σ' t' →
+      AStep σ (letUnit t u) e σ' (letUnit t' (LCU.renameRefs (Var.shiftN e) u))
+  | letBang {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {t : Term n ρ} {t' : Term n (ρ + e)}
+      (u : Term (n + 1) ρ) :
+      AStep σ t e σ' t' →
+      AStep σ (letBang t u) e σ' (letBang t' (LCU.renameRefs (Var.shiftN e) u))
+  | borrow {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {t : Term n ρ} {t' : Term n (ρ + e)} :
+      AStep σ t e σ' t' → AStep σ (borrow t) e σ' (borrow t')
+  | copy {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {t : Term n ρ} {t' : Term n (ρ + e)}
+      (u : Term (n + 1) ρ) :
+      AStep σ t e σ' t' → AStep σ (copy t u) e σ' (copy t' (LCU.renameRefs (Var.shiftN e) u))
   /-- evaluation of the next argument of a primitive -/
-  | primArg {n : ℕ} {σ σ' : Store} {f t t' : Term n} :
-      PrimReady f → AStep σ t σ' t' → AStep σ (app f t) σ' (app f t')
+  | primArg {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} {f t : Term n ρ}
+      {t' : Term n (ρ + e)} :
+      PrimReady f → AStep σ t e σ' t' →
+      AStep σ (app f t) e σ' (app (LCU.renameRefs (Var.shiftN e) f) t')
   /-- evaluation under `*` of the (unique) array argument of a primitive -/
-  | primStar {n : ℕ} {σ σ' : Store} (p : Prim) {s s' : Term n} :
-      AStep σ s σ' s' → AStep σ (app (prim p) (star s)) σ' (app (prim p) (star s'))
-  | newArray {n : ℕ} (σ : Store) (k a : ℕ) : σ a = none →
-      AStep σ (app (prim .newArray) (nat k) : Term n) (σ.set a (some fun _ => 0))
-        (star (ref a))
-  | readArray {n : ℕ} (σ : Store) (a k : ℕ) (arr : ℕ → Float) : σ a = some arr →
-      AStep σ (app (app (prim .readArray) (star (ref a))) (nat k) : Term n) σ
+  | primStar {n ρ e : ℕ} {σ : Store ρ} {σ' : Store (ρ + e)} (p : Prim) {s : Term n ρ}
+      {s' : Term n (ρ + e)} :
+      AStep σ s e σ' s' → AStep σ (app (prim p) (star s)) e σ' (app (prim p) (star s'))
+  /-- `newArray`: the new array is the new reference `Var.zero` -/
+  | newArray {n ρ : ℕ} (σ : Store ρ) (k : ℕ) :
+      AStep σ (app (prim .newArray) (nat k) : Term n ρ) 1 (σ ,, some fun _ => 0)
+        (star (ref .zero))
+  | readArray {n ρ : ℕ} (σ : Store ρ) (a : Var ρ) (k : ℕ) (arr : ℕ → FloatLit) : σ.At a arr →
+      AStep σ (app (app (prim .readArray) (star (ref a))) (nat k) : Term n ρ) 0 σ
         (pair (float (arr k)) (star (ref a)))
-  | writeArray {n : ℕ} (σ : Store) (a k : ℕ) (x : Float) (arr : ℕ → Float) : σ a = some arr →
-      AStep σ (app (app (app (prim .writeArray) (star (ref a))) (nat k)) (float x) : Term n)
+  | writeArray {n ρ : ℕ} (σ : Store ρ) (a : Var ρ) (k : ℕ) (x : FloatLit) (arr : ℕ → FloatLit) :
+      σ.At a arr →
+      AStep σ (app (app (app (prim .writeArray) (star (ref a))) (nat k)) (float x) : Term n ρ) 0
         (σ.set a (some (Function.update arr k x))) (star (ref a))
-  | deleteArray {n : ℕ} (σ : Store) (a : ℕ) :
-      AStep σ (app (prim .deleteArray) (star (ref a)) : Term n) σ unit
+  | deleteArray {n ρ : ℕ} (σ : Store ρ) (a : Var ρ) :
+      AStep σ (app (prim .deleteArray) (star (ref a)) : Term n ρ) 0 σ unit
 
 /-- Multi-step reduction `σ ⊢ t ⟶* σ' ⊢ t'`. -/
-inductive ASteps {n : ℕ} : Store → Term n → Store → Term n → Prop where
-  | refl (σ : Store) (t : Term n) : ASteps σ t σ t
-  | tail {σ σ' σ'' : Store} {t t' t'' : Term n} :
-      ASteps σ t σ' t' → AStep σ' t' σ'' t'' → ASteps σ t σ'' t''
+inductive ASteps {n ρ : ℕ} (σ : Store ρ) (t : Term n ρ) :
+    {ρ' : ℕ} → Store ρ' → Term n ρ' → Prop where
+  | refl : ASteps σ t σ t
+  | tail {ρ' e : ℕ} {σ' : Store ρ'} {t' : Term n ρ'} {σ'' : Store (ρ' + e)}
+      {t'' : Term n (ρ' + e)} :
+      ASteps σ t σ' t' → AStep σ' t' e σ'' t'' → ASteps σ t σ'' t''
 
 /-! ## Well-typed configurations -/
 
 /-- A typing context `Γ` is compatible with the store `σ`: there are no variable
 assumptions, array references are non-linear, and every typed reference is allocated. -/
-structure ConfOK {n : ℕ} (σ : Store) (Γ : Ctx n) : Prop where
+structure ConfOK {n ρ : ℕ} (σ : Store ρ) (Γ : TCtx n ρ) : Prop where
   noVars : Γ.NoVars
   refsNonLin : Γ.RefsNonLin
-  alloc : ∀ a h, Γ (.inr a) = some h → σ a ≠ none
+  alloc : ∀ a h, Γ.refs.get a = some h → σ.get a ≠ none
 
 /-- A context compatible with a store is non-linear. -/
-lemma ConfOK.allNonLin {n : ℕ} {σ : Store} {Γ : Ctx n} (h : ConfOK σ Γ) : Γ.AllNonLin :=
+lemma ConfOK.allNonLin {n ρ : ℕ} {σ : Store ρ} {Γ : TCtx n ρ} (h : ConfOK σ Γ) : Γ.AllNonLin :=
   h.noVars.allNonLin h.refsNonLin
-
-/-- Unallocated references do not occur in a compatible context. -/
-lemma ConfOK.not_alloc {n : ℕ} {σ : Store} {Γ : Ctx n} (h : ConfOK σ Γ) {a : ℕ}
-    (ha : σ a = none) : Γ (.inr a) = none := by
-  by_contra hne
-  obtain ⟨h', e⟩ := Option.ne_none_iff_exists'.1 hne
-  exact h.alloc a h' e ha
 
 end LCU

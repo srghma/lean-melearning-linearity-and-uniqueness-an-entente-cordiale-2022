@@ -15,68 +15,80 @@ well-typed term is assumed in its context (`HasType.refs_ne_none`).
 
 namespace FOFU
 
+open Binding
+
 variable {R : Type} [Grades.PreorderedSemiring R]
 
+omit [Grades.PreorderedSemiring R] in
+lemma RefAdd.ne_none_left {k : ℕ} {a b c : Option (RefTy R k)} (h : RefAdd a b c)
+    (ha : a ≠ none) : c ≠ none := by
+  cases h <;> simp_all
+
+omit [Grades.PreorderedSemiring R] in
+lemma RefAdd.ne_none_right {k : ℕ} {a b c : Option (RefTy R k)} (h : RefAdd a b c)
+    (hb : b ≠ none) : c ≠ none := by
+  cases h <;> simp_all
+
 /-- Every runtime reference occurring in a well-typed term is assumed in its context. -/
-theorem HasType.refs_ne_none {k n : ℕ} {Γ : Ctx R k n} {t : Term R n} {A : Ty R k}
-    (h : HasType Γ t A) {a : ℕ} (ha : a ∈ t.refs) : Γ.refs a ≠ none := by
+theorem HasType.refOccurs_ne_none {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ}
+    {A : Ty R k} (h : HasType Γ t A) : ∀ {a : Var ρ}, t.RefOccurs a → Γ.refs.get a ≠ none := by
   induction h with
-  | var => simp [Term.refs] at ha
-  | abs _ ih => exact ih ha
-  | app hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | pr hs _ _ ih => rw [hs.refs]; exact ih ha
-  | elim hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | der _ _ ih => exact ih ha
-  | approx _ _ _ ih => exact ih ha
-  | tensorI hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | tensorE hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | unitI => simp [Term.refs] at ha
-  | unitE hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | pack _ _ ih => exact ih ha
+  | var _ => intro a hocc; exact absurd hocc Tm.not_hasOp_var
+  | abs _ ih =>
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h | h⟩
+    · exact ih h
+    · cases h
+  | app hadd _ _ ih₁ ih₂ | tensorI hadd _ _ ih₁ ih₂ | unitE hadd _ _ ih₁ ih₂
+  | withBorrow hadd _ _ ih₁ ih₂ | join _ hadd _ _ ih₁ ih₂ | elim hadd _ _ ih₁ ih₂
+  | clone _ hadd _ _ _ _ _ ih₁ ih₂ | tensorE hadd _ _ ih₁ ih₂ =>
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h | h⟩
+    · exact (hadd.refs.get a).ne_none_left (ih₁ h)
+    · rcases h with h | h
+      · exact (hadd.refs.get a).ne_none_right (ih₂ h)
+      · cases h
   | unpack hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · apply (hadd.refs a).ne_none_right
-      have := ih₂ h
-      simpa [Ctx.shiftNames, Ctx.substNames] using this
-  | share _ _ ih => exact ih ha
-  | clone _ hadd _ _ _ _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | withBorrow hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | split _ ih => exact ih ha
-  | join _ hadd _ _ ih₁ ih₂ =>
-    rcases Finset.mem_union.1 ha with h | h
-    · exact (hadd.refs a).ne_none_left (ih₁ h)
-    · exact (hadd.refs a).ne_none_right (ih₂ h)
-  | push _ ih => exact ih ha
-  | pull _ ih => exact ih ha
-  | nat => simp [Term.refs] at ha
-  | float => simp [Term.refs] at ha
-  | prim => simp [Term.refs] at ha
-  | nec _ _ _ ih => exact ih ha
-  | unborrow _ ih => exact ih ha
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h | h⟩
+    · exact (hadd.refs.get a).ne_none_left (ih₁ h)
+    · rcases h with h | h
+      · refine (hadd.refs.get a).ne_none_right ?_
+        have := ih₂ h
+        simpa [TCtx.shiftNames] using this
+      · cases h
+  | pr hs _ _ ih =>
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h | h⟩
+    · rw [hs.refs]; exact ih h
+    · cases h
+  | approx _ _ _ ih | der _ _ ih =>
+    intro a hocc; simpa using ih hocc
+  | pack _ _ ih | share _ _ ih | split _ ih | push _ ih | pull _ ih | unborrow _ ih =>
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h | h⟩
+    · exact ih h
+    · cases h
+  | nec _ _ _ ih =>
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h | h⟩
+    · simpa using ih h
+    · cases h
+  | unitI _ | nat _ _ | float _ _ | prim _ _ =>
+    intro a hocc
+    rcases hocc with ⟨⟨⟩⟩ | ⟨h⟩
+    cases h
   | ref _ hT =>
-    simp only [Term.refs, Finset.mem_singleton] at ha
-    subst ha; simp [hT]
+    intro a hocc
+    rcases hocc with ⟨h⟩ | ⟨h⟩
+    · simp only [Op.isRef, decide_eq_true_eq] at h
+      subst h; simp [hT.eq]
+    · cases h
+
+/-- Every runtime reference in `refs(t)` of a well-typed term `t` is assumed in its
+context. -/
+theorem HasType.refs_ne_none {k n ρ : ℕ} {Γ : TCtx R k n ρ} {t : Term R n ρ} {A : Ty R k}
+    (h : HasType Γ t A) {a : Var ρ} (ha : a ∈ t.refs) : Γ.refs.get a ≠ none :=
+  h.refOccurs_ne_none (Term.mem_refs.1 ha)
 
 end FOFU

@@ -29,7 +29,7 @@ generalised to grades and so are proved separately.)
 
 namespace FOFU
 
-variable {R : Type} [Grades.PreorderedSemiring R] {k n : ℕ}
+variable {R : Type} [Grades.PreorderedSemiring R] {k n ρ : ℕ}
 
 /-! ## Addition of assumptions -/
 
@@ -93,23 +93,25 @@ end RefAdd
 
 namespace CtxAdd
 
-lemma comm {Γ₁ Γ₂ Γ : Ctx R k n} (h : CtxAdd Γ₁ Γ₂ Γ) : CtxAdd Γ₂ Γ₁ Γ :=
-  ⟨fun i => (h.vars i).comm, fun a => (h.refs a).comm⟩
+open Ctx
 
-lemma assoc {A B AB C ABC : Ctx R k n} (h₁ : CtxAdd A B AB) (h₂ : CtxAdd AB C ABC) :
+lemma comm {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) : CtxAdd Γ₂ Γ₁ Γ :=
+  ⟨h.refs.swap RefAdd.comm, h.vars.swap AssmAdd.comm⟩
+
+lemma assoc {A B AB C ABC : TCtx R k n ρ} (h₁ : CtxAdd A B AB) (h₂ : CtxAdd AB C ABC) :
     ∃ BC, CtxAdd B C BC ∧ CtxAdd A BC ABC := by
-  choose f hf using fun i => (h₁.vars i).assoc (h₂.vars i)
-  choose g hg using fun a => (h₁.refs a).assoc (h₂.refs a)
-  exact ⟨⟨f, g⟩, ⟨fun i => (hf i).1, fun a => (hg a).1⟩, ⟨fun i => (hf i).2, fun a => (hg a).2⟩⟩
+  obtain ⟨r, hr₁, hr₂⟩ := h₁.refs.assoc h₂.refs RefAdd.assoc
+  obtain ⟨v, hv₁, hv₂⟩ := h₁.vars.assoc h₂.vars AssmAdd.assoc
+  exact ⟨⟨r, v⟩, ⟨hr₁, hv₁⟩, ⟨hr₂, hv₂⟩⟩
 
 /-- Associativity, in the other direction. -/
-lemma assoc' {A B BC C ABC : Ctx R k n} (h₁ : CtxAdd B C BC) (h₂ : CtxAdd A BC ABC) :
+lemma assoc' {A B BC C ABC : TCtx R k n ρ} (h₁ : CtxAdd B C BC) (h₂ : CtxAdd A BC ABC) :
     ∃ AB, CtxAdd A B AB ∧ CtxAdd AB C ABC := by
   obtain ⟨X, h3, h4⟩ := assoc h₁.comm h₂.comm
   exact ⟨X, h3.comm, h4.comm⟩
 
 /-- The interchange law `(A₁ + A₂) + (B₁ + B₂) = (A₁ + B₁) + (A₂ + B₂)`. -/
-lemma interchange {A₁ A₂ A B₁ B₂ B C : Ctx R k n} (hA : CtxAdd A₁ A₂ A) (hB : CtxAdd B₁ B₂ B)
+lemma interchange {A₁ A₂ A B₁ B₂ B C : TCtx R k n ρ} (hA : CtxAdd A₁ A₂ A) (hB : CtxAdd B₁ B₂ B)
     (hC : CtxAdd A B C) :
     ∃ C₁ C₂, CtxAdd A₁ B₁ C₁ ∧ CtxAdd A₂ B₂ C₂ ∧ CtxAdd C₁ C₂ C := by
   obtain ⟨X, hX1, hX2⟩ := assoc hA hC
@@ -117,14 +119,25 @@ lemma interchange {A₁ A₂ A B₁ B₂ B C : Ctx R k n} (hA : CtxAdd A₁ A₂
   obtain ⟨C₁, hC1, hC2⟩ := assoc' hY2 hX2
   exact ⟨C₁, Y, hC1, hY1.comm, hC2⟩
 
-lemma none_left (Γ : Ctx R k n) : CtxAdd (Ctx.none n) Γ Γ :=
-  ⟨fun _ => .noneLeft _, fun _ => .noneLeft _⟩
+/-- `Γ` is the sum of its runtime part `γ` and itself. -/
+lemma refsOnly_left (Γ : TCtx R k n ρ) : CtxAdd Γ.refsOnly Γ Γ :=
+  ⟨forall₃_iff.2 fun _ => RefAdd.idem _, Forall₃.replicate_left (fun _ => .noneLeft _) _⟩
 
-lemma none_right (Γ : Ctx R k n) : CtxAdd Γ (Ctx.none n) Γ := (none_left Γ).comm
+lemma refsOnly_right (Γ : TCtx R k n ρ) : CtxAdd Γ Γ.refsOnly Γ := (refsOnly_left Γ).comm
 
-lemma refsOnly {Γ₁ Γ₂ Γ : Ctx R k n} (h : CtxAdd Γ₁ Γ₂ Γ) :
+lemma refsOnly {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) :
     CtxAdd Γ₁.refsOnly Γ₂.refsOnly Γ.refsOnly :=
-  ⟨fun _ => .noneLeft _, h.refs⟩
+  ⟨h.refs, Forall₃.replicate_left (fun _ => .noneLeft _) _⟩
+
+/-- Extending both summands and the sum by new variables. -/
+lemma cons {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) {a b c : Option (Assm R k)}
+    (habc : AssmAdd a b c) : CtxAdd (Γ₁.cons a) (Γ₂.cons b) (Γ.cons c) :=
+  ⟨h.refs, .snoc h.vars habc⟩
+
+/-- Updating one variable in the summands and the sum. -/
+lemma setVar {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) (i : Var n) {a b c : Option (Assm R k)}
+    (habc : AssmAdd a b c) : CtxAdd (Γ₁.setVar i a) (Γ₂.setVar i b) (Γ.setVar i c) :=
+  ⟨h.refs, h.vars.set i habc⟩
 
 end CtxAdd
 
@@ -135,14 +148,20 @@ lemma ZeroAssm.add {a b c : Option (Assm R k)} (h : AssmAdd a b c) (ha : ZeroAss
   cases h with
   | noneLeft _ => exact hb
   | noneRight _ => exact ha
-  | grd A r s => simp only [ZeroAssm] at *; rw [ha, hb, add_zero]
+  | grd A r s => cases ha; cases hb; simp
 
-lemma Ctx.IsZero.add {Γ₁ Γ₂ Γ : Ctx R k n} (h : CtxAdd Γ₁ Γ₂ Γ) (h₁ : Γ₁.IsZero)
-    (h₂ : Γ₂.IsZero) : Γ.IsZero := fun i => (h₁ i).add (h.vars i) (h₂ i)
+lemma TCtx.IsZero.add {Γ₁ Γ₂ Γ : TCtx R k n ρ} (h : CtxAdd Γ₁ Γ₂ Γ) (h₁ : Γ₁.IsZero)
+    (h₂ : Γ₂.IsZero) : Γ.IsZero := h.vars.all (fun habc ha hb => ZeroAssm.add habc ha hb) h₁ h₂
 
-lemma Ctx.IsZero.none : (Ctx.none n : Ctx R k n).IsZero := fun _ => trivial
+lemma TCtx.IsZero.empty : (TCtx.empty : TCtx R k n ρ).IsZero := Ctx.all_replicate .none n
 
-lemma Ctx.IsZero.refsOnly (Γ : Ctx R k n) : Γ.refsOnly.IsZero := fun _ => trivial
+lemma TCtx.IsZero.refsOnly (Γ : TCtx R k n ρ) : Γ.refsOnly.IsZero := Ctx.all_replicate .none n
+
+lemma TCtx.IsZero.cons {Γ : TCtx R k n ρ} (h : Γ.IsZero) {a : Option (Assm R k)}
+    (ha : ZeroAssm a) : (Γ.cons a).IsZero := .snoc h ha
+
+lemma TCtx.IsZero.of_cons {Γ : TCtx R k n ρ} {a : Option (Assm R k)} (h : (Γ.cons a).IsZero) :
+    Γ.IsZero ∧ ZeroAssm a := Ctx.all_snoc.1 h
 
 /-- Adding a zero assumption to a linear one leaves it unchanged. -/
 lemma AssmAdd.zero_lin {z b c : Option (Assm R k)} {A : Ty R k} (h : AssmAdd z b c)
@@ -155,15 +174,17 @@ lemma AssmAdd.zero_grd {z b c : Option (Assm R k)} {A : Ty R k} {r : R} (h : Ass
     (hz : ZeroAssm z) (hb : b = some (.grd A r)) : c = some (.grd A r) := by
   subst hb; cases h with
   | noneLeft _ => rfl
-  | grd _ s _ => simp only [ZeroAssm] at hz; rw [hz, zero_add]
+  | grd _ s _ => cases hz; rw [zero_add]
 
 /-! ## Scaling -/
 
-/-- A context with no linear assumptions (the paper's `[Γ]`). -/
-def Ctx.Graded (Γ : Ctx R k n) : Prop := ∀ i A, Γ.vars i ≠ some (.lin A)
+/-- An optional assumption that is not linear (absent or graded). -/
+inductive NotLin : Option (Assm R k) → Prop where
+  | none : NotLin none
+  | grd (A : Ty R k) (r : R) : NotLin (some (.grd A r))
 
-omit [Grades.PreorderedSemiring R] in
-lemma Ctx.Graded.none : (Ctx.none n : Ctx R k n).Graded := fun _ _ h => by cases h
+/-- A context with no linear assumptions (the paper's `[Γ]`). -/
+def TCtx.Graded (Γ : TCtx R k n ρ) : Prop := Γ.vars.All NotLin
 
 namespace AssmScale
 
@@ -200,82 +221,100 @@ lemma add_exists {a' b' c' : Option (Assm R k)} (h₁ : AssmScale r a a') (h₂ 
       | grd _ _ _ => exact ⟨_, .grd T p q, by rw [← mul_add]; exact .grd T _⟩
 
 lemma zero (h : ZeroAssm a) (r : R) : AssmScale r a a := by
-  rcases a with _ | ⟨A | ⟨A, s⟩⟩
-  · exact .none
-  · exact h.elim
-  · simp only [ZeroAssm] at h; subst h
+  cases h with
+  | none => exact .none
+  | grd A =>
     have h := AssmScale.grd (r := r) A 0
     rwa [mul_zero] at h
 
 lemma isZero (h : AssmScale r a b) (ha : ZeroAssm a) : ZeroAssm b := by
   cases h with
-  | none => trivial
-  | grd A s => simp only [ZeroAssm] at *; rw [ha, mul_zero]
+  | none => exact .none
+  | grd A s => cases ha; simp
 
 lemma isZero_zero (h : AssmScale 0 a b) : ZeroAssm b := by
   cases h with
-  | none => trivial
-  | grd A s => simp only [ZeroAssm]; rw [zero_mul]
+  | none => exact .none
+  | grd A s => simp
 
 lemma not_lin_left {A : Ty R k} (h : AssmScale r (some (.lin A)) b) : False := by cases h
 
 lemma not_lin_right {A : Ty R k} (h : AssmScale r a (some (.lin A))) : False := by cases h
 
+lemma notLin_left (h : AssmScale r a b) : NotLin a := by
+  cases h <;> constructor
+
+lemma notLin_right (h : AssmScale r a b) : NotLin b := by
+  cases h <;> constructor
+
+lemma exists_of_notLin (h : NotLin a) (r : R) : ∃ b, AssmScale r a b := by
+  cases h with
+  | none => exact ⟨_, .none⟩
+  | grd A s => exact ⟨_, .grd A s⟩
+
+lemma unique (h₁ : AssmScale r a b) (h₂ : AssmScale r a c) : b = c := by
+  cases h₁ <;> cases h₂ <;> rfl
+
 end AssmScale
 
 namespace CtxScale
 
-lemma exists_of_graded {Γ : Ctx R k n} (h : Γ.Graded) (r : R) : ∃ Γ', CtxScale r Γ Γ' := by
-  have : ∀ i, ∃ b, AssmScale r (Γ.vars i) b := by
-    intro i
-    rcases e : Γ.vars i with _ | ⟨A | ⟨A, s⟩⟩
-    · exact ⟨_, .none⟩
-    · exact absurd e (h i A)
-    · exact ⟨_, .grd A s⟩
-  choose f hf using this
-  exact ⟨⟨f, Γ.refs⟩, ⟨hf, rfl⟩⟩
+open Ctx
 
-lemma graded {r : R} {Γ Γ' : Ctx R k n} (h : CtxScale r Γ Γ') : Γ.Graded := by
-  intro i A e; have := h.vars i; rw [e] at this; exact this.not_lin_left
+lemma exists_of_graded {Γ : TCtx R k n ρ} (h : Γ.Graded) (r : R) : ∃ Γ', CtxScale r Γ Γ' := by
+  obtain ⟨v, hv⟩ := Ctx.exists_of_forall fun i => AssmScale.exists_of_notLin (h.get i) r
+  exact ⟨⟨Γ.refs, v⟩, rfl, forall₂_iff.2 hv⟩
 
-lemma graded' {r : R} {Γ Γ' : Ctx R k n} (h : CtxScale r Γ Γ') : Γ'.Graded := by
-  intro i A e; have := h.vars i; rw [e] at this; exact this.not_lin_right
+lemma graded {r : R} {Γ Γ' : TCtx R k n ρ} (h : CtxScale r Γ Γ') : Γ.Graded :=
+  all_iff.2 fun i => (h.vars.get i).notLin_left
 
-lemma one_eq {Γ Γ' : Ctx R k n} (h : CtxScale 1 Γ Γ') : Γ' = Γ := by
-  ext1
-  · funext i; exact (h.vars i).one_eq
-  · exact h.refs
+lemma graded' {r : R} {Γ Γ' : TCtx R k n ρ} (h : CtxScale r Γ Γ') : Γ'.Graded :=
+  all_iff.2 fun i => (h.vars.get i).notLin_right
 
-lemma comp {q r : R} {Γ Γq Γrq : Ctx R k n} (h₁ : CtxScale q Γ Γq) (h₂ : CtxScale r Γq Γrq) :
+lemma one_eq {Γ Γ' : TCtx R k n ρ} (h : CtxScale 1 Γ Γ') : Γ' = Γ :=
+  TCtx.ext h.refs (Ctx.ext fun i => (h.vars.get i).one_eq)
+
+lemma unique {r : R} {Γ Γ₁ Γ₂ : TCtx R k n ρ} (h₁ : CtxScale r Γ Γ₁) (h₂ : CtxScale r Γ Γ₂) :
+    Γ₁ = Γ₂ :=
+  TCtx.ext (h₁.refs.trans h₂.refs.symm) (Ctx.ext fun i => (h₁.vars.get i).unique (h₂.vars.get i))
+
+lemma comp {q r : R} {Γ Γq Γrq : TCtx R k n ρ} (h₁ : CtxScale q Γ Γq) (h₂ : CtxScale r Γq Γrq) :
     CtxScale (r * q) Γ Γrq :=
-  ⟨fun i => (h₁.vars i).comp (h₂.vars i), h₂.refs.trans h₁.refs⟩
+  ⟨h₂.refs.trans h₁.refs, forall₂_iff.2 fun i => (h₁.vars.get i).comp (h₂.vars.get i)⟩
 
 /-- `r · Γ + s · Γ = (r + s) · Γ`. -/
-lemma add_scale {r s : R} {Γ Γr Γs Γrs : Ctx R k n} (hr : CtxScale r Γ Γr)
+lemma add_scale {r s : R} {Γ Γr Γs Γrs : TCtx R k n ρ} (hr : CtxScale r Γ Γr)
     (hs : CtxScale s Γ Γs) (hrs : CtxScale (r + s) Γ Γrs) : CtxAdd Γr Γs Γrs := by
-  refine ⟨fun i => (hr.vars i).add_scale (hs.vars i) (hrs.vars i), fun a => ?_⟩
-  rw [hr.refs, hs.refs, hrs.refs]; exact RefAdd.idem _
+  refine ⟨?_, forall₃_iff.2 fun i => (hr.vars.get i).add_scale (hs.vars.get i) (hrs.vars.get i)⟩
+  rw [hr.refs, hs.refs, hrs.refs]
+  exact forall₃_iff.2 fun _ => RefAdd.idem _
 
 /-- Distributivity, `r · A + r · B = r · (A + B)`, in the form needed for inversion. -/
-lemma add_exists {r : R} {A A' B B' C' : Ctx R k n} (hA : CtxScale r A A') (hB : CtxScale r B B')
-    (hC : CtxAdd A' B' C') : ∃ C, CtxAdd A B C ∧ CtxScale r C C' := by
-  choose f hf using fun i => (hA.vars i).add_exists (hB.vars i) (hC.vars i)
-  refine ⟨⟨f, C'.refs⟩, ⟨fun i => (hf i).1, fun a => ?_⟩, ⟨fun i => (hf i).2, rfl⟩⟩
-  have := hC.refs a
+lemma add_exists {r : R} {A A' B B' C' : TCtx R k n ρ} (hA : CtxScale r A A')
+    (hB : CtxScale r B B') (hC : CtxAdd A' B' C') : ∃ C, CtxAdd A B C ∧ CtxScale r C C' := by
+  obtain ⟨v, hv⟩ := Ctx.exists_of_forall fun i =>
+    (hA.vars.get i).add_exists (hB.vars.get i) (hC.vars.get i)
+  refine ⟨⟨C'.refs, v⟩, ⟨?_, forall₃_iff.2 fun i => (hv i).1⟩, rfl, forall₂_iff.2 fun i => (hv i).2⟩
+  have := hC.refs
   rwa [hA.refs, hB.refs] at this
 
 /-- A zero context is unchanged by scaling. -/
-lemma of_isZero {Z : Ctx R k n} (hZ : Z.IsZero) (r : R) : CtxScale r Z Z :=
-  ⟨fun i => AssmScale.zero (hZ i) r, rfl⟩
+lemma of_isZero {Z : TCtx R k n ρ} (hZ : Z.IsZero) (r : R) : CtxScale r Z Z :=
+  ⟨rfl, forall₂_iff.2 fun i => AssmScale.zero (hZ.get i) r⟩
 
-lemma isZero {r : R} {Γ Γ' : Ctx R k n} (h : CtxScale r Γ Γ') (hΓ : Γ.IsZero) : Γ'.IsZero :=
-  fun i => (h.vars i).isZero (hΓ i)
+lemma isZero {r : R} {Γ Γ' : TCtx R k n ρ} (h : CtxScale r Γ Γ') (hΓ : Γ.IsZero) : Γ'.IsZero :=
+  all_iff.2 fun i => (h.vars.get i).isZero (hΓ.get i)
 
-lemma isZero_zero {Γ Γ' : Ctx R k n} (h : CtxScale 0 Γ Γ') : Γ'.IsZero :=
-  fun i => (h.vars i).isZero_zero
+lemma isZero_zero {Γ Γ' : TCtx R k n ρ} (h : CtxScale 0 Γ Γ') : Γ'.IsZero :=
+  all_iff.2 fun i => (h.vars.get i).isZero_zero
 
-lemma refsOnly {r : R} {Γ Γ' : Ctx R k n} (h : CtxScale r Γ Γ') :
-    CtxScale r Γ.refsOnly Γ'.refsOnly := ⟨fun _ => .none, h.refs⟩
+lemma refsOnly {r : R} {Γ Γ' : TCtx R k n ρ} (h : CtxScale r Γ Γ') :
+    CtxScale r Γ.refsOnly Γ'.refsOnly :=
+  ⟨h.refs, forall₂_iff.2 fun i => by simpa using AssmScale.none⟩
+
+lemma cons {r : R} {Γ Γ' : TCtx R k n ρ} (h : CtxScale r Γ Γ') {a b : Option (Assm R k)}
+    (hab : AssmScale r a b) : CtxScale r (Γ.cons a) (Γ'.cons b) :=
+  ⟨h.refs, .snoc h.vars hab⟩
 
 end CtxScale
 
@@ -287,9 +326,9 @@ inductive AssmLe : Option (Assm R k) → Option (Assm R k) → Prop where
   | grd (A : Ty R k) {r s : R} : r ≤ s → AssmLe (some (.grd A r)) (some (.grd A s))
 
 /-- `CtxLe Γ Γ'`: `Γ'` is `Γ` with some grades approximated upwards. -/
-structure CtxLe (Γ Γ' : Ctx R k n) : Prop where
-  vars : ∀ i, AssmLe (Γ.vars i) (Γ'.vars i)
+structure CtxLe (Γ Γ' : TCtx R k n ρ) : Prop where
   refs : Γ'.refs = Γ.refs
+  vars : Ctx.Forall₂ AssmLe Γ.vars Γ'.vars
 
 namespace AssmLe
 
@@ -312,35 +351,38 @@ end AssmLe
 
 namespace CtxLe
 
-lemma refl (Γ : Ctx R k n) : CtxLe Γ Γ := ⟨fun _ => .refl _, rfl⟩
+open Ctx
+
+lemma refl (Γ : TCtx R k n ρ) : CtxLe Γ Γ := ⟨rfl, forall₂_iff.2 fun _ => .refl _⟩
 
 /-- If `A ≤ A'` and `A' + B` is defined, so is `A + B`, and it is below `A' + B`. -/
-lemma add_exists {A A' B C' : Ctx R k n} (hA : CtxLe A A') (hC : CtxAdd A' B C') :
+lemma add_exists {A A' B C' : TCtx R k n ρ} (hA : CtxLe A A') (hC : CtxAdd A' B C') :
     ∃ C, CtxAdd A B C ∧ CtxLe C C' := by
-  choose f hf using fun i => (hA.vars i).add_exists (hC.vars i)
-  refine ⟨⟨f, C'.refs⟩, ⟨fun i => (hf i).1, fun a => ?_⟩, ⟨fun i => (hf i).2, rfl⟩⟩
-  have := hC.refs a
+  obtain ⟨v, hv⟩ := Ctx.exists_of_forall fun i => (hA.vars.get i).add_exists (hC.vars.get i)
+  refine ⟨⟨C'.refs, v⟩, ⟨?_, forall₃_iff.2 fun i => (hv i).1⟩, rfl, forall₂_iff.2 fun i => (hv i).2⟩
+  have := hC.refs
   rwa [hA.refs] at this
 
 /-- If `B ≤ B'` and `A + B'` is defined, so is `A + B`, and it is below `A + B'`. -/
-lemma add_exists' {A B B' C' : Ctx R k n} (hB : CtxLe B B') (hC : CtxAdd A B' C') :
+lemma add_exists' {A B B' C' : TCtx R k n ρ} (hB : CtxLe B B') (hC : CtxAdd A B' C') :
     ∃ C, CtxAdd A B C ∧ CtxLe C C' := by
   obtain ⟨C, h1, h2⟩ := add_exists hB hC.comm
   exact ⟨C, h1.comm, h2⟩
 
 /-- `r ≤ s` implies `r · Γ ≤ s · Γ`. -/
-lemma of_scale {r s : R} {Γ Γr Γs : Ctx R k n} (hr : CtxScale r Γ Γr) (hs : CtxScale s Γ Γs)
+lemma of_scale {r s : R} {Γ Γr Γs : TCtx R k n ρ} (hr : CtxScale r Γ Γr) (hs : CtxScale s Γ Γs)
     (h : r ≤ s) : CtxLe Γr Γs :=
-  ⟨fun i => AssmLe.of_scale (hr.vars i) (hs.vars i) h, by rw [hr.refs, hs.refs]⟩
+  ⟨by rw [hr.refs, hs.refs], forall₂_iff.2 fun i => AssmLe.of_scale (hr.vars.get i) (hs.vars.get i) h⟩
 
 /-- Approximating one graded assumption. -/
-lemma update {Γ : Ctx R k n} {i : Fin n} {A : Ty R k} {r s : R}
-    (hi : Γ.vars i = some (.grd A r)) (h : r ≤ s) :
-    CtxLe Γ (Γ.update i (some (.grd A s))) := by
-  refine ⟨fun j => ?_, rfl⟩
-  by_cases hj : j = i
-  · subst hj; simp only [Ctx.update, Function.update_self, hi]; exact .grd A h
-  · simp only [Ctx.update, Function.update_of_ne hj]; exact .refl _
+lemma setVar {Γ : TCtx R k n ρ} {i : Var n} {A : Ty R k} {r s : R}
+    (hi : Γ.vars.get i = some (.grd A r)) (h : r ≤ s) :
+    CtxLe Γ (Γ.setVar i (some (.grd A s))) := by
+  refine ⟨rfl, forall₂_iff.2 fun j => ?_⟩
+  simp only [TCtx.setVar_vars, Ctx.get_set]
+  split_ifs with hj
+  · subst hj; rw [hi]; exact .grd A h
+  · exact .refl _
 
 end CtxLe
 

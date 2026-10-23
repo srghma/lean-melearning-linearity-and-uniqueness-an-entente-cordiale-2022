@@ -1,6 +1,7 @@
 module
 public import RequestProject.FOFU.Sec6_3_Theorems.CounterProgress
 public import RequestProject.FOFU.Sec6_1_Preliminaries.TypingRefs
+public import RequestProject.FOFU.Sec3_CoreCalculus.TypingLemmas
 
 /-!
 # A one-array configuration used by several counterexamples
@@ -10,7 +11,8 @@ Theorem 6.9 and Corollary 6.10 all start from the heap
 
   `Ha = ref₀ ↦_1 id₀, id₀ ↦ init`
 
-holding a single (uninitialised) array, and the context `Γa = ref₀ : Array_id₀ 𝔽`.
+holding a single (uninitialised) array, and the context `Γa = ref₀ : Array_id₀ 𝔽`.  Both
+have one reference `ref₀ = Var.zero` and one identifier `id₀ = Var.zero` in scope.
 `Ha ⋈ Γa` holds for the repaired heap compatibility (`gc = true`, `compat_Ha`), but not
 for Definition 6.4 as printed (`Compat.ress_eq_none`).
 -/
@@ -22,63 +24,62 @@ namespace FOFU
 variable {R : Type} [Grades.PreorderedSemiring R]
 
 /-- The reference type `Array_id₀ 𝔽`. -/
-def arrT : RefTy R 0 := ⟨.array, .rt 0, .float⟩
+def arrT : RefTy R 1 := ⟨.array, .zero, .float⟩
 
 /-- The context `ref₀ : Array_id₀ 𝔽`. -/
-def Γa : Ctx R 0 0 := Ctx.empty.addRef 0 arrT
+def Γa : TCtx R 1 0 1 := TCtx.empty.addRef (some arrT)
 
 /-- The heap `ref₀ ↦_1 id₀, id₀ ↦ init`. -/
-def Ha : Heap R 0 := (Heap.empty.addRef 0 1 0).addRes 0 (.arr .init)
+def Ha : Heap R 0 1 1 := (Heap.empty.addId (some (.arr .init))).newRef Frac.one .zero
 
 omit [Grades.PreorderedSemiring R] in
-lemma Ha_refs (a : ℕ) : (Ha : Heap R 0).refs a = if a = 0 then some (1, 0) else none := by
-  by_cases h : a = 0 <;> simp [Ha, Heap.addRef, Heap.addRes, Heap.empty, Function.update, h]
+@[simp] lemma Ha_refs (a : Var 1) : (Ha : Heap R 0 1 1).refs.get a = some (Frac.one, .zero) := by
+  cases a with
+  | zero => rfl
+  | succ a => cases a
 
 omit [Grades.PreorderedSemiring R] in
-lemma Ha_ress (id : ℕ) :
-    (Ha : Heap R 0).ress id = if id = 0 then some (.arr .init) else none := by
-  by_cases h : id = 0 <;> simp [Ha, Heap.addRef, Heap.addRes, Heap.empty, Function.update, h]
+@[simp] lemma Ha_ress (id : Var 1) : (Ha : Heap R 0 1 1).ress.get id = some (.arr .init) := by
+  cases id with
+  | zero => rfl
+  | succ a => cases a
 
 omit [Grades.PreorderedSemiring R] in
-lemma Γa_refs (a : ℕ) : (Γa : Ctx R 0 0).refs a = if a = 0 then some arrT else none := by
-  by_cases h : a = 0 <;> simp [Γa, Ctx.addRef, Ctx.empty, Function.update, h]
-
-omit [Grades.PreorderedSemiring R] in
-/-- Reference assumptions can always be added to themselves. -/
-lemma RefAdd.self {k : ℕ} (x : Option (RefTy R k)) : RefAdd x x x := by
-  cases x with
-  | none => exact RefAdd.noneLeft none
-  | some T => exact RefAdd.both T
+@[simp] lemma Γa_refs (a : Var 1) : (Γa : TCtx R 1 0 1).refs.get a = some arrT := by
+  cases a with
+  | zero => rfl
+  | succ a => cases a
 
 /-- A context without variables is its own sum. -/
-lemma ctxAdd_self_of_fin0 {k : ℕ} (Γ : Ctx R k 0) : CtxAdd Γ Γ Γ :=
-  ⟨fun i => i.elim0, fun _ => RefAdd.self _⟩
+lemma ctxAdd_self_of_vars0 {k ρ : ℕ} (Γ : TCtx R k 0 ρ) : CtxAdd Γ Γ Γ :=
+  ⟨Ctx.forall₃_iff.2 fun _ => RefAdd.idem _, Ctx.forall₃_iff.2 fun i => nomatch i⟩
 
 /-- `∅ + Γ = Γ` for contexts without variables. -/
-lemma ctxAdd_empty_left {k : ℕ} (Γ : Ctx R k 0) : CtxAdd Ctx.empty Γ Γ :=
-  ⟨fun i => i.elim0, fun _ => RefAdd.noneLeft _⟩
+lemma ctxAdd_empty_left {k ρ : ℕ} (Γ : TCtx R k 0 ρ) : CtxAdd TCtx.empty Γ Γ :=
+  ⟨Ctx.Forall₃.replicate_left (fun _ => .noneLeft _) _, Ctx.forall₃_iff.2 fun i => nomatch i⟩
 
 /-- `s · Γ = Γ` for contexts without variables. -/
-lemma ctxScale_of_fin0 {k : ℕ} (s : R) (Γ : Ctx R k 0) : CtxScale s Γ Γ :=
-  ⟨fun i => i.elim0, rfl⟩
+lemma ctxScale_of_vars0 {k ρ : ℕ} (s : R) (Γ : TCtx R k 0 ρ) : CtxScale s Γ Γ :=
+  ⟨rfl, Ctx.forall₂_iff.2 fun i => nomatch i⟩
 
-lemma isZero_of_fin0 {k : ℕ} (Γ : Ctx R k 0) : Γ.IsZero := fun i => i.elim0
+lemma isZero_of_vars0 {k ρ : ℕ} (Γ : TCtx R k 0 ρ) : Γ.IsZero :=
+  Ctx.all_iff.2 fun i => nomatch i
 
 /-- `Ha ⋈ Γa` with the repaired heap compatibility. -/
-theorem compat_Ha : Compat true (Ha : Heap R 0) Γa := by
-  refine Compat.extRes (Γ := Ctx.empty) (γ := Ctx.empty) (Δ := Ctx.empty) rfl rfl rfl
-    (fun i => i.elim0) (ResValTy.arr (ArrValTy.init _)) ctxAdd_empty ?_
-  exact Compat.gcRes rfl rfl Compat.empty
+theorem compat_Ha : Compat true (Ha : Heap R 0 1 1) Γa :=
+  Compat.extRes (Γ := TCtx.empty) (γ := TCtx.empty) (Δ := TCtx.empty) (id := .zero)
+    (Ctx.Lookup.of_eq rfl) rfl (ResValTy.arr (ArrValTy.init _)) ctxAdd_empty
+    (Compat.gcRes Compat.empty)
 
-/-- `Γ ⊢ ref₀ : Array_id₀ 𝔽` in any context assuming `ref₀ : Array_id₀ 𝔽` with no
-variables. -/
-lemma ref0_typed {n : ℕ} {Γ : Ctx R 0 n} (hz : Γ.IsZero) (h : Γ.refs 0 = some arrT) :
-    HasType Γ (.ref 0) (arrT.toTy) :=
-  HasType.ref hz h
+/-- `Γ ⊢ ref₀ : Array_id₀ 𝔽` in any context `0 · Γ` assuming `ref₀ : Array_id₀ 𝔽`. -/
+lemma ref0_typed {n ρ : ℕ} {Γ : TCtx R 1 n (ρ + 1)} (hz : Γ.IsZero)
+    (h : Γ.refs.get .zero = some arrT) : HasType Γ (.ref .zero) (arrT.toTy) :=
+  HasType.ref hz (Ctx.Lookup.of_eq h)
 
 /-- `*ref₀ : &_p (Array_id₀ 𝔽)` for any permission `p`. -/
-lemma star_ref0_typed {n : ℕ} {Γ : Ctx R 0 n} (hz : Γ.IsZero) (h : Γ.refs 0 = some arrT)
-    (p : Perm) : HasType Γ (.star (.ref 0)) (Ty.borrow p arrT.toTy) :=
-  HasType.nec p hz (HasType.ref (fun _ => trivial) h)
+lemma star_ref0_typed {n ρ : ℕ} {Γ : TCtx R 1 n (ρ + 1)} (hz : Γ.IsZero)
+    (h : Γ.refs.get .zero = some arrT) (p : Perm) :
+    HasType Γ (.star (.ref .zero)) (Ty.borrow p arrT.toTy) :=
+  HasType.nec p hz (HasType.ref (TCtx.IsZero.refsOnly _) (Ctx.Lookup.of_eq h))
 
 end FOFU
