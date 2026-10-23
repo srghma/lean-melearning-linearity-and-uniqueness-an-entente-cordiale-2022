@@ -41,7 +41,7 @@ compatibility (`Compat gc`).  The flag `gc` selects Definition 6.4 as printed
 * `∑_{ref ∈ refs(t), ref ↦_p id ∈ H} p` is `permSum H t id`.
 * The restriction of Theorem 6.7 ("reference resources are restricted to non-function
   types") is the hypothesis that every type `Ref_id B` occurring in the context or in the
-  result type has a function-free `B` (`Ty.RefsFunFree`).
+  result type has a function-free `B` (`Ty.refsFunFree`, `TCtx.RefsFunFree`).
 * In Theorem 6.11 the relation "`H'(v₁) ≡ H''(v₂)`" (equality of the values with the heap
   substituted in, under full β-reduction) is not defined in the paper; it is a parameter
   `heapEq` of the statement.  The disproof works for every such relation.  The paper also
@@ -61,37 +61,42 @@ def TCtx.lift {k n ρ : ℕ} (d e f : ℕ) (Γ : TCtx R k n ρ) : TCtx R (k + f)
   ⟨(Γ.refs.map (Option.map (RefTy.ren (Var.shiftN f)))).pad none e,
     (Γ.vars.map (Option.map (Assm.ren (Var.shiftN f)))).pad none d⟩
 
-/-- `Ty.FunFree A`: `A` contains no function type. -/
-def Ty.FunFree {k : ℕ} : Ty R k → Prop
-  | .lolli _ _ => False
-  | .tensor A B => A.FunFree ∧ B.FunFree
-  | .unit => True
-  | .box _ A => A.FunFree
-  | .ex A => A.FunFree
-  | .borrow _ A => A.FunFree
-  | .res _ _ A => A.FunFree
-  | .nat => True
-  | .float => True
+/-- `Ty.funFree A`: `A` contains no function type. -/
+def Ty.funFree {k : ℕ} : Ty R k → Bool
+  | .lolli _ _ => false
+  | .tensor A B => A.funFree && B.funFree
+  | .unit => true
+  | .box _ A => A.funFree
+  | .ex A => A.funFree
+  | .borrow _ A => A.funFree
+  | .res _ _ A => A.funFree
+  | .nat => true
+  | .float => true
 
-/-- `Ty.RefsFunFree A`: every reference type `Ref_id B` occurring in `A` has a
+/-- `Ty.refsFunFree A`: every reference type `Ref_id B` occurring in `A` has a
 function-free `B`. -/
-def Ty.RefsFunFree {k : ℕ} : Ty R k → Prop
-  | .lolli A B => A.RefsFunFree ∧ B.RefsFunFree
-  | .tensor A B => A.RefsFunFree ∧ B.RefsFunFree
-  | .unit => True
-  | .box _ A => A.RefsFunFree
-  | .ex A => A.RefsFunFree
-  | .borrow _ A => A.RefsFunFree
-  | .res κ _ A => (κ = .ref → A.FunFree) ∧ A.RefsFunFree
-  | .nat => True
-  | .float => True
+def Ty.refsFunFree {k : ℕ} : Ty R k → Bool
+  | .lolli A B => A.refsFunFree && B.refsFunFree
+  | .tensor A B => A.refsFunFree && B.refsFunFree
+  | .unit => true
+  | .box _ A => A.refsFunFree
+  | .ex A => A.refsFunFree
+  | .borrow _ A => A.refsFunFree
+  | .res .ref _ A => A.funFree && A.refsFunFree
+  | .res _ _ A => A.refsFunFree
+  | .nat => true
+  | .float => true
+
+/-- The type of an assumption (`x : A` or `x : [A]_r`). -/
+def Assm.ty {k : ℕ} : Assm R k → Ty R k
+  | .lin A => A
+  | .grd A _ => A
 
 /-- The restriction of Theorem 6.7 on a context: all types occurring in it satisfy
-`Ty.RefsFunFree`. -/
+`Ty.refsFunFree`. -/
 def TCtx.RefsFunFree {k n ρ : ℕ} (Γ : TCtx R k n ρ) : Prop :=
-  (∀ i A, Γ.vars.get i = some (.lin A) → A.RefsFunFree) ∧
-  (∀ i A r, Γ.vars.get i = some (.grd A r) → A.RefsFunFree) ∧
-  (∀ a T, Γ.refs.get a = some T → T.toTy.RefsFunFree)
+  Γ.vars.All (fun o => ∀ a ∈ o, a.ty.refsFunFree) ∧
+    Γ.refs.All (fun o => ∀ T ∈ o, T.toTy.refsFunFree)
 
 /-- The permission `p` of an entry `ref ↦_p id'` on the identifier `id` (`0` if the entry
 is absent or points to another identifier). -/
@@ -118,7 +123,7 @@ restricted to non-function types), `H ⋈ (Γ₀ + s · Γ)` and `H ⊢ t ⤳_s 
 `Γ'` with `Γ' ⊢ t' : A` and `H' ⋈ (Γ₀ + s · Γ')`. -/
 def Preservation (gc : Bool) : Prop :=
   ∀ {n ρ ι d e f : ℕ} (Γ : TCtx R ι n ρ) (t : Term R n ρ) (A : Ty R ι), HasType Γ t A →
-    Γ.RefsFunFree → A.RefsFunFree →
+    Γ.RefsFunFree → A.refsFunFree →
     ∀ (s : R) (Γ₀ Γs Δ : TCtx R ι n ρ) (H : Heap R n ρ ι)
       (H' : Heap R (n + d) (ρ + e) (ι + f)) (t' : Term R (n + d) (ρ + e)),
       CtxScale s Γ Γs → CtxAdd Γ₀ Γs Δ → Compat gc H Δ → Step H t s d e f H' t' →

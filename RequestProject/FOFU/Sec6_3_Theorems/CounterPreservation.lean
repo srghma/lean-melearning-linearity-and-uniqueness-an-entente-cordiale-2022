@@ -51,14 +51,14 @@ lemma newArray_step :
 
 omit [Grades.PreorderedSemiring R] in
 lemma refsFunFree_empty {k n ρ : ℕ} : (TCtx.empty : TCtx R k n ρ).RefsFunFree :=
-  ⟨fun _ _ h => by simp at h, fun _ _ _ h => by simp at h, fun _ _ h => by simp at h⟩
+  ⟨Ctx.all_iff.2 fun _ _ h => by simp at h, Ctx.all_iff.2 fun _ _ h => by simp at h⟩
 
 /-- **Theorem 6.7 is false** for Definition 6.4 as printed. -/
 theorem not_preservation_literal : ¬ Preservation (R := R) false := by
   intro h
   obtain ⟨Γ', Γs', Δ', -, -, -, hc⟩ :=
     h TCtx.empty _ newArrayTy newArray_typed refsFunFree_empty
-      (by simp [Ty.RefsFunFree, newArrayTy]) 1 TCtx.empty TCtx.empty TCtx.empty Heap.empty _ _
+      (by simp [Ty.refsFunFree, newArrayTy]) 1 TCtx.empty TCtx.empty TCtx.empty Heap.empty _ _
       (ctxScale_empty 1) ctxAdd_empty Compat.empty newArray_step
   have := Compat.ress_eq_none hc .zero
   simp at this
@@ -109,15 +109,14 @@ lemma danglingTerm_step :
 /-- **Theorem 6.7 is false** for the repaired heap compatibility. -/
 theorem not_preservation_gc : ¬ Preservation (R := R) true := by
   intro h
-  have hff : (Γa : TCtx R 1 0 1).RefsFunFree := by
-    unfold TCtx.RefsFunFree
-    refine ⟨fun i => (nomatch i), fun i => (nomatch i), fun a T hT => ?_⟩
-    simp only [Γa_refs, Option.some.injEq] at hT
-    subst hT
-    simp [Ty.RefsFunFree, arrT, RefTy.toTy]
+  have hff : (Γa : TCtx R 1 0 1).RefsFunFree :=
+    ⟨Ctx.all_iff.2 fun i => (nomatch i), Ctx.all_iff.2 fun a T hT => by
+      simp only [Γa_refs, Option.mem_def, Option.some.injEq] at hT
+      subst hT
+      simp [Ty.refsFunFree, arrT, RefTy.toTy]⟩
   obtain ⟨Γ', Γs', Δ', ht, hs, hadd, hc⟩ :=
     h Γa danglingTerm danglingTy danglingTerm_typed hff
-      (by simp [Ty.RefsFunFree, arrT, RefTy.toTy])
+      (by simp [Ty.refsFunFree, arrT, RefTy.toTy])
       1 TCtx.empty Γa Γa Ha _ _ (ctxScale_of_vars0 1 Γa) (ctxAdd_empty_left Γa) compat_Ha
       danglingTerm_step
   have h0 : (app (danglingFun.wk2 0 2) (pair (star (ref (.succ .zero))) (star (ref .zero))) :

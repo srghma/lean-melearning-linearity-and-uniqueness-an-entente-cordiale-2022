@@ -1,23 +1,24 @@
-# Summary of changes for run feda3a25-de51-43a2-9f19-2b52b9c82dd5
-**What `RequestProject/Proposal/` was, and whether you need it**
-It held one file, `Prototype.lean`. This was a small standalone sketch written before `PROPOSAL.md` was implemented, to try out the planned design (snoc-list contexts, a structural variable rule, values as their own type, and permissions restricted to \(0 < p \le 1\)). No file in the project imported it, and the real versions of those ideas now live in `Common/Var.lean`, `Common/Ctx.lean`, `Common/Syntax.lean`, `FOFU/` and `LCU/`. Neither paper's formalisation needs it, so I removed it.
+# Summary of changes for run 193e9862-0d20-4f36-86aa-b189dcc46fa9
+The request was just "refactor", so I worked on the refactoring items that `PROPOSAL.md` still listed as open. The full project builds, there is no `sorry`, `admit` or `axiom` in `RequestProject/`, and the changes are committed and pushed.
 
-**Does anything deleted need restoring? No.** I checked every file in your deleted list:
-- **The 23 files deleted from the top of `RequestProject/LCU/`** (`Syntax`, `Typing`, `TypingD`, `Context`, `CtxAlgebra`, `Substitution`, `Weakening`, `Values`, `Equational`, `Heap`, `Metatheory`, the four `Counter*` files, `KeyIdeas`, `Granule`, the `Cbn*` and `Array*` files, `RefShift`). Each one already has a counterpart with the same name in the section folders (`Sec2_KeyIdeas/`, `Sec3_1_Calculus/`, `Sec3_2_Equational/`, `Sec3_4_HeapModel/`, `Sec3_5_Metatheory/`, `Sec4_Implementation/`, `Ext1_CallByName/`, `Ext2_MutableArrays/`). Those counterparts were already tracked in git, which is why they show as "modified" rather than new, and they use the new design. The deleted files were old copies from before the folder split.
-- **`Common/DeBruijn.lean`** (and the earlier `Common/Lookup.lean`) were the old `Fin`-based helpers. `Common/Var.lean` and `Common/Ctx.lean` replace them.
-- To catch anything lost along the way, I also checked that:
-  - all 57 entries in the Properties table point to files and names that still exist;
-  - every Lean file and declaration named in `README.md` and both reading guides exists. The only exceptions are a few paper examples the FOFU reading guide already says are not formalised (`exampleConcurrent`, `exampleDeriving`), plus the planned `Sanity.lean` and the old `Common/DeBruijn.lean`, which `PROPOSAL.md` mentions only as a proposed item and in its pre-change description of the code.
+**1. Function-free restriction of Theorem 6.7 (`FOFU/Sec6_3_Theorems/Statements.lean`)**
+- The two checks for "contains no function type" are now `Bool`-valued functions, `Ty.funFree` and `Ty.refsFunFree`. They used to be predicates (`Ty.FunFree`, `Ty.RefsFunFree`). This matches how `Ty.copyable` and `Ty.cloneable` were already done.
+- `TCtx.RefsFunFree` used to be three `∀ i, Γ.vars.get i = some …` clauses. It is now two uses of the existing `Ctx.All` predicate, with a small helper `Assm.ty` that returns the type of an assumption.
+- `Preservation` means the same as before. The two disproofs in `CounterPreservation.lean` were updated, now use simpler proofs, and still build. The Lean statements in the Properties table did not change, so no entries needed updating.
 
-  Note that the repository history starts at a single commit, so I could not compare file contents against the old versions. This check is by file names, declarations and the docs.
+**2. Grade class (`Common/Grades/PreorderedSemiring.lean`)**
+- `Grades.PreorderedSemiring` is now connected to Mathlib's ordering classes (`AddLeftMono`, `AddRightMono`, `MulLeftMono`, `MulRightMono`), in both directions:
+  - any grade semiring automatically gets these instances, so Mathlib's lemmas such as `add_le_add` and `mul_le_mul'` work on grades;
+  - `PreorderedSemiring.ofMono` builds the class from them. The ℕ instance now uses it.
+- `FOFU/Sec3_CoreCalculus/CtxAlgebra.lean` now uses Mathlib's lemmas instead of the class fields.
+- I did not switch to Mathlib's `IsOrderedRing` because it requires a partial order, and the papers only assume a pre-order. The file's documentation says this.
 
-**What else I removed**
-- `RequestProject/Main.lean`: an unused template file. It contained only `import Mathlib` and some `set_option` lines, and nothing imported it.
+**3. Permission algebra (`FOFU/Sec5_Fractional/Permission.lean`)**
+- I added the basic laws for the partial addition of fractions `Frac.add`: commutativity (`add_comm`), associativity (`add_assoc`) and cancellation (`add_left_cancel`).
+- I also added `not_one_add` (nothing can be added to the full permission `1`), `lt_add_left` (a sum is larger than each part) and `half_lt` (halving makes a fraction smaller).
+- The typing rules still take the proof that `f + g ≤ 1` directly; I did not change them to use these laws.
 
-I left the many small unreferenced lemmas in place. They are mostly `@[simp]` rewrite and injectivity lemmas that the simplifier uses implicitly, or results listed in the Properties table, not leftovers from the old design. I also kept everything else: `paper.typ`, `paper.bib`, `lncs-alpha.csl`, the reading guides and `PROPOSAL.md`.
+**4. Documentation**
+- The status table in `PROPOSAL.md` now records items 6 and 7 as partly done, describing exactly what changed, and the small clean-ups in item 11 as done. Those clean-ups (`Step.appL`, `weakenTo`, a dedicated type for LCU array references) had already been made earlier; this run only finished the context-restriction one.
 
-**Documentation**
-I removed the mention of the prototype from `README.md`. In `PROPOSAL.md` I replaced the pointer to the prototype file with a note that it has been removed, so the later references to "the prototype" make sense.
-
-**Status**
-`lake build` succeeds, there is no `sorry`, `admit` or `axiom` in `RequestProject/`, and the changes are committed and pushed.
+**Not done:** a separate grammar of function-free types (the rest of item 6), and the process and tooling items 9, 10 and 12–14 (a verified type checker, a file of checks that each hypothesis can actually be satisfied, and process rules).

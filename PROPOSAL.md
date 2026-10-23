@@ -32,10 +32,11 @@ custom `Var n` instead of `Fin2`", "a generic binding layer: yes" and "floats as
 | 3. Scoped runtime names, `Frac` permissions | done: `Term R n ρ` with `ref : Var ρ → _`, `Heap R n ρ ι` with `refs : Ctx (Option (Frac × Var ι)) ρ`; allocation creates the name `Var.zero`; no freshness premises, and the references of a term are in the scope of its heap by construction (deallocated references have entry `none`) |
 | 4. Values as a separate type | LCU already had `Value n ρ`; FOFU keeps the `IsValue` predicate |
 | 5. Steps indexed by growth | done: `Step H t s d e f H' t'` (FOFU) and `Step H t d e H' t'` (LCU); in FOFU configurations grow at index `0`, so β-rules continue with the body itself |
-| 6. Restricted grammars | partly: `Ty.copyable`, `Ty.cloneable` are `Bool`-valued and `Term.Allocates` is decidable; the function-free restriction of Theorem 6.7 is still a predicate |
-| 7. Permission algebra, grade class | not done |
+| 6. Restricted grammars | partly: `Ty.copyable`, `Ty.cloneable`, `Ty.funFree`, `Ty.refsFunFree` are `Bool`-valued and `Term.Allocates` is decidable; the context restriction `TCtx.RefsFunFree` is stated with `Ctx.All`; the restriction of Theorem 6.7 is still a hypothesis rather than a separate grammar of ground types |
+| 7. Permission algebra, grade class | partly: `Grades.PreorderedSemiring` provides Mathlib's `AddLeftMono` / `AddRightMono` / `MulLeftMono` / `MulRightMono` instances (and `PreorderedSemiring.ofMono` builds the class from them), so Mathlib's order lemmas apply to grades; `Frac.add` has its partial commutative monoid laws (`add_comm`, `add_assoc`, `add_left_cancel`); the typing rules still take the definedness proof `f + g ≤ 1` directly |
 | 8. Floats | done: `FloatLit := Lean.JsonNumber` in both papers |
-| 9–14 | not done (process and tooling items) |
+| 11. Small clean-ups | done (`Step.appL`, `weakenTo`, lookup-based context restriction, `ArrTy` for LCU references) |
+| 9, 10, 12–14 | not done (process and tooling items) |
 
 The text below is the original proposal; its "Now" paragraphs describe the code before
 the change.

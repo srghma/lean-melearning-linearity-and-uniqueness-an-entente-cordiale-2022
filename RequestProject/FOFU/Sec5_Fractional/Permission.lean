@@ -58,6 +58,39 @@ lemma half_add_half (f : Frac) : (half f).1 + (half f).1 ≤ 1 := by
 lemma add_half_half (f : Frac) : add (half f) (half f) (half_add_half f) = f := by
   apply Subtype.ext; simp only [add_val, half_val]; ring
 
+/-! ### Partial commutative monoid laws of `Frac.add`
+
+`Frac.add` is a partial operation (defined when the sum is at most `1`); these are the
+laws of a partial commutative monoid without unit, stated with explicit definedness
+proofs. -/
+
+lemma add_comm (f g : Frac) (h : f.1 + g.1 ≤ 1) :
+    add f g h = add g f (by rwa [_root_.add_comm]) :=
+  Subtype.ext (_root_.add_comm _ _)
+
+lemma add_assoc (f g k : Frac) (h₁ : f.1 + g.1 ≤ 1) (h₂ : (add f g h₁).1 + k.1 ≤ 1) :
+    add (add f g h₁) k h₂ =
+      add f (add g k (by simp only [add_val] at h₂; linarith [f.2.1]))
+        (by simp only [add_val] at h₂ ⊢; linarith) :=
+  Subtype.ext (_root_.add_assoc _ _ _)
+
+/-- Cancellation: `f + g = f + g'` implies `g = g'`. -/
+lemma add_left_cancel {f g g' : Frac} {h : f.1 + g.1 ≤ 1} {h' : f.1 + g'.1 ≤ 1}
+    (e : add f g h = add f g' h') : g = g' :=
+  Subtype.ext (by simpa using congrArg Subtype.val e)
+
+/-- The full permission cannot be extended: `1 + g` is never defined. -/
+lemma not_one_add (g : Frac) : ¬ one.1 + g.1 ≤ 1 := by
+  simp only [one_val]; linarith [g.2.1]
+
+/-- A sum is strictly larger than each summand. -/
+lemma lt_add_left (f g : Frac) (h : f.1 + g.1 ≤ 1) : f.1 < (add f g h).1 := by
+  simp only [add_val]; linarith [g.2.1]
+
+/-- Halving strictly decreases a fraction. -/
+lemma half_lt (f : Frac) : (half f).1 < f.1 := by
+  simp only [half_val]; linarith [f.2.1]
+
 end Frac
 
 /-- Permissions `p ::= * | f`: unique ownership `*` or a fraction `0 < f ≤ 1`. -/

@@ -339,13 +339,13 @@ lemma add_exists {a a' b c' : Option (Assm R k)} (h₁ : AssmLe a a') (h₂ : As
   | grd T hrs =>
     cases h₂ with
     | noneRight _ => exact ⟨_, .noneRight _, .grd T hrs⟩
-    | grd _ _ q => exact ⟨_, .grd T _ q, .grd T (Grades.PreorderedSemiring.add_mono hrs le_rfl)⟩
+    | grd _ _ q => exact ⟨_, .grd T _ q, .grd T (add_le_add_left hrs _)⟩
 
 lemma of_scale {r s : R} {a b c : Option (Assm R k)} (h₁ : AssmScale r a b)
     (h₂ : AssmScale s a c) (h : r ≤ s) : AssmLe b c := by
   cases h₁ with
   | none => cases h₂; exact .refl _
-  | grd A q => cases h₂; exact .grd A (Grades.PreorderedSemiring.mul_mono h le_rfl)
+  | grd A q => cases h₂; exact .grd A (mul_le_mul_left h _)
 
 end AssmLe
 
