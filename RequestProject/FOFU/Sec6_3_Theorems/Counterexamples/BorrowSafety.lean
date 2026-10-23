@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.CounterPreservation
+public import RequestProject.FOFU.Sec6_3_Theorems.Counterexamples.Preservation
 
 /-!
 # Lemma 6.8, Theorem 6.9 and Corollary 6.10 (borrow safety and uniqueness)
@@ -10,11 +10,11 @@ Definition 6.4 as printed, compatible heaps have no identifiers
 vacuously (`uniqueness_literal`).  For Lemma 6.8 and Theorem 6.9 with the printed
 definition, the second conjunct (about new identifiers) is not vacuous: Lemma 6.8 holds
 (`borrowSafety_literal`, in `BorrowSafetyLiteral.lean`) and Theorem 6.9 is false
-(`not_multiBorrowSafety_literal`, in `CounterMultiBorrowLiteral.lean`).
+(`not_multiBorrowSafety_literal`, in `MultiBorrowLiteral.lean`).
 
 With the repaired heap compatibility (`gc = true`) all three statements are false; each
 counterexample starts from the heap `ref₀ ↦_1 id₀, id₀ ↦ init` and the context
-`ref₀ : Array_id₀ 𝔽` (`CounterSetup.lean`).
+`ref₀ : Array_id₀ 𝔽` (`Setup.lean`).
 
 * **Lemma 6.8**: `clone [ref₀]_1 as x in x` steps (by `⤳clone β`) to a fresh heap
   variable `y`, bound to `pack ⟨id₁, *ref₁⟩` where `ref₁ ↦_1 id₁` is the copy.  The new

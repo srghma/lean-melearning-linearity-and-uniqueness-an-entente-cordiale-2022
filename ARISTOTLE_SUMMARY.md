@@ -1,24 +1,28 @@
-# Summary of changes for run 193e9862-0d20-4f36-86aa-b189dcc46fa9
-The request was just "refactor", so I worked on the refactoring items that `PROPOSAL.md` still listed as open. The full project builds, there is no `sorry`, `admit` or `axiom` in `RequestProject/`, and the changes are committed and pushed.
+# Summary of changes for run 192af3e0-5e8b-42a7-bd3a-49fba301d17d
+I split the large files and tidied up the directory layout. Only code was moved: no definition, statement or proof changed. The whole project still builds (`lake build`, 1004 jobs) with no warnings, and there is no `sorry`, `admit` or `axiom`. The longest file is now 331 lines (`LCU/Ext2_MutableArrays/ArrayProgress.lean`); before, it was 761.
 
-**1. Function-free restriction of Theorem 6.7 (`FOFU/Sec6_3_Theorems/Statements.lean`)**
-- The two checks for "contains no function type" are now `Bool`-valued functions, `Ty.funFree` and `Ty.refsFunFree`. They used to be predicates (`Ty.FunFree`, `Ty.RefsFunFree`). This matches how `Ty.copyable` and `Ty.cloneable` were already done.
-- `TCtx.RefsFunFree` used to be three `∀ i, Γ.vars.get i = some …` clauses. It is now two uses of the existing `Ctx.All` predicate, with a small helper `Assm.ty` that returns the type of an assumption.
-- `Preservation` means the same as before. The two disproofs in `CounterPreservation.lean` were updated, now use simpler proofs, and still build. The Lean statements in the Properties table did not change, so no entries needed updating.
+**How files were split.** A big file became a directory of smaller files. A file with the original name stays next to it, keeps the overview docstring and imports all the parts. Because of this, existing `import`s of these files did not need to change. Each new file has its own short docstring.
 
-**2. Grade class (`Common/Grades/PreorderedSemiring.lean`)**
-- `Grades.PreorderedSemiring` is now connected to Mathlib's ordering classes (`AddLeftMono`, `AddRightMono`, `MulLeftMono`, `MulRightMono`), in both directions:
-  - any grade semiring automatically gets these instances, so Mathlib's lemmas such as `add_le_add` and `mul_le_mul'` work on grades;
-  - `PreorderedSemiring.ofMono` builds the class from them. The ℕ instance now uses it.
-- `FOFU/Sec3_CoreCalculus/CtxAlgebra.lean` now uses Mathlib's lemmas instead of the class fields.
-- I did not switch to Mathlib's `IsOrderedRing` because it requires a partial order, and the papers only assume a pre-order. The file's documentation says this.
+| Old file (lines) | New parts |
+| --- | --- |
+| `Common/Syntax.lean` (761) | `Common/Syntax/`: `Basic`, `RenSubst`, `MapOp`, `Occurs`, `HasOp` |
+| `Common/Ctx.lean` (717) | `Common/Ctx/`: `Basic`, `Pointwise`, `Algebra`, `Ren`, `Combine` |
+| `FOFU/Sec3_CoreCalculus/Syntax.lean` (570) | `Syntax/`: `Types`, `Terms`, `Eliminators`, `Source` |
+| `LCU/Sec3_1_Calculus/Syntax.lean` (393) | `Syntax/`: `Types`, `Terms`, `Eliminators`, `Core` |
+| `FOFU/Sec3_CoreCalculus/TypingD.lean` (405) | `TypingD/`: `Basic`, `Equiv` |
+| `FOFU/Sec3_CoreCalculus/CtxAlgebra.lean` (389) | `CtxAlgebra/`: `Add`, `Scale`, `Approx` |
 
-**3. Permission algebra (`FOFU/Sec5_Fractional/Permission.lean`)**
-- I added the basic laws for the partial addition of fractions `Frac.add`: commutativity (`add_comm`), associativity (`add_assoc`) and cancellation (`add_left_cancel`).
-- I also added `not_one_add` (nothing can be added to the full permission `1`), `lt_add_left` (a sum is larger than each part) and `half_lt` (halving makes a fraction smaller).
-- The typing rules still take the proof that `f + g ≤ 1` directly; I did not change them to use these laws.
+Three files were split differently, into separate files with their own names:
+- `LCU/Sec3_4_HeapModel/Heap.lean` (510) is now `Heap.lean` (heaps), `Step.lean` (reduction, and the notes on the rules that had to be reconstructed) and `Compat.lean` (Definition 3).
+- The FOFU substitution lemmas are now `SubstSetup.lean` (supporting definitions) and `Substitution.lean` (Lemmas 6.2 and 6.3).
+- `LCU/Ext1_CallByName/CbnSemantics.lean` is now `PrimFree.lean` (terms without array primitives) and `CbnSemantics.lean`.
 
-**4. Documentation**
-- The status table in `PROPOSAL.md` now records items 6 and 7 as partly done, describing exactly what changed, and the small clean-ups in item 11 as done. Those clean-ups (`Step.appL`, `weakenTo`, a dedicated type for LCU array references) had already been made earlier; this run only finished the context-restriction one.
+**Directory changes**
+- **FOFU, §6.3:** `Sec6_3_Theorems/` had 18 files. The proof of the substitution lemmas is now in `SubstitutionLemmas/` (`NameSubst`, `Renaming`, `ZeroWeakening`, `Occurs`, `SubstSetup`, `Substitution`). The counterexamples are in `Counterexamples/`, without the `Counter` prefix (`Setup`, `Progress`, `Preservation`, `BorrowSafety`, `MultiBorrowLiteral`, `EqSoundness`).
+- **LCU, §3.5:** the same was done for `Sec3_5_Metatheory/Counterexamples/` (`Conservation`, `Uniqueness`, `Progress`, `EqSoundness`).
+- **FOFU, §5:** `Sec5_1_Equational/` and `Sec5_2_Distributive/` each held one file, so they are merged into `Sec5_Fractional/` as `Equational.lean` and `Distributive.lean`.
 
-**Not done:** a separate grammar of function-free types (the rest of item 6), and the process and tooling items 9, 10 and 12–14 (a verified type checker, a file of checks that each hypothesis can actually be satisfied, and process rules).
+**Documentation and tracking**
+- `RequestProject/FOFU.lean` and `RequestProject/LCU.lean` list all the files, grouped by section, and describe the layout. `LCU.lean` now also imports `RefRenaming`, which it was missing before.
+- File references were updated in the docstrings, `README.md` and both reading guides, including the LCU dependency diagram. `PROPOSAL.md` now says that its older file references may be out of date.
+- In the Properties table, the 16 entries whose declarations moved now point to their new files. Their statuses and evidence are unchanged.

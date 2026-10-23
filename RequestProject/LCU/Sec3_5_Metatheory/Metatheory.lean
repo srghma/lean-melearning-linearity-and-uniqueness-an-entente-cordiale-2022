@@ -1,5 +1,6 @@
 module
-public import RequestProject.LCU.Sec3_4_HeapModel.Heap
+public import RequestProject.LCU.Sec3_4_HeapModel.Step
+public import RequestProject.LCU.Sec3_4_HeapModel.Compat
 
 /-!
 # Metatheory of the heap model: the statements of Theorems 4–7 (Section 3.5)
@@ -13,10 +14,10 @@ The disproofs are in the other files of this directory:
 
 | Statement | Disproof | File |
 | --- | --- | --- |
-| `Conservation` (Theorem 4) | `not_conservation` | `CounterConservation.lean` |
-| `Uniqueness` (Theorem 5) | `not_uniqueness` | `CounterUniqueness.lean` |
-| `Progress` (Theorem 6) | `not_progress` | `CounterProgress.lean` |
-| `EqSoundness` (Theorem 7) | `not_eqSoundness` | `CounterEqSoundness.lean` |
+| `Conservation` (Theorem 4) | `not_conservation` | `Counterexamples/Conservation.lean` |
+| `Uniqueness` (Theorem 5) | `not_uniqueness` | `Counterexamples/Uniqueness.lean` |
+| `Progress` (Theorem 6) | `not_progress` | `Counterexamples/Progress.lean` |
+| `EqSoundness` (Theorem 7) | `not_eqSoundness` | `Counterexamples/EqSoundness.lean` |
 
 Notation used below: `H ⋈ Γ` is `Compat H Γ` (Definition 3), `H ⊢ t ⇝ H' ⊢ t' | Γ | Δ`
 is `Step H t H' t' Γ Δ`, `⇒` is its reflexive-transitive closure `Steps`, and `⇒_β` is

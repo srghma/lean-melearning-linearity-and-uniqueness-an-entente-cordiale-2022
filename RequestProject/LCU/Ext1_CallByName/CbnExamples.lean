@@ -1,7 +1,7 @@
 module
 public import RequestProject.LCU.Ext1_CallByName.CbnSemantics
-public import RequestProject.LCU.Sec3_5_Metatheory.CounterProgress
-public import RequestProject.LCU.Sec3_5_Metatheory.CounterConservation
+public import RequestProject.LCU.Sec3_5_Metatheory.Counterexamples.Progress
+public import RequestProject.LCU.Sec3_5_Metatheory.Counterexamples.Conservation
 
 /-!
 # The heap-model counterexamples under the repaired call-by-name semantics

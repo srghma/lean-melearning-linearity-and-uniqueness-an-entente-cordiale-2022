@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.CounterSetup
+public import RequestProject.FOFU.Sec6_3_Theorems.Counterexamples.Setup
 
 /-!
 # Theorem 6.7 (Type preservation) is false

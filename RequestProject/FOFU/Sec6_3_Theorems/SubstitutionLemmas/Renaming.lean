@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.NameSubst
+public import RequestProject.FOFU.Sec6_3_Theorems.SubstitutionLemmas.NameSubst
 public import RequestProject.FOFU.Sec3_CoreCalculus.RenameSubst
 
 /-!

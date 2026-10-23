@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.CounterProgress
+public import RequestProject.FOFU.Sec6_3_Theorems.Counterexamples.Progress
 public import RequestProject.FOFU.Sec6_1_Preliminaries.TypingRefs
 public import RequestProject.FOFU.Sec3_CoreCalculus.TypingLemmas
 

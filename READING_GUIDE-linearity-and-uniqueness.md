@@ -16,10 +16,10 @@ use live in `RequestProject/Common/`:
 
 * `Common/Var.lean`: de Bruijn variables `Var n` (constructors `zero` and `succ`) and
   renamings (`Ren.up`, `Ren.upN`, `Var.shiftN`);
-* `Common/Ctx.lean`: length-indexed snoc lists `Ctx α n` (contexts, heaps and stores),
+* `Common/Ctx.lean` (split into the files of `Common/Ctx/`): length-indexed snoc lists `Ctx α n` (contexts, heaps and stores),
   the lookup judgment `Ctx.Lookup` and the pointwise relations `Ctx.All`, `Ctx.Forall₂`,
   `Ctx.Forall₃`;
-* `Common/Syntax.lean`: the generic binding layer `Binding.Tm S n` (terms over a
+* `Common/Syntax.lean` (split into the files of `Common/Syntax/`): the generic binding layer `Binding.Tm S n` (terms over a
   signature, with renaming, substitution and their laws), of which `Term n ρ` is an
   instance;
 * `Common/Grades/PreorderedSemiring.lean`: the class of pre-ordered semirings of grades;
@@ -52,15 +52,18 @@ use live in `RequestProject/Common/`:
 ## Directory layout
 
 The directory names follow the sections of the paper. The `Ext…` directories contain
-material that goes beyond the paper.
+material that goes beyond the paper. A large file is split into a directory of smaller
+files next to a file of the same name that imports them all: `Sec3_1_Calculus/Syntax.lean`
+imports `Sec3_1_Calculus/Syntax/Types.lean`, `Terms.lean`, `Eliminators.lean` and
+`Core.lean`.
 
 | Directory | Paper | Contents |
 | --- | --- | --- |
 | `Sec2_KeyIdeas/` | §2 Key Ideas | the cake/coffee examples, `sip`, dereliction, borrowing, `uniqueBind` |
 | `Sec3_1_Calculus/` | §3.1 (and Figure 1) | syntax, contexts, typing, weakening, substitution (Lemmas 1–3), values |
 | `Sec3_2_Equational/` | §3.2 | the equational theory and the typability of its axioms |
-| `Sec3_4_HeapModel/` | §3.4 | heaps, the reduction rules, compatibility (Definition 3) |
-| `Sec3_5_Metatheory/` | §3.5 | Theorems 4–7 as stated, and their disproofs |
+| `Sec3_4_HeapModel/` | §3.4 | heaps (`Heap.lean`), the reduction rules (`Step.lean`), compatibility (Definition 3, `Compat.lean`) |
+| `Sec3_5_Metatheory/` | §3.5 | Theorems 4–7 as stated; their disproofs are in `Counterexamples/` |
 | `Sec4_Implementation/` | §4.1 | the `{0, 1, ω}` semiring used by Granule |
 | `Ext1_CallByName/` | beyond the paper | a repaired, substitution-based call-by-name semantics: type safety and termination |
 | `Ext2_MutableArrays/` | §3.3 + beyond | a store-based semantics with mutable arrays: type safety |
@@ -82,12 +85,12 @@ material that goes beyond the paper.
 | Equational theory (§3.2) | `EqAxiom`, `Equiv` (`≡ₗ`) | `Sec3_2_Equational/Equational.lean` |
 | Typability of the axioms | `EqAxiom.preserves` | `Sec3_2_Equational/EqAxiomTyping.lean` |
 | Values (Theorem 6) | `Value`, `PrimFun`, `IsValue` | `Sec3_1_Calculus/Values.lean` |
-| Heaps and reduction (§3.4) | `Heap`, `Step`, `Steps`, `FullStep`, `FullSteps` | `Sec3_4_HeapModel/Heap.lean` |
-| Definition 3 (compatibility `H ⋈ Γ`) | `Compat` | `Sec3_4_HeapModel/Heap.lean` |
-| Theorem 4 (Conservation) | `Conservation`, refuted by `not_conservation` | `Sec3_5_Metatheory/Metatheory.lean`, `CounterConservation.lean` |
-| Theorem 5 (Uniqueness) | `Uniqueness`, refuted by `not_uniqueness` | `Sec3_5_Metatheory/Metatheory.lean`, `CounterUniqueness.lean` |
-| Theorem 6 (Progress) | `Progress`, refuted by `not_progress` | `Sec3_5_Metatheory/Metatheory.lean`, `CounterProgress.lean` |
-| Theorem 7 (Equational soundness) | `EqSoundness`, refuted by `not_eqSoundness` | `Sec3_5_Metatheory/Metatheory.lean`, `CounterEqSoundness.lean` |
+| Heaps and reduction (§3.4) | `Heap`, `Step`, `Steps`, `FullStep`, `FullSteps` | `Sec3_4_HeapModel/Heap.lean`, `Sec3_4_HeapModel/Step.lean` |
+| Definition 3 (compatibility `H ⋈ Γ`) | `Compat` | `Sec3_4_HeapModel/Compat.lean` |
+| Theorem 4 (Conservation) | `Conservation`, refuted by `not_conservation` | `Sec3_5_Metatheory/Metatheory.lean`, `Counterexamples/Conservation.lean` |
+| Theorem 5 (Uniqueness) | `Uniqueness`, refuted by `not_uniqueness` | `Sec3_5_Metatheory/Metatheory.lean`, `Counterexamples/Uniqueness.lean` |
+| Theorem 6 (Progress) | `Progress`, refuted by `not_progress` | `Sec3_5_Metatheory/Metatheory.lean`, `Counterexamples/Progress.lean` |
+| Theorem 7 (Equational soundness) | `EqSoundness`, refuted by `not_eqSoundness` | `Sec3_5_Metatheory/Metatheory.lean`, `Counterexamples/EqSoundness.lean` |
 | §2 examples | `impossible_cake`, `impossible_coffee`, `possible_cake`, `sip_hasType`, ... | `Sec2_KeyIdeas/KeyIdeas.lean` |
 | §4.1 grades `{0, 1, ω}` | `NOT` and its `CommSemiring`/`PartialOrder` instances | `Sec4_Implementation/Granule.lean` |
 
@@ -106,10 +109,11 @@ every proof.
 5. `Sec3_1_Calculus/Weakening.lean` and `Substitution.lean`: the statements of
    Lemmas 1–3 (`HasType.weaken`, `HasType.subst_lin`, `HasType.subst_nonlin`).
 6. `Sec3_2_Equational/Equational.lean`: the equational axioms.
-7. `Sec3_4_HeapModel/Heap.lean`: heaps and the reduction rules. The docstring lists
+7. `Sec3_4_HeapModel/Heap.lean` and `Step.lean`: heaps and the reduction rules. The
+   docstring of `Step.lean` lists
    the rules that were missing from the text and how they were reconstructed.
 8. `Sec3_5_Metatheory/Metatheory.lean`: Theorems 4–7 stated literally. Then read the
-   module docstrings of the four `Counter*.lean` files, which describe each
+   module docstrings of the four files in `Counterexamples/`, which describe each
    counterexample in words.
 9. `Ext1_CallByName/CbnSemantics.lean`: the repaired semantics and its type safety
    theorem `cbn_type_safety`; then `CbnNormalization.lean` for `cbn_normalization`
@@ -124,7 +128,7 @@ look at their docstrings.
 
 **§3.1: the calculus** (`Sec3_1_Calculus/`)
 
-1. `Syntax.lean`: `Ty`, `Prim`, `Term n ρ`, `CoreTy`, `CoreTerm n`.
+1. `Syntax.lean` (the files of `Syntax/`): `Ty`, `Prim`, `Term n ρ`, `CoreTy`, `CoreTerm n`.
 2. `RenameSubst.lean` *(technical)*: parallel renaming and substitution, `subst1`,
    `subst2`, `renameRefs`, and their composition laws.
 3. `Context.lean`: `Hyp`, `TCtx n ρ`, `HypAdd`, `TCtx.Add`, `TCtx.AllNonLin`, `TCtx.cons`.
@@ -153,28 +157,29 @@ to show that `λx. (t₁, t₂)` is ill-typed when `x` occurs in both components
     to right), and the `…_expand` lemmas (the axioms without substitution also
     preserve typing from right to left).
 
-**§3.4: heap model** (`Sec3_4_HeapModel/Heap.lean`)
+**§3.4: heap model** (`Sec3_4_HeapModel/`)
 
-13. Usage annotations, heaps (whose entries store their typing derivations), `Step`,
-    `Steps`, `FullStep`, `FullSteps`, `Compat`.
+13. `Heap.lean`: usage annotations and heaps (whose entries store their typing
+    derivations); `Step.lean`: `Step`, `Steps`, `FullStep`, `FullSteps`; `Compat.lean`:
+    `Compat`.
 
 **§3.5: metatheory** (`Sec3_5_Metatheory/`)
 
 14. `Metatheory.lean`: the four statements, and a table pointing to their disproofs.
-15. `CounterProgress.lean`: the shortest counterexample (a stuck term). A good first
+15. `Counterexamples/Progress.lean`: the shortest counterexample (a stuck term). A good first
     example of how the counterexamples are built.
-16. `CounterConservation.lean`: one step whose reduct cannot be typed in any
+16. `Counterexamples/Conservation.lean`: one step whose reduct cannot be typed in any
     compatible context.
-17. `CounterEqSoundness.lean`: an `η!` instance whose two sides can never reach the
+17. `Counterexamples/EqSoundness.lean`: an `η!` instance whose two sides can never reach the
     same final heap.
-18. `CounterUniqueness.lean`: a six-step reduction, with every intermediate heap
+18. `Counterexamples/Uniqueness.lean`: a six-step reduction, with every intermediate heap
     spelled out, that ends in a unique value pointing to a shared array.
 
 These four files are independent of each other.
 
 **Beyond the paper: a repaired call-by-name semantics** (`Ext1_CallByName/`)
 
-19. `CbnSemantics.lean`: `CbnStep` replaces heap bindings with substitution. Results:
+19. `CbnSemantics.lean` (with `PrimFree.lean`, terms without array primitives): `CbnStep` replaces heap bindings with substitution. Results:
     subject reduction (`CbnStep.preserves`), progress for terms without array
     primitives (`cbn_progress`), type safety (`cbn_type_safety`), determinism. It also
     shows (`not_cbnStep_preserves_open`) that subject reduction fails for open terms.
@@ -208,11 +213,12 @@ Syntax ─ RenameSubst ─┬─ Context ─ Typing ─ CtxAlgebra ─ TypingD �
                                                                                             │
      Substitution ─ FreeVars ─┐                                                             │
      Equational (+ Values) ───┴─ EqAxiomTyping ─┬─ KeyIdeas                                 │
-                                                ├─ Heap ─ Metatheory ─ Counter* (×4)        │
-                                                └─ CbnSemantics ─┬─ CbnNormalization        │
-                                                                 ├─ CbnExamples (+ Counter*)│
-                                                                 └─ RefShift ─ ArraySemantics
-                                                                     ─ ArrayPreservation ─ ArrayProgress ─ ArrayExamples
+                                                ├─ Heap ─ Step, Compat ─ Metatheory         │
+                                                │    ─ Counterexamples/* (×4)               │
+                                                └─ PrimFree ─ CbnSemantics ─┬─ CbnNormalization
+                                                                            ├─ CbnExamples (+ Counterexamples)
+                                                                            └─ RefShift ─ ArraySemantics
+                                                         ─ ArrayPreservation ─ ArrayProgress ─ ArrayExamples
 Granule (standalone)
 ```
 

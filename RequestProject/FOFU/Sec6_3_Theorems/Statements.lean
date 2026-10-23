@@ -1,7 +1,7 @@
 module
 public import RequestProject.FOFU.Sec6_3_Theorems.Compat
 public import RequestProject.FOFU.Sec6_2_Reduction.Step
-public import RequestProject.FOFU.Sec5_1_Equational.Equational
+public import RequestProject.FOFU.Sec5_Fractional.Equational
 public import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 public import Mathlib.Algebra.Order.Field.Rat
 
@@ -15,14 +15,14 @@ compatibility (`Compat gc`).  The flag `gc` selects Definition 6.4 as printed
 
 | paper | statement | result |
 | --- | --- | --- |
-| Lemma 6.2 (Linear substitution) | `HasType.subst_lin` | proved (`Substitution.lean`) |
-| Lemma 6.3 (Graded substitution) | `HasType.subst_grd` | proved (`Substitution.lean`) |
-| Theorem 6.6 (Progress) | `Progress gc` | false for both `gc` (`CounterProgress.lean`) |
-| Theorem 6.7 (Type preservation) | `Preservation gc` | false for both `gc` (`CounterPreservation.lean`) |
-| Lemma 6.8 (Borrow safety) | `BorrowSafety gc` | true for `gc = false` (`BorrowSafetyLiteral.lean`), false for `gc = true` (`CounterBorrowSafety.lean`) |
-| Theorem 6.9 (Multi-reduction borrow safety) | `MultiBorrowSafety gc` | false for both `gc` (`CounterMultiBorrowLiteral.lean`, `CounterBorrowSafety.lean`) |
+| Lemma 6.2 (Linear substitution) | `HasType.subst_lin` | proved (`SubstitutionLemmas/Substitution.lean`) |
+| Lemma 6.3 (Graded substitution) | `HasType.subst_grd` | proved (`SubstitutionLemmas/Substitution.lean`) |
+| Theorem 6.6 (Progress) | `Progress gc` | false for both `gc` (`Counterexamples/Progress.lean`) |
+| Theorem 6.7 (Type preservation) | `Preservation gc` | false for both `gc` (`Counterexamples/Preservation.lean`) |
+| Lemma 6.8 (Borrow safety) | `BorrowSafety gc` | true for `gc = false` (`BorrowSafetyLiteral.lean`), false for `gc = true` (`Counterexamples/BorrowSafety.lean`) |
+| Theorem 6.9 (Multi-reduction borrow safety) | `MultiBorrowSafety gc` | false for both `gc` (`Counterexamples/MultiBorrowLiteral.lean`, `Counterexamples/BorrowSafety.lean`) |
 | Corollary 6.10 (Uniqueness) | `Uniqueness gc` | vacuously true for `gc = false`, false for `gc = true` |
-| Theorem 6.11 (Soundness w.r.t. `≡`) | `EqSoundness gc heapEq` | false for both `gc` and every `heapEq` (`CounterEqSoundness.lean`) |
+| Theorem 6.11 (Soundness w.r.t. `≡`) | `EqSoundness gc heapEq` | false for both `gc` and every `heapEq` (`Counterexamples/EqSoundness.lean`) |
 
 ## Formalisation choices
 

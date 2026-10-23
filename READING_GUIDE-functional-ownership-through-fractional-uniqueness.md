@@ -17,14 +17,14 @@ and each place where the FOFU code reuses something says so in a comment:
 | Shared file | Contents | Use in FOFU | Use in LCU |
 | --- | --- | --- | --- |
 | `Common/Var.lean` | de Bruijn variables `Var n` (constructors `zero`, `succ`), renamings `Ren.up`, `Ren.upN`, `Var.shiftN` | term variables, runtime references and identifiers | term variables and array references |
-| `Common/Ctx.lean` | length-indexed snoc lists `Ctx α n`, the lookup judgment `Ctx.Lookup`, `Ctx.Pick`, and the pointwise relations `Ctx.All`, `Ctx.Forall₂`, `Ctx.Forall₃` | typing contexts, context addition and scaling, heaps | typing contexts, heaps, stores |
-| `Common/Syntax.lean` | the generic binding layer: terms `Binding.Tm S n` over a signature `S`, renaming, substitution and their laws, `Tm.Occurs`, `Tm.HasOp` | `Term R n ρ` is `Tm (sig R ρ) n` | `Term n ρ` is `Tm (sig ρ) n` |
+| `Common/Ctx.lean` (`Common/Ctx/`) | length-indexed snoc lists `Ctx α n`, the lookup judgment `Ctx.Lookup`, `Ctx.Pick`, and the pointwise relations `Ctx.All`, `Ctx.Forall₂`, `Ctx.Forall₃` | typing contexts, context addition and scaling, heaps | typing contexts, heaps, stores |
+| `Common/Syntax.lean` (`Common/Syntax/`) | the generic binding layer: terms `Binding.Tm S n` over a signature `S`, renaming, substitution and their laws, `Tm.Occurs`, `Tm.HasOp` | `Term R n ρ` is `Tm (sig R ρ) n` | `Term n ρ` is `Tm (sig ρ) n` |
 | `Common/Grades/PreorderedSemiring.lean` | the class `Grades.PreorderedSemiring R` (semiring, preorder, monotone `+` and `*`), with the instance for `ℕ` | the parameter `R` of the whole calculus (§3) | the `{0, 1, ω}` semiring of §4.1 is an instance |
 
 Two proof techniques are also reused from the first paper (the code is separate because
 the rule sets differ), as noted in the module docstrings: the dereliction-free typing
-judgment (`TypingD.lean`), and the structure of the general substitution lemma
-(`Substitution.lean`).
+judgment (`Sec3_CoreCalculus/TypingD.lean`), and the structure of the general substitution
+lemma (`Sec6_3_Theorems/SubstitutionLemmas/Substitution.lean`).
 
 ## Conventions you need first
 
@@ -68,18 +68,23 @@ judgment (`TypingD.lean`), and the structure of the general substitution lemma
 
 ## Directory layout
 
-The directory names follow the sections of the paper.
+The directory names follow the sections of the paper. Large files are split into a
+directory of smaller files, next to a file of the same name that imports them all: for
+example `Sec3_CoreCalculus/Syntax.lean` imports `Sec3_CoreCalculus/Syntax/Types.lean`,
+`Terms.lean`, `Eliminators.lean` and `Source.lean`. The same holds for
+`Sec3_CoreCalculus/CtxAlgebra.lean` (`Add`, `Scale`, `Approx`) and
+`Sec3_CoreCalculus/TypingD.lean` (`Basic`, `Equiv`).
 
 | Directory | Paper | Contents |
 | --- | --- | --- |
 | `Sec3_CoreCalculus/` | §3 Core calculus | syntax, identifier substitution, renaming and substitution of terms, contexts and their algebra, the typing rules, the dereliction-free judgment, the example derivation |
 | `Sec4_Uniqueness/` | §4 Uniqueness and sharing | `exampleMove`, `exampleShare` |
-| `Sec5_Fractional/` | §5 Fractional uniqueness | permissions, resource interfaces, `copyable`/`cloneable`, `resourceAllocator`, the examples of §5 |
-| `Sec5_1_Equational/` | §5.1 (and the axioms of §4) | the equational theory `≡` |
-| `Sec5_2_Distributive/` | §5.2 Partial views | `examplePartial` |
+| `Sec5_Fractional/` | §5 Fractional uniqueness, §5.1, §5.2 | permissions, resource interfaces, `copyable`/`cloneable`, `resourceAllocator`, the examples of §5, the equational theory `≡` of §5.1 (and the axioms of §4) (`Equational.lean`), `examplePartial` of §5.2 (`Distributive.lean`) |
 | `Sec6_1_Preliminaries/` | §6.1 | values, heaps, the references of a typed term |
 | `Sec6_2_Reduction/` | §6.2 | single-step and multi-step reduction |
-| `Sec6_3_Theorems/` | §6.3 | heap compatibility, Example 6.5, Lemmas 6.2 and 6.3 and the lemmas they need, Theorems 6.6–6.11 as stated, and their counterexamples |
+| `Sec6_3_Theorems/` | §6.3 | heap compatibility, Example 6.5, Theorems 6.6–6.11 as stated |
+| `Sec6_3_Theorems/SubstitutionLemmas/` | §6.3 | Lemmas 6.2 and 6.3 and the lemmas they need |
+| `Sec6_3_Theorems/Counterexamples/` | §6.3 | the counterexamples to Theorems 6.6–6.11 |
 
 The permissions of §5 (`Permission.lean`) are imported by `Sec3_CoreCalculus/Syntax.lean`,
 because the single type of types contains the borrowing modality.
@@ -101,17 +106,17 @@ because the single type of types contains the borrowing modality.
 | Permissions `p ::= * \| f` (§5) | `Frac`, `Perm` | `Sec5_Fractional/Permission.lean` |
 | Resource interfaces, `copyable`, `cloneable`, `resourceAllocator` | `PrimTy`, `Ty.copyable`, `Ty.cloneable`, `Term.Allocates` | `Sec5_Fractional/Resources.lean` |
 | `exampleBorrow`, `exampleReborrow`, `exampleArray`, `exampleClone`, `exampleReference` | `…_typing` | `Sec5_Fractional/Examples.lean` |
-| Equational theory (§4, §5.1) | `EqAxiom`, `Equiv` (`≡`) | `Sec5_1_Equational/Equational.lean` |
-| `examplePartial` (§5.2) | `examplePartial_typing` | `Sec5_2_Distributive/Examples.lean` |
+| Equational theory (§4, §5.1) | `EqAxiom`, `Equiv` (`≡`) | `Sec5_Fractional/Equational.lean` |
+| `examplePartial` (§5.2) | `examplePartial_typing` | `Sec5_Fractional/Distributive.lean` |
 | Values (§6.1) | `IsValue`, `PrimSpine` | `Sec6_1_Preliminaries/Values.lean` |
 | Heaps (§6.1) | `Heap`, `ArrVal`, `ResVal`, `ArrVal.Reads` | `Sec6_1_Preliminaries/Heap.lean` |
 | Reduction (§6.2) | `Step`, `Steps`, `CopyHeap` | `Sec6_2_Reduction/Step.lean` |
 | Definition 6.4 (heap compatibility) | `Compat gc` | `Sec6_3_Theorems/Compat.lean` |
 | Example 6.5 | `example_6_5` | `Sec6_3_Theorems/Compat.lean` |
-| **Lemma 6.2** (linear substitution) | `HasType.subst_lin` | `Sec6_3_Theorems/Substitution.lean` |
-| **Lemma 6.3** (graded substitution) | `HasType.subst_grd` | `Sec6_3_Theorems/Substitution.lean` |
+| **Lemma 6.2** (linear substitution) | `HasType.subst_lin` | `Sec6_3_Theorems/SubstitutionLemmas/Substitution.lean` |
+| **Lemma 6.3** (graded substitution) | `HasType.subst_grd` | `Sec6_3_Theorems/SubstitutionLemmas/Substitution.lean` |
 | Theorems 6.6–6.11 as stated | `Progress`, `Preservation`, `BorrowSafety`, `MultiBorrowSafety`, `Uniqueness`, `EqSoundness` | `Sec6_3_Theorems/Statements.lean` |
-| Counterexamples | `not_progress`, `not_preservation_literal`, `not_preservation_gc`, `not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_multiBorrowSafety_literal`, `not_uniqueness_gc`, `not_eqSoundness` | `Sec6_3_Theorems/Counter*.lean` |
+| Counterexamples | `not_progress`, `not_preservation_literal`, `not_preservation_gc`, `not_borrowSafety_gc`, `not_multiBorrowSafety_gc`, `not_multiBorrowSafety_literal`, `not_uniqueness_gc`, `not_eqSoundness` | `Sec6_3_Theorems/Counterexamples/*.lean` |
 | Lemma 6.8 for the printed Definition 6.4 | `borrowSafety_literal`, `Step.new_ident` | `Sec6_3_Theorems/BorrowSafetyLiteral.lean` |
 
 ## Results on the theorems of §6.3
@@ -121,7 +126,7 @@ because the single type of types contains the borrowing modality.
 `HasType.subst_grd`: if `Γ₁ ⊢ t₁ : A`, `Γ₂, x : [A]_r ⊢ t₂ : B`, `¬ resourceAllocator(t₁)`,
 `r · Γ₁ = Γ₁ʳ` and `Γ₂ + Γ₁ʳ = Γ`, then `Γ ⊢ t₂[t₁/x] : B`. The paper's hypothesis that
 `Γ₁` has only graded assumptions follows from `r · Γ₁` being defined. The proof uses
-these lemmas, all in `Sec6_3_Theorems/`:
+these lemmas, all in `Sec6_3_Theorems/SubstitutionLemmas/`:
 
 * `HasTypeD.renNames` and `HasTypeD.shiftNames` (`NameSubst.lean`): renaming of
   identifiers, needed for `unpack`;
@@ -130,6 +135,8 @@ these lemmas, all in `Sec6_3_Theorems/`:
 * `HasTypeD.weakenZero` (`ZeroWeakening.lean`): weakening by zero-graded assumptions;
 * `HasTypeD.occurs` and `Term.allocates_subst` (`Occurs.lean`): needed for the side
   condition of promotion;
+* `SubstSetup`, `TCtx.remove` and `SubstHyp` (`SubstSetup.lean`): the data of a
+  substitution and the side condition on the substituted term;
 * `HasTypeD.subst_gen` (`Substitution.lean`): the general lemma, substituting for any
   variable whose assumption may be absent, linear or graded.
 
@@ -156,7 +163,7 @@ the old references and identifiers are tracked by the maps `θr`, `θi` recorded
 | Corollary 6.10 (Uniqueness) | true, vacuously: `uniqueness_literal` | false: `not_uniqueness_gc` |
 | Theorem 6.11 (Soundness w.r.t. `≡`) | false: `not_eqSoundness` | false: `not_eqSoundness` |
 
-The counterexamples (details in the docstrings of the `Counter*.lean` files):
+The counterexamples (details in the docstrings of the files in `Sec6_3_Theorems/Counterexamples/`):
 
 * **Progress, Soundness:** `split (*())` is well typed (`nec` gives `*()` every
   permission, and `split` does not require a resource type), is not a value, and
@@ -233,7 +240,7 @@ main ones are:
    `TypingLemmas.lean`.
 3. `Sec6_1_Preliminaries/`, `Sec6_2_Reduction/Step.lean`, `Sec6_3_Theorems/Compat.lean`:
    the semantics and heap compatibility.
-4. `Sec6_3_Theorems/Statements.lean`, then the `Counter*.lean` files.
-5. `Sec6_3_Theorems/Substitution.lean` for Lemmas 6.2 and 6.3, going back to
-   `Sec3_CoreCalculus/CtxAlgebra.lean`, `TypingD.lean` and the other `Sec6_3_Theorems/`
-   files for the lemmas they use.
+4. `Sec6_3_Theorems/Statements.lean`, then the files of `Sec6_3_Theorems/Counterexamples/`.
+5. `Sec6_3_Theorems/SubstitutionLemmas/Substitution.lean` for Lemmas 6.2 and 6.3, going back to
+   `Sec3_CoreCalculus/CtxAlgebra.lean`, `TypingD.lean` and the other files of
+   `Sec6_3_Theorems/SubstitutionLemmas/` for the lemmas they use.

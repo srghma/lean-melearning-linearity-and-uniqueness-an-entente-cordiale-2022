@@ -30,13 +30,15 @@ literals).
   `i` carries `a` and every other entry satisfies `P` (this is the paper's
   "`0 · Γ, x : A`"); `Ctx.All`, `Ctx.Forall₂` and `Ctx.Forall₃` are pointwise predicates
   and relations defined by recursion on the lists, and context addition and scaling are
-  instances of them.
+  instances of them. The files are in `Common/Ctx/` (`Basic`, `Pointwise`, `Algebra`,
+  `Ren`, `Combine`); `Common/Ctx.lean` imports them all.
 * `Common/Syntax.lean`: a generic binding layer. A signature lists the operators of a
   language with the binding arities of their arguments, and `Binding.Tm S n` is the type
   of terms with `n` free variables. Renaming, parallel substitution, single and double
   instantiation, operator maps (`Tm.mapOp`, used to rename runtime names stored in
   operators), free occurrences (`Tm.Occurs`) and operator occurrences (`Tm.HasOp`) are
-  defined once, with their laws proved once.
+  defined once, with their laws proved once. The files are in `Common/Syntax/` (`Basic`,
+  `RenSubst`, `MapOp`, `Occurs`, `HasOp`); `Common/Syntax.lean` imports them all.
 * `Common/Grades/PreorderedSemiring.lean`: the class of pre-ordered semirings of grades,
   with the instance for `ℕ`. The `{0, 1, ω}` semiring of the first paper is an instance,
   and the second paper's calculus is parameterised by it.
@@ -67,9 +69,11 @@ literals are `Lean.JsonNumber` (`FloatLit`).
 ## *Functional Ownership through Fractional Uniqueness*
 
 The directories of `RequestProject/FOFU/` follow the sections of the paper:
-`Sec3_CoreCalculus/`, `Sec4_Uniqueness/`, `Sec5_Fractional/`, `Sec5_1_Equational/`,
-`Sec5_2_Distributive/`, `Sec6_1_Preliminaries/`, `Sec6_2_Reduction/` and
-`Sec6_3_Theorems/`. The reading guide maps every item of the paper to its Lean name and
+`Sec3_CoreCalculus/`, `Sec4_Uniqueness/`, `Sec5_Fractional/` (§5, including the
+equational theory of §5.1 and the partial-views example of §5.2),
+`Sec6_1_Preliminaries/`, `Sec6_2_Reduction/` and `Sec6_3_Theorems/`. In
+`Sec6_3_Theorems/`, the proof of the substitution lemmas is in `SubstitutionLemmas/` and
+the disproofs of the theorems are in `Counterexamples/`. The reading guide maps every item of the paper to its Lean name and
 lists the formalisation choices.
 
 * **Calculus.** Types `Ty R k` (with `k` de Bruijn identifiers in scope), terms
@@ -158,10 +162,15 @@ The files are grouped into directories by section of the paper;
 `READING_GUIDE-linearity-and-uniqueness.md` explains the layout, maps every numbered definition, lemma and theorem of the paper to
 its Lean name, and suggests reading orders. `RequestProject/LCU.lean` imports everything.
 
+Large files are split into a directory of smaller files, next to a file of the same name
+that imports them all. For example, `Sec3_1_Calculus/Syntax.lean` imports
+`Sec3_1_Calculus/Syntax/Types.lean`, `Terms.lean`, `Eliminators.lean` and `Core.lean`.
+The same layout is used in `RequestProject/Common/` and `RequestProject/FOFU/`.
+
 | Directory (under `RequestProject/LCU/`) | Files | Contents |
 | --- | --- | --- |
 | `Sec2_KeyIdeas/` | `KeyIdeas.lean` | the examples of Section 2 (impossible/possible cake and coffee programs, `sip`, dereliction, borrowing, `uniqueReturn`/`uniqueBind`) |
-| `Sec3_1_Calculus/` | `Syntax.lean`, `RenameSubst.lean` | types `Ty`, primitives, terms `Term n ρ`, the core grammars `CoreTy` and `CoreTerm n`; renaming and substitution |
+| `Sec3_1_Calculus/` | `Syntax.lean` (`Syntax/`), `RenameSubst.lean`, `RefRenaming.lean` | types `Ty`, primitives, terms `Term n ρ`, the core grammars `CoreTy` and `CoreTerm n`; renaming and substitution of variables and of array references |
 | | `Context.lean`, `CtxAlgebra.lean` | contexts, context addition and its algebra |
 | | `Typing.lean` | the typing judgment `HasType` (Figure 1 plus the array primitives of §3.3) |
 | | `TypingD.lean` | an equivalent system with no separate dereliction rule (`hasType_iff_hasTypeD`) |
@@ -170,11 +179,14 @@ its Lean name, and suggests reading orders. `RequestProject/LCU.lean` imports ev
 | | `Values.lean` | the value grammar `Value n ρ` and partially applied primitives `PrimFun n ρ`, with an induction principle `IsValue.induction` |
 | | `FreeVars.lean` | free variables; linear variables must occur; strengthening |
 | `Sec3_2_Equational/` | `Equational.lean`, `EqAxiomTyping.lean` | the equational theory `≡ₗ` (§3.2); every axiom preserves typing (`EqAxiom.preserves`) |
-| `Sec3_4_HeapModel/` | `Heap.lean` | the heap model (§3.4): heaps, single-step reduction `Step`, multi-step `Steps`, full β-reduction, compatibility `Compat` (**Definition 3**) |
+| `Sec3_4_HeapModel/` | `Heap.lean` | the heap model (§3.4): usage and binding contexts, heaps |
+| | `Step.lean` | single-step reduction `Step`, multi-step `Steps`, full β-reduction `FullStep` |
+| | `Compat.lean` | heap-context compatibility `Compat` (**Definition 3**) |
 | `Sec3_5_Metatheory/` | `Metatheory.lean` | **Theorems 4–7** stated literally as propositions `Conservation`, `Uniqueness`, `Progress`, `EqSoundness` |
-| | `Counter*.lean` | formal disproofs of these four statements (see below) |
+| | `Counterexamples/*.lean` | formal disproofs of these four statements (see below) |
 | `Sec4_Implementation/` | `Granule.lean` | the `{0, 1, ω}` semiring of §4.1: a commutative semiring and partial order with monotone `+` and `*` |
-| `Ext1_CallByName/` | `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
+| `Ext1_CallByName/` | `PrimFree.lean` | terms without array primitives |
+| | `CbnSemantics.lean` | a repaired, substitution-based call-by-name reduction `CbnStep` with subject reduction, progress, type safety and determinism (see below) |
 | | `CbnExamples.lean` | the progress and conservation counterexamples reduce to values under `CbnStep` |
 | | `CbnNormalization.lean` | termination of `CbnStep` evaluation on well-typed closed terms (logical relation); `cbn_eval_core` for core terms |
 | `Ext2_MutableArrays/` | `RefShift.lean` | renaming of array references (for `copy_β`) and weakening into larger non-linear contexts |
@@ -189,7 +201,7 @@ The provided text leaves out a few rules: the runtime typing rule for array refe
 follows. Array references are typed by `[Γ], a : Array A ⊢ a : Array A`, and `nec`
 passes the array references of its conclusion to its premise. For source programs (no
 array references), the typing rules are exactly the paper's. The heap-model rules we
-reconstructed are documented in the docstring of `Heap.lean`.
+reconstructed are documented in the docstring of `Sec3_4_HeapModel/Step.lean`.
 
 ### Results on Theorems 4–7
 

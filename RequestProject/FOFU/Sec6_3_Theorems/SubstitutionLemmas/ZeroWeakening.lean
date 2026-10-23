@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.Renaming
+public import RequestProject.FOFU.Sec6_3_Theorems.SubstitutionLemmas.Renaming
 
 /-!
 # Weakening by zero-graded assumptions

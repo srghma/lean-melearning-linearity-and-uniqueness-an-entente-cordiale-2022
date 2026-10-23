@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.ZeroWeakening
+public import RequestProject.FOFU.Sec6_3_Theorems.SubstitutionLemmas.ZeroWeakening
 
 /-!
 # Free occurrences of variables

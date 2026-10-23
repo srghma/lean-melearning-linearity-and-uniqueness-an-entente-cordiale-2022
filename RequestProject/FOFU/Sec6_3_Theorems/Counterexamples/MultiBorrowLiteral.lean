@@ -1,5 +1,5 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.CounterBorrowSafety
+public import RequestProject.FOFU.Sec6_3_Theorems.Counterexamples.BorrowSafety
 public import RequestProject.FOFU.Sec3_CoreCalculus.TypingLemmas
 
 /-!
@@ -31,7 +31,7 @@ The term is typed by the rules of the paper: `split` needs only a fractional bor
 `newRef` accepts a value of any type (here `&_(1/2) A ⊗ &_(1/2) A`), `share` applies to the
 owned cell `*Ref_id' (…)` at any grade, in particular `0`, and a variable of grade `0`
 may be discarded.  The reduction uses the rule `⤳share β` with the heap left unchanged
-(the paper's `[H]_0` is undefined, see `Step.lean`); any reading of `[H]_0` that discards
+(the paper's `[H]_0` is undefined, see `Sec6_2_Reduction/Step.lean`); any reading of `[H]_0` that discards
 the cell without joining the halves gives the same result.
 -/
 

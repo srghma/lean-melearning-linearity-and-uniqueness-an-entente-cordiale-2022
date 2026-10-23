@@ -39,7 +39,8 @@ custom `Var n` instead of `Fin2`", "a generic binding layer: yes" and "floats as
 | 9, 10, 12–14 | not done (process and tooling items) |
 
 The text below is the original proposal; its "Now" paragraphs describe the code before
-the change.
+the change, and its file references may point to files that have since been moved or
+split (see `README.md` for the current layout).
 
 ---
 

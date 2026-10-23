@@ -1,12 +1,12 @@
 module
-public import RequestProject.FOFU.Sec6_3_Theorems.CounterProgress
+public import RequestProject.FOFU.Sec6_3_Theorems.Counterexamples.Progress
 
 /-!
 # Theorem 6.11 (Soundness with respect to the equational theory) is false
 
 Take `t₁ = t₂ = split (*())` (equal by reflexivity of `≡`), of type
 `&_(1/2) unit ⊗ &_(1/2) unit` in the empty context, with the empty heap.  The term is
-stuck (see `CounterProgress.lean`), so the only multi-step reduction from it is the
+stuck (see `Progress.lean`), so the only multi-step reduction from it is the
 trivial one, which does not end in a value.  Hence no multi-reductions to values exist,
 whatever the relation `heapEq` used for "`H'(v₁) ≡ H''(v₂)`", and for both variants of
 heap compatibility.  Since the term contains no redex at all, extending the semantics to
